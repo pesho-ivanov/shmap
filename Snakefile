@@ -132,7 +132,7 @@ rule saveFindThomsResult:
 
 rule simulateReads:
     output:
-        rds = "simulations/reads/t2thumanChrY_sr0.00010909090909090909_dr0.0009818181818181818_i0.0009090909090909091_sd7361077429744071834_lmn100_lmx1000000_lavg9000_ls7000_dp10.fasta"
+        rds = "simulations/reads/t2thumanChrY_sr0.0001090909090909091_dr0.0009818181818181818_i0.0009090909090909091_sd7361077429744071834_lmn100_lmx1000000_lavg9000_ls7000_dp10_rm20.fasta"
     shell:
         "mkdir -p simulations/reads & python3 scripts/simReads.py -dp 10 -lmn 100 -lmx 1000000 -lavg 9000 -ls 7000 -r simulations/genomes/t2thumanChrY.fasta -sr 0.00010909090909090909 -dr 0.0009818181818181818 -ir 0.0009090909090909091 -sd 7361077429744071834 -o {output.rds}"
 
