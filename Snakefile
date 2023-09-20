@@ -130,6 +130,12 @@ rule saveFindThomsResult:
 	shell:
 		"mv {input} {output}"
 
+rule simulateReads:
+    output:
+        rds = "simulations/reads/t2thumanChrY_sr0.00010909090909090909_dr0.0009818181818181818_i0.0009090909090909091_sd7361077429744071834_lmn100_lmx1000000_lavg9000_ls7000_dp10.fasta"
+    shell:
+        "mkdir -p simulations/reads & python3 scripts/simReads.py -dp 10 -lmn 100 -lmx 1000000 -lavg 9000 -ls 7000 -r simulations/genomes/t2thumanChrY.fasta -sr 0.00010909090909090909 -dr 0.0009818181818181818 -ir 0.0009090909090909091 -sd 7361077429744071834 -o {output.rds}"
+
 rule searchMinimapSketchReadHomologies:
 	input:
 		rds = "simulations/reads/{genome}_{desc}.fasta",
@@ -152,6 +158,12 @@ rule searchMinimapSketchReadHomologies:
 	shell:
 		"/usr/bin/time -v src/eskemap -p {input.rds} -s {input.txt} -k {params.k} -c {params.c} -u " + \
 		"{params.u} -d {params.d} -i {params.i} -w {params.w} -b {input.bl} -N > {output.homs} 2> {output.bench}"
+
+rule downloadT2ThumanChrY:
+	output:
+		ref = "simulations/genomes/t2thumanChrY.fasta"
+	shell:
+		"mkdir -p simulations/genomes/ && wget 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&id=NC_060948.1&rettype=fasta&retmode=text' -O {output.ref}"
 
 #Simulate read set
 rule simReadsOwnScript:
