@@ -46,11 +46,11 @@ const vector<Thomology> findThoms(const Sketch& skP, const mm_idx_t *tidx, const
 	j = 0;
 
 	//Testing
-	// cout << "L.size():" << L.size() << endl;
+	cerr << "L.size():" << L.size() << endl;
 
 	//Fill score matrix
 	for(fLit = L.begin(); fLit != L.end(); ++fLit){
-		//Add new column in score matrix...
+        //Add new column in score matrix...
 		scores.push_back(vector<float>());
 		//...and reserve enough space
 		scores.back().reserve(j + 1);

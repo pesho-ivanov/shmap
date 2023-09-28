@@ -20,24 +20,26 @@ READ_SEED = randrange(maxsize)
 
 rule all:
 	input:
-		"simulations/edlibMappings/%s_sr%.19f_dr%.19f_i%.19f_sd%d_lmn100_lmx1000000_lavg9000_ls7000_dp10_ri0-69400.er" \
-		%(config['ref'], SUB_ERR, DEL_ERR, INS_ERR, READ_SEED),
-		"simulations/homologies/homologies_%s_sr%.19f_dr%.19f_i%.19f_sd" %(config['ref'], SUB_ERR, DEL_ERR, INS_ERR) + \
-		"%d_lmn100_lmx1000000_lavg9000_ls7000_dp10_rm20_k15_w10_c1_u1_de%.8f_in%.13f.txt" %(READ_SEED, config['eskemapDecent'], \
-			config['eskemapIntercept']),
-		"benchmarks/benchEskemap_%s_sr%.19f_dr%.19f_i%.19f_sd%d_lmn100_"  %(config['ref'], SUB_ERR, DEL_ERR, INS_ERR, READ_SEED) + \
-		"lmx1000000_lavg9000_ls7000_dp10_rm20_k15_w10_c1_u1_de%.8f_in%.13f_rep0.txt" %(config['eskemapDecent'], config\
-			['eskemapIntercept']),
+		#"simulations/sweep/%s_sr%.19f_dr%.19f_i%.19f_sd%d_lmn100_lmx1000000_lavg9000_ls7000_dp10_rm20_k15.txt" \
+		#%(config['ref'], SUB_ERR, DEL_ERR, INS_ERR, READ_SEED),
+		#"simulations/edlibMappings/%s_sr%.19f_dr%.19f_i%.19f_sd%d_lmn100_lmx1000000_lavg9000_ls7000_dp10_ri0-69400.er" \
+		#%(config['ref'], SUB_ERR, DEL_ERR, INS_ERR, READ_SEED),
+		#"simulations/homologies/homologies_%s_sr%.19f_dr%.19f_i%.19f_sd" %(config['ref'], SUB_ERR, DEL_ERR, INS_ERR) + \
+		#"%d_lmn100_lmx1000000_lavg9000_ls7000_dp10_rm20_k15_w10_c1_u1_de%.8f_in%.13f.txt" %(READ_SEED, config['eskemapDecent'], \
+		#	config['eskemapIntercept'])#,
+		#"benchmarks/benchEskemap_%s_sr%.19f_dr%.19f_i%.19f_sd%d_lmn100_"  %(config['ref'], SUB_ERR, DEL_ERR, INS_ERR, READ_SEED) + \
+		#"lmx1000000_lavg9000_ls7000_dp10_rm20_k15_w10_c1_u1_de%.8f_in%.13f_rep0.txt" %(config['eskemapDecent'], config\
+		#	['eskemapIntercept']),
 		"simulations/minimap2Res/%s_sr%.19f_dr%.19f_i%.19f_sd%d_lmn100_lmx1000000_lavg9000_ls7000_dp10_rm20_k15.paf.gz" \
 		%(config['ref'], SUB_ERR, DEL_ERR, INS_ERR, READ_SEED),
-		"benchmarks/benchMinimap2ApprxMppng_%s_sr%.19f_dr%.19f_i%.19f_sd" %(config['ref'], SUB_ERR, DEL_ERR, INS_ERR) + \
-		"%d_lmn100_lmx1000000_lavg9000_ls7000_dp10_rm20_k15_rep0.txt" %READ_SEED,
-		"simulations/Winnowmap2Res/%s_sr%.19f_dr%.19f_i%.19f_sd%d_lmn100_lmx1000000_lavg9000_ls7000_dp10_rm20_k15.paf.gz" \
-		%(config['ref'], SUB_ERR, DEL_ERR, INS_ERR, READ_SEED),
-		"benchmarks/benchWinnowmap2ApprxMppng_%s_sr%.19f_dr%.19f_i%.19f_sd" %(config['ref'], SUB_ERR, DEL_ERR, INS_ERR) + \
-		"%d_lmn100_lmx1000000_lavg9000_ls7000_dp10_rm20_k15_rep0.txt" %READ_SEED,
-		expand("simulations/blastRes/{bname}_e0.01.tsv", bname=[f.split("mappedAreas/")[1].split(".fasta")[0] for f in \
-				glob("simulations/mappedAreas/sub_s_*-s_*.fasta")])
+		#"benchmarks/benchMinimap2ApprxMppng_%s_sr%.19f_dr%.19f_i%.19f_sd" %(config['ref'], SUB_ERR, DEL_ERR, INS_ERR) + \
+		#"%d_lmn100_lmx1000000_lavg9000_ls7000_dp10_rm20_k15_rep0.txt" %READ_SEED,
+		#"simulations/Winnowmap2Res/%s_sr%.19f_dr%.19f_i%.19f_sd%d_lmn100_lmx1000000_lavg9000_ls7000_dp10_rm20_k15.paf.gz" \
+		#%(config['ref'], SUB_ERR, DEL_ERR, INS_ERR, READ_SEED),
+		#"benchmarks/benchWinnowmap2ApprxMppng_%s_sr%.19f_dr%.19f_i%.19f_sd" %(config['ref'], SUB_ERR, DEL_ERR, INS_ERR) + \
+		#"%d_lmn100_lmx1000000_lavg9000_ls7000_dp10_rm20_k15_rep0.txt" %READ_SEED,
+		#expand("simulations/blastRes/{bname}_e0.01.tsv", bname=[f.split("mappedAreas/")[1].split(".fasta")[0] for f in \
+		#		glob("simulations/mappedAreas/sub_s_*-s_*.fasta")])
 
 rule blastPairwiseMultFasta:
 	input:
@@ -134,7 +136,7 @@ rule simulateReads:
     output:
         rds = "simulations/reads/t2thumanChrY_sr0.0001090909090909091_dr0.0009818181818181818_i0.0009090909090909091_sd7361077429744071834_lmn100_lmx1000000_lavg9000_ls7000_dp10_rm20.fasta"
     shell:
-        "mkdir -p simulations/reads & python3 scripts/simReads.py -dp 10 -lmn 100 -lmx 1000000 -lavg 9000 -ls 7000 -r simulations/genomes/t2thumanChrY.fasta -sr 0.00010909090909090909 -dr 0.0009818181818181818 -ir 0.0009090909090909091 -sd 7361077429744071834 -o {output.rds}"
+        "mkdir -p simulations/reads & python3 scripts/simReads.py -dp 1 -lmn 100 -lmx 10000000 -lavg 9000 -ls 7000 -r simulations/genomes/t2thumanChrY.fasta -sr 0.00010909090909090909 -dr 0.0009818181818181818 -ir 0.0009090909090909091 -sd 7361077429744071834 -o {output.rds}"
 
 rule searchMinimapSketchReadHomologies:
 	input:
@@ -221,3 +223,27 @@ rule mergeEdlibRes:
 				ofile.write(l)
 
 		ofile.close()
+
+rule saveSweepResult:
+	input:
+		"simulations/sweep/{genome}_sr{desc}_k{k}_rep0.txt"
+	output:
+		"simulations/sweep/{genome}_sr{desc}_k{k}.txt"
+	wildcard_constraints:
+		k = "[0-9]+"
+	shell:
+		"mv {input} {output}"
+
+rule runApprxMppngSweeponRealGenomePacBioFASTA:
+	input:
+		ref = "simulations/genomes/{genome}.fasta",
+		qry = "simulations/reads/{genome}_sr{desc}.fasta"
+	params:
+		k = "{k}",
+		r = "{r}"
+	output:
+		res = temp("simulations/sweep/{genome}_sr{desc}_k{k}_rep{r}.txt"),
+	wildcard_constraints:
+		r = "[0-9]+"
+	shell:
+		"/usr/bin/time -v src/sweep -p {input.qry} -s {input.ref} > {output}"
