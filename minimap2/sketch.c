@@ -275,7 +275,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
 					// printf("%lu\n", ((buf[j].y << 32) >> 33) + 1 - k);
 
 					int zp = (int) ((buf[j].y << 63) >> 63);
-					buf[j].y = (buf[j].y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
+					//buf[j].y = (buf[j].y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;  // 278, 300, 323, 344, 369, 390 and 414
 					kv_push(mm128_t, km, *p, buf[j]);
 					++hcnt;
 				}
@@ -297,7 +297,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
 					// printf("%lu\n", ((buf[j].y << 32) >> 33) + 1 - k);
 
 					int zp = (int) ((buf[j].y << 63) >> 63);
-					buf[j].y = (buf[j].y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
+					//buf[j].y = (buf[j].y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
 					kv_push(mm128_t, km, *p, buf[j]);
 					++hcnt;
 				}
@@ -320,7 +320,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
 				// printf("%lu\n", ((min.y << 32) >> 33) + 1 - k);
 
 				int zp = (int) ((min.y << 63) >> 63);
-				min.y = (min.y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
+				//min.y = (min.y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
 				kv_push(mm128_t, km, *p, min);
 				++hcnt;
 			}
@@ -341,7 +341,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
 				// printf("%lu\n", ((min.y << 32) >> 33) + 1 - k);
 
 				int zp = (int) ((min.y << 63) >> 63);
-				min.y = (min.y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
+				//min.y = (min.y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
 				kv_push(mm128_t, km, *p, min);
 				++hcnt;
 			}
@@ -366,7 +366,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
 						// printf("%lu\n", ((buf[j].y << 32) >> 33) + 1 - k);
 
 						int zp = (int) ((buf[j].y << 63) >> 63);
-						buf[j].y = (buf[j].y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
+						//buf[j].y = (buf[j].y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
 						kv_push(mm128_t, km, *p, buf[j]);
 						++hcnt;
 					}
@@ -387,7 +387,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
 						// printf("%lu\n", ((buf[j].y << 32) >> 33) + 1 - k);
 
 						int zp = (int) ((buf[j].y << 63) >> 63);
-						buf[j].y = (buf[j].y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
+						//buf[j].y = (buf[j].y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
 						kv_push(mm128_t, km, *p, buf[j]);
 						++hcnt;
 					}
@@ -411,7 +411,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
 		// printf("%lu\n", ((min.y << 32) >> 33) + 1 - k);
 
 		int zp = (int) ((min.y << 63) >> 63);
-		min.y = (min.y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
+		//min.y = (min.y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
 		kv_push(mm128_t, km, *p, min);
 		++hcnt;
 	}
