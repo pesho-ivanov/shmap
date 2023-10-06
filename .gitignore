@@ -5,3 +5,4 @@ FindSimSeqs/FindSimSeqs
 scripts/__pycache__
 simulations
 src/eskemap
+src/sweep
