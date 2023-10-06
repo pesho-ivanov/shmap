@@ -32,38 +32,102 @@ unordered_map<uint64_t, uint32_t> zero_occurences(const Sketch& skP) {
     return occs;
 }
 
-const vector<Thomology> sweep(const Sketch& skP, const mm_idx_t *tidx, const int len) {
+template<typename TT>
+const TT::iterator prev(const typename TT::iterator &it) {
+    auto pr = it;
+    return --pr;
+}
+
+typedef vector<pair<uint64_t, uint32_t>> L_t;
+
+void print_L(const L_t &L) {
+    int i=0;
+    for (const auto &s: L) {
+        cerr << "L[" << i << "]=(" << s.first << ", " << s.second << ")" << endl;
+        ++i;
+    }
+}
+
+void print_skP(const Sketch& skP) {
+    int i=0;
+    for (const auto &p: skP) {
+        cerr << "skP[" << i << "]=" << p << endl;
+        ++i;
+    }
+}
+
+int32_t scoreX1000(const Sketch& skP, int xmin, int S_sz) {
+    assert (S_sz >= 0);
+    assert(skP.size() + S_sz - xmin > 0);
+    auto scj = 1000 * xmin / (skP.size() + S_sz - xmin);
+    //cout << scj << endl;
+    assert (0 <= scj && scj <= 1000);
+    return scj;
+}
+
+const int window2score(const L_t &L, const Sketch& skP, int from_nucl, int to_nucl, int plen_nucl) {
+    int xmin = 0;
+    auto l = L.end(), r = L.begin();
+	for(auto s = L.begin(); s != L.end(); ++s) {
+        if (from_nucl <= s->second && s->second + plen_nucl < to_nucl) {
+            cout << "[" << from_nucl << ", " << to_nucl << "] includes sketch (" << s->first << ", " << s->second << ")" << endl; 
+            if (s->second < l->second) l=s;
+            if (s->second >= r->second) r=s;
+            ++xmin;
+        }
+    }
+
+    if (l == L.end() && r == L.begin())
+        l = r;
+
+    for (auto s=l; s<r; ++s)
+        assert(from_nucl <= s->second && to_nucl <= s->second + plen_nucl);
+
+    auto scj = scoreX1000(skP, xmin, r-l);
+    //auto scj = 0;
+    cout << "[" << from_nucl << ", " << to_nucl << "] includes " << xmin << " sketches,"  << ", r-l=" << (r-l) <<  ", scj=" << scj << endl;
+    return xmin;
+}
+
+const vector<Thomology> sweep(const Sketch& skP, const mm_idx_t *tidx, const int plen_nucl, const int k) {
     unordered_map<uint64_t, uint32_t> occp;  // occp[kmer_hash] = #occurences in P
     unordered_map<uint64_t, uint32_t> occs;  // occp[kmer_hash] = #occurences in s = T[l,r]
-    vector<pair<uint64_t, uint32_t>> L;      // for all kmers from P in T: <kmer_hash, pos_in_T> * |P|
+    vector<pair<uint64_t, uint32_t>> L;      // for all kmers from P in T: <kmer_hash, pos_in_T> * |P| sorted by pos_in_T
 	vector<Thomology> res;                   // List of tripples <i, j, score> of matches
 
     occp = occurences(skP);
-    occs = zero_occurences(skP);
     L    = genL(occp, tidx);
+    occs = zero_occurences(skP);
+
+    //print_skP(skP);
+    //print_L(L);
 
     int xmin = 0;
     Thomology best(-1, -1, 0);            // <i, j, score>
  
-    // Move the left end to the right.
-	for(auto l = L.begin(), r = L.begin(); l != L.end(); ++l) {
-        // Move the right end to the right end of the [l,r) window.
-        for(; r != L.end() && r->second <= l->second + len; ++r) 
+    //cerr << "|P| = " << plen_nucl << ", |p| = " << skP.size() << endl;
+    //cerr << "|L| = " << L.size() << endl;
+    //cerr << "k = " << k <<endl;
+
+    // Increase the left point end of the window [l,r) one by one.
+    int i=0, j=0;
+	for(auto l = L.begin(), r = L.begin(); l != L.end(); ++l, ++i) {
+        // Increase the right end of the window [l,r) until it gets out.
+        for(; r != L.end() && l->second + plen_nucl >= r->second + k; ++r, ++j) {
             // If taking this kmer from T increases the intersection with P 
             if (++occs[r->first] <= occp[r->first])
                 ++xmin;
+            assert (l->second <= r->second);
+        }
+
+        auto scj = scoreX1000(skP, xmin, r-l);
+        //cerr << "i=" << i << ", j=" << j << ", l=" << l->second << ", r=" << r->second << ", r-l=" << (prev(r)->second - l->second) << ", xmin=" << xmin << ", |s|=" << (r-l) <<  ", scj=" << scj << endl;
 
         // If better than best
-        assert(skP.size() + (r-l) - xmin > 0);
-        auto scj = 1000 * xmin / (skP.size() + (r-l) - xmin);
-        assert (0 <= scj && scj <= 1000);
-        cout << "l=" << l->second << ", r=" << r->second << ", scj=" << scj << endl;
-
         if (scj > get<2>(best)) {
             //cout << "s=r-l=" << r-l << endl;
             //cout << "denom: " << skP.size() + (r-l) - xmin << endl;
-            auto r_copy = r;
-            best = Thomology(l->second, (--r_copy)->second, scj);
+            best = Thomology(l->second, prev(r)->second, scj);
         }
 
         // Prepare for the next step 
@@ -75,6 +139,9 @@ const vector<Thomology> sweep(const Sketch& skP, const mm_idx_t *tidx, const int
 
     for (auto it: occs)
         assert(it.second == 0);
+
+    //auto scj = window2score(L, skP, 4681377, 4683857, plen_nucl);
+    //cout << "l=" << 4681377 << ", r=" << 4683857 << ", xmin=" << xmin << ", r-l=" << 4683857-4681377 <<  ", scj=" << scj << endl;
 
     res.push_back(best);
     return res;
@@ -186,22 +253,28 @@ int main(int argc, char **argv){
 	//Open stream to read in patterns
 	fStr.open(pFile);
 
+    string text;
+    //readFASTA(tFile, text);
+	//Sketch tsk = buildMiniSketch(text, kmerLen, tidx->w, bLstmers);
+
+    //cerr << "|T| = " << text.size() << ", |t| = " << tsk.size() << endl;
+
 	//Load pattern sequences in batches
 	// while(lPttnSks(fStr, kmerLen, hFrac, bLstmers, pSks) || !pSks.empty()){//TODO: Test for this function need to be adaptated!
 	while(lMiniPttnSks(fStr, kmerLen, tidx->w, bLstmers, pSks) || !pSks.empty()){//TODO: This function still needs to be tested!
 		//Iterate over pattern sketches
 		for(p = pSks.begin(); p != pSks.end(); ++p){
 			auto seqID = get<0>(*p);
-            auto len = get<1>(*p);
+            auto plen_nucl = get<1>(*p);
             auto sks = get<2>(*p);
-			//Only output pattern sequence name if there is more than one sequence
-			if(pSks.size() > 1) cout << seqID << endl;
 
 			//Calculate an adapted threshold if we have the necessary informations
-			if(dec != 0 && inter != 0) tThres = dec * len + inter;
+			if(dec != 0 && inter != 0) tThres = dec * plen_nucl + inter;
 
 			//Find t-homologies and output them
-			outputHoms(sweep(sks, tidx, len), normalize, sks.size());//TODO: Tests for this function need to be adaptated!
+            auto res = sweep(sks, tidx, plen_nucl, iopt.k);
+			outputHoms(res, normalize, sks.size(), seqID, text);//TODO: Tests for this function need to be adaptated!
+			//outputHomsSeqs(res, normalize, sks.size());//TODO: Tests for this function need to be adaptated!
 		}
 
 		//Remove processed pattern sketches
