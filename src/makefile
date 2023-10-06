@@ -1,7 +1,7 @@
 CC = g++
-CFLAGS = -std=c++2a -O3 -lz -lm -lpthread
+CFLAGS = -std=c++2a -O3 -lz -lm -lpthread -Wno-unused-result
 
-all:
+eskemap:
 	$(CC) Eskemap.cpp ../minimap2/libminimap2.a $(CFLAGS) -o eskemap
 
 astar:
