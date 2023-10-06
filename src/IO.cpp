@@ -309,6 +309,7 @@ const bool lMiniPttnSks(ifstream& fStr, const uint32_t& k, const uint32_t& w, co
 		if(c == '>' && headerRead && lnBrkDiscvd){
 			//Add sequence's sketch, length and id to result vector
 			pSks.push_back(make_tuple(seqID, seq.length(), buildMiniSketch(seq, k, w, blmers)));//TODO: This function still needs to be tested!
+            //cout << "pattern: " << seq << endl;
 			//Clear sequence id
 			seqID.clear();
 			//Clear sequence
@@ -346,7 +347,10 @@ const bool lMiniPttnSks(ifstream& fStr, const uint32_t& k, const uint32_t& w, co
 	}
 
 	//Add last entry's sketch and sequence id to result vector if it is not empty
-	if(!seq.empty()) pSks.push_back(make_tuple(seqID, seq.length(), buildMiniSketch(seq, k, w, blmers)));
+	if(!seq.empty()) {
+        pSks.push_back(make_tuple(seqID, seq.length(), buildMiniSketch(seq, k, w, blmers)));
+        //cout << "pattern: " << seq << endl;
+    }
 
 	return false;
 }

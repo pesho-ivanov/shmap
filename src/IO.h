@@ -52,18 +52,28 @@ inline void dsHlp(){
 }
 
 //This function outputs all given t-homologies
-inline void outputHoms(const vector<Thomology>& homs, const bool& norm, const uint32_t& pLen){
+inline void outputHoms(const vector<Thomology>& homs, const bool& norm, const uint32_t& pLen, const string &seqID, const string &text){
 	//Iterate over t-homologies
 	for(vector<Thomology>::const_iterator h = homs.begin(); h != homs.end(); ++h){
 		//Normalize score before reporting if requested
-		if(norm){
-			cout << "i: " << get<0>(*h) << " j: " << get<1>(*h) << " score: " << (double) get<2>(*h) / max(pLen, get<1>(*h) - 
-				get<0>(*h) + 1) << endl;
-		} else{
-			cout << "i: " << get<0>(*h) << " j: " << get<1>(*h) << " score: " << get<2>(*h) << endl;
-		}
+        auto i = get<0>(*h);
+        auto j = get<1>(*h);
+        double score = get<2>(*h);
+        if (norm) score /= max(pLen, j-i+1);
+        cout << seqID << "\t" << i << "\t" << j << "\t" << score << endl;
+        if (!text.empty())
+            cerr << "   text: " << text.substr(i, j-i+1) << endl;
 	}
 }
+
+//inline void outputHomsWithNucl(const vector<Thomology>& homs, const uint32_t& pLen){
+//	//Iterate over t-homologies
+//	for(vector<Thomology>::const_iterator h = homs.begin(); h != homs.end(); ++h){
+//		//Normalize score before reporting if requested
+//        cout << "i: " << get<0>(*h) << " j: " << get<1>(*h) << " score: " << (double) get<2>(*h) / max(pLen, get<1>(*h) - 
+//            get<0>(*h) + 1) << endl;
+//	}
+//}
 
 //This function parses the program parameters. Returns false if given arguments are not valid
 const bool prsArgs(int& nArgs, char** argList, string& seqa, string& seqb, Measure& msr);
