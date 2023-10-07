@@ -89,7 +89,7 @@ const int window2score(const L_t &L, const Sketch& skP, int from_nucl, int to_nu
     return xmin;
 }
 
-const vector<Thomology> sweep(const Sketch& skP, const mm_idx_t *tidx, const int plen_nucl, const int k) {
+const vector<Thomology> sweep(const Sketch& skP, const mm_idx_t *tidx, const int Plen_nucl, const int k) {
     unordered_map<uint64_t, uint32_t> occp;  // occp[kmer_hash] = #occurences in P
     unordered_map<uint64_t, uint32_t> occs;  // occp[kmer_hash] = #occurences in s = T[l,r]
     vector<pair<uint64_t, uint32_t>> L;      // for all kmers from P in T: <kmer_hash, pos_in_T> * |P| sorted by pos_in_T
@@ -105,15 +105,15 @@ const vector<Thomology> sweep(const Sketch& skP, const mm_idx_t *tidx, const int
     int xmin = 0;
     Thomology best(-1, -1, 0);            // <i, j, score>
  
-    //cerr << "|P| = " << plen_nucl << ", |p| = " << skP.size() << endl;
+    //cerr << "|P| = " << Plen_nucl << ", |p| = " << skP.size() << endl;
     //cerr << "|L| = " << L.size() << endl;
     //cerr << "k = " << k <<endl;
 
     // Increase the left point end of the window [l,r) one by one.
-    int i=0, j=0;
+    int i = 0, j = 0;
 	for(auto l = L.begin(), r = L.begin(); l != L.end(); ++l, ++i) {
         // Increase the right end of the window [l,r) until it gets out.
-        for(; r != L.end() && l->second + plen_nucl >= r->second + k; ++r, ++j) {
+        for(; r != L.end() && l->second + Plen_nucl >= r->second + k; ++r, ++j) {
             // If taking this kmer from T increases the intersection with P 
             if (++occs[r->first] <= occp[r->first])
                 ++xmin;

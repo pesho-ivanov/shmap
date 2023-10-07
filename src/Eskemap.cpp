@@ -166,13 +166,16 @@ int main(int argc, char **argv){
 	// cout << "main: Length of filtered text sketch: " << tsk.size() << endl;
 	// return 0;
 
+    string text;
+    //readFASTA(tFile, text);
+
 	//Load pattern sequences in batches
 	// while(lPttnSks(fStr, kmerLen, hFrac, bLstmers, pSks) || !pSks.empty()){//TODO: Test for this function need to be adaptated!
 	while(lMiniPttnSks(fStr, kmerLen, tidx->w, bLstmers, pSks) || !pSks.empty()){//TODO: This function still needs to be tested!
 		//Iterate over pattern sketches
 		for(p = pSks.begin(); p != pSks.end(); ++p){
 			//Only output pattern sequence name if there is more than one sequence
-			if(pSks.size() > 1) cout << get<0>(*p) << endl;
+			//if(pSks.size() > 1) cout << get<0>(*p) << endl;
 
 			//Testing
 			// cout << "Pattern sketch:" << endl;
@@ -188,7 +191,7 @@ int main(int argc, char **argv){
 			// cout << "main: noNesting flag is " << (noNesting ? "" : "not ") << "set" << endl; 
 
 			//Find t-homologies and output them
-			outputHoms(findThoms(get<2>(*p), tidx, comWght, uniWght, tThres, noNesting), normalize, get<2>(*p).size());//TODO: Tests for this function need to be adaptated!
+			outputHoms(findThoms(get<2>(*p), tidx, comWght, uniWght, tThres, noNesting), normalize, get<2>(*p).size(), get<0>(*p), text);//TODO: Tests for this function need to be adaptated!
 		}
 
 		//Remove processed pattern sketches
