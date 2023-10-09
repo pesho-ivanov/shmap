@@ -56,7 +56,7 @@ void print_skP(const Sketch& skP) {
     }
 }
 
-int32_t scoreX1000(const Sketch& skP, int xmin, int S_sz) {
+int32_t scoreX1000(const Sketch& skP, int S_sz, int xmin) {
     assert (S_sz >= 0);
     assert(skP.size() + S_sz - xmin > 0);
     auto scj = 1000 * xmin / (skP.size() + S_sz - xmin);
@@ -92,7 +92,7 @@ const int window2score(const L_t &L, const Sketch& skP, int from_nucl, int to_nu
 const vector<Thomology> sweep(const Sketch& skP, const mm_idx_t *tidx, const int Plen_nucl, const int k) {
     unordered_map<uint64_t, uint32_t> occp;  // occp[kmer_hash] = #occurences in P
     unordered_map<uint64_t, uint32_t> occs;  // occp[kmer_hash] = #occurences in s = T[l,r]
-    vector<pair<uint64_t, uint32_t>> L;      // for all kmers from P in T: <kmer_hash, pos_in_T> * |P| sorted by pos_in_T
+    vector<pair<uint64_t, uint32_t>> L;      // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
 	vector<Thomology> res;                   // List of tripples <i, j, score> of matches
 
     occp = occurences(skP);
@@ -113,24 +113,25 @@ const vector<Thomology> sweep(const Sketch& skP, const mm_idx_t *tidx, const int
     int i = 0, j = 0;
 	for(auto l = L.begin(), r = L.begin(); l != L.end(); ++l, ++i) {
         // Increase the right end of the window [l,r) until it gets out.
-        for(; r != L.end() && l->second + Plen_nucl >= r->second + k; ++r, ++j) {
+        for(; r != L.end() && r->second <= l->second - k + Plen_nucl; ++r, ++j) {
             // If taking this kmer from T increases the intersection with P 
             if (++occs[r->first] <= occp[r->first])
                 ++xmin;
             assert (l->second <= r->second);
         }
 
-        auto scj = scoreX1000(skP, xmin, r-l);
+		int Ssz = r-l;  // TODO: fix! S is from T, not L
+        auto scj = scoreX1000(skP, Ssz, xmin);
         //cerr << "i=" << i << ", j=" << j << ", l=" << l->second << ", r=" << r->second << ", r-l=" << (prev(r)->second - l->second) << ", xmin=" << xmin << ", |s|=" << (r-l) <<  ", scj=" << scj << endl;
 
         // If better than best
         if (scj > get<2>(best)) {
             //cout << "s=r-l=" << r-l << endl;
             //cout << "denom: " << skP.size() + (r-l) - xmin << endl;
-            best = Thomology(l->second, prev(r)->second, scj);
+            best = Thomology(l->second, prev(r)->second + k, scj);
         }
 
-        // Prepare for the next step 
+        // Prepare for the next step by moving `l` to the right
         if (--occs[l->first] < occp[l->first])
             --xmin;
 
