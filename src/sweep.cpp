@@ -1,36 +1,22 @@
-#include "Sketch.cpp"
-#include "IO.cpp"
-#include "Thomology.cpp"
-#include "Index.cpp"
+#include <algorithm>
+
+#include "Sketch.h"
+#include "IO.h"
+#include "Index.h"
 
 //The FracMinHash ratio
 double hFrac = HASH_RATIO;
 unordered_map<uint64_t, char> bLstmers;
 
-unordered_map<uint64_t, uint32_t> occurences(const Sketch& skP) {
-    unordered_map<uint64_t, uint32_t> occp(skP.size());
-
-    //Fill occp
-    for(Sketch::const_iterator fSkIt = skP.begin(); fSkIt != skP.end(); ++fSkIt){
-        if(occp.contains(*fSkIt)){
-            ++occp[*fSkIt];
-        } else{
-            occp[*fSkIt] = 1;
-        }
-    }
-    
-    return occp;
-}
-
-unordered_map<uint64_t, uint32_t> zero_occurences(const Sketch& skP) {
-    unordered_map<uint64_t, uint32_t> occs(skP.size());
-
-    //Fill occp
-    for(Sketch::const_iterator fSkIt = skP.begin(); fSkIt != skP.end(); ++fSkIt)
-        occs[*fSkIt] = 0;
-    
-    return occs;
-}
+//unordered_map<uint65_t, uint32_t> zero_occurences(const Sketch& skP) {
+//    unordered_map<uint64_t, uint32_t> occs(skP.size());
+//
+//    //Fill occp
+//    for(Sketch::const_iterator fSkIt = skP.begin(); fSkIt != skP.end(); ++fSkIt)
+//        occs[*fSkIt] = 0;
+//    
+//    return occs;
+//}
 
 template<typename TT>
 const TT::iterator prev(const typename TT::iterator &it) {
@@ -38,7 +24,7 @@ const TT::iterator prev(const typename TT::iterator &it) {
     return --pr;
 }
 
-typedef vector<pair<uint64_t, uint32_t>> L_t;
+typedef vector<pair<uint32_t, uint32_t>> L_t;
 
 void print_L(const L_t &L) {
     int i=0;
@@ -56,54 +42,94 @@ void print_skP(const Sketch& skP) {
     }
 }
 
-int32_t scoreX1000(const Sketch& skP, int S_sz, int xmin) {
-    assert (S_sz >= 0);
-    assert(skP.size() + S_sz - xmin > 0);
-    auto scj = 1000 * xmin / (skP.size() + S_sz - xmin);
+//const int window2score(const L_t &L, const Sketch& skP, int from_nucl, int to_nucl, int plen_nucl) {
+//    int xmin = 0;
+//    auto l = L.end(), r = L.begin();
+//	for(auto s = L.begin(); s != L.end(); ++s) {
+//        if (from_nucl <= s->second && s->second + plen_nucl < to_nucl) {
+//            cout << "[" << from_nucl << ", " << to_nucl << "] includes sketch (" << s->first << ", " << s->second << ")" << endl; 
+//            if (s->second < l->second) l=s;
+//            if (s->second >= r->second) r=s;
+//            ++xmin;
+//        }
+//    }
+//
+//    if (l == L.end() && r == L.begin())
+//        l = r;
+//
+//    for (auto s=l; s<r; ++s)
+//        assert(from_nucl <= s->second && to_nucl <= s->second + plen_nucl);
+//
+//    auto scj = scoreX1000(skP, xmin, r-l);
+//    //auto scj = 0;
+//    cout << "[" << from_nucl << ", " << to_nucl << "] includes " << xmin << " sketches,"  << ", r-l=" << (r-l) <<  ", scj=" << scj << endl;
+//    return xmin;
+//}
+
+void init(
+		// input
+		const Sketch& p,
+		const mm_idx_t *tidx,
+		// output
+		unordered_map<uint32_t, int32_t> *hist,
+		L_t *L) {
+
+	unordered_map<uint64_t, uint32_t> hash2ord;
+	uint32_t kmers = 0;
+	L->reserve(P_MULTIPLICITY * p.size());
+
+    for(auto p_it = p.begin(); p_it != p.end(); ++p_it) {
+		uint32_t kmer_ord;
+		auto kmer_hash = *p_it;
+		auto ord_it = hash2ord.find(kmer_hash);
+		if (ord_it != hash2ord.end()) {
+			kmer_ord = ord_it->second;
+			++(hist->at(kmer_ord));
+		} else {
+			kmer_ord = kmers;
+			assert(hist->find(kmer_ord) == hist->end());
+			(*hist)[kmer_ord] = 1;
+			hash2ord[kmer_hash] = kmers;
+			++kmers;
+
+			int nHits;
+			auto *idx_p = mm_idx_get(tidx, kmer_hash, &nHits);
+			for (int i = 0; i < nHits; ++i, ++idx_p)// Iterate over all occurrences
+				L->push_back(make_pair(kmer_ord, ((uint32_t)(*idx_p))>>1));  // Push (hash value, k-mer position in sketch) pair
+		}
+	}
+
+	//Sort L by ascending positions in reference
+	sort(L->begin(), L->end(), [](const pair<uint32_t, uint32_t>& hpa, const pair<uint32_t, uint32_t>& hpb) {
+		return hpa.second < hpb.second;
+	});
+
+	//for (auto it: *hash2ord)
+	//	cout << "hash2ord: " << it.first << " " << it.second << endl;
+	//for (auto it: *L)
+	//	cout << "L: " << it.first << " " << it.second << endl;
+	//for (auto it: *hist)
+	//	cout << "hist: " << it.first << " " << it.second << endl;
+}
+
+int32_t scoreX1000(const Sketch& p, int s_sz, int xmin) {
+    assert (s_sz >= 0);
+    assert(p.size() + s_sz - xmin > 0);
+    auto scj = 1000 * xmin / (p.size() + s_sz - xmin);
     //cout << scj << endl;
     assert (0 <= scj && scj <= 1000);
     return scj;
 }
 
-const int window2score(const L_t &L, const Sketch& skP, int from_nucl, int to_nucl, int plen_nucl) {
-    int xmin = 0;
-    auto l = L.end(), r = L.begin();
-	for(auto s = L.begin(); s != L.end(); ++s) {
-        if (from_nucl <= s->second && s->second + plen_nucl < to_nucl) {
-            cout << "[" << from_nucl << ", " << to_nucl << "] includes sketch (" << s->first << ", " << s->second << ")" << endl; 
-            if (s->second < l->second) l=s;
-            if (s->second >= r->second) r=s;
-            ++xmin;
-        }
-    }
+const vector<Thomology> sweep(const Sketch& p, const mm_idx_t *tidx, const int Plen_nucl, const int k) {
+    unordered_map<uint32_t, int32_t> hist;  // rem[kmer_hash] = #occurences in `p` - #occurences in `s`
+    vector<pair<uint32_t, uint32_t>> s;    // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
+	vector<Thomology> res;                 // List of tripples <i, j, score> of matches
 
-    if (l == L.end() && r == L.begin())
-        l = r;
-
-    for (auto s=l; s<r; ++s)
-        assert(from_nucl <= s->second && to_nucl <= s->second + plen_nucl);
-
-    auto scj = scoreX1000(skP, xmin, r-l);
-    //auto scj = 0;
-    cout << "[" << from_nucl << ", " << to_nucl << "] includes " << xmin << " sketches,"  << ", r-l=" << (r-l) <<  ", scj=" << scj << endl;
-    return xmin;
-}
-
-const vector<Thomology> sweep(const Sketch& skP, const mm_idx_t *tidx, const int Plen_nucl, const int k) {
-    unordered_map<uint64_t, uint32_t> occp;  // occp[kmer_hash] = #occurences in P
-    unordered_map<uint64_t, uint32_t> occs;  // occp[kmer_hash] = #occurences in s = T[l,r]
-    vector<pair<uint64_t, uint32_t>> L;      // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
-	vector<Thomology> res;                   // List of tripples <i, j, score> of matches
-
-    occp = occurences(skP);
-    L    = genL(occp, tidx);
-    occs = zero_occurences(skP);
-
-    //print_skP(skP);
-    //print_L(L);
+    init(p, tidx, &hist, &s);
 
     int xmin = 0;
-    Thomology best(-1, -1, 0);            // <i, j, score>
+    Thomology best(0, 0, 0);            // <i, j, score>
  
     //cerr << "|P| = " << Plen_nucl << ", |p| = " << skP.size() << endl;
     //cerr << "|L| = " << L.size() << endl;
@@ -111,35 +137,33 @@ const vector<Thomology> sweep(const Sketch& skP, const mm_idx_t *tidx, const int
 
     // Increase the left point end of the window [l,r) one by one.
     int i = 0, j = 0;
-	for(auto l = L.begin(), r = L.begin(); l != L.end(); ++l, ++i) {
+	for(auto l = s.begin(), r = s.begin(); l != s.end(); ++l, ++i) {
         // Increase the right end of the window [l,r) until it gets out.
-        for(; r != L.end() && r->second <= l->second - k + Plen_nucl; ++r, ++j) {
-            // If taking this kmer from T increases the intersection with P 
-            if (++occs[r->first] <= occp[r->first])
-                ++xmin;
-            assert (l->second <= r->second);
+        for(; r != s.end() && r->second + k <= l->second + Plen_nucl; ++r, ++j) {
+			// If taking this kmer from T increases the intersection with P 
+			if (--hist.at(r->first) >= 0)
+				++xmin;
+			assert (l->second <= r->second);
         }
 
-		int Ssz = r-l;  // TODO: fix! S is from T, not L
-        auto scj = scoreX1000(skP, Ssz, xmin);
-        //cerr << "i=" << i << ", j=" << j << ", l=" << l->second << ", r=" << r->second << ", r-l=" << (prev(r)->second - l->second) << ", xmin=" << xmin << ", |s|=" << (r-l) <<  ", scj=" << scj << endl;
+		int s_sz = r-l;  // TODO: fix! S is from T, not L
+        auto scj = scoreX1000(p, s_sz, xmin);
+        //cout << "i=" << i << ", j=" << j << ", l=" << l->second << ", r=" << r->second << ", |s|=" << s_sz << ", xmin=" << xmin << ", |s|=" << (r-l) <<  ", scj=" << scj << endl;
 
         // If better than best
         if (scj > get<2>(best)) {
             //cout << "s=r-l=" << r-l << endl;
             //cout << "denom: " << skP.size() + (r-l) - xmin << endl;
-            best = Thomology(l->second, prev(r)->second + k, scj);
+            best = Thomology(l->second, prev(r)->second, scj);
         }
 
         // Prepare for the next step by moving `l` to the right
-        if (--occs[l->first] < occp[l->first])
-            --xmin;
+		if (++hist.at(l->first) > 0)
+			--xmin;
 
         assert(xmin >= 0);
     }
-
-    for (auto it: occs)
-        assert(it.second == 0);
+	assert (xmin == 0);
 
     //auto scj = window2score(L, skP, 4681377, 4683857, plen_nucl);
     //cout << "l=" << 4681377 << ", r=" << 4683857 << ", xmin=" << xmin << ", r-l=" << 4683857-4681377 <<  ", scj=" << scj << endl;
@@ -217,6 +241,8 @@ int main(int argc, char **argv){
 	}
 
 	bLstmers = readBlstKmers(bLstFl);
+
+	// TODO: ignore blacklisted kmers in the index
 
 	//Construct index of reference
 	if((tidx = mm_idx_reader_read(r, 1)) == 0){//TODO: Make use of multithreading here!
