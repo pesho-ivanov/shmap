@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <iostream>
+#include <iomanip>
 
 #include "Sketch.h"
 #include "IO.h"
@@ -18,31 +20,44 @@ unordered_map<uint64_t, char> bLstmers;
 //    return occs;
 //}
 
+struct Match {
+	uint32_t kmer_ord;
+	uint32_t T_pos;
+	uint32_t t_pos;
+
+	Match() {}
+	Match(uint32_t _kmer_ord, uint32_t _T_pos, uint32_t _t_pos)
+		: kmer_ord(_kmer_ord), T_pos(_T_pos), t_pos(_t_pos) {}
+
+	bool operator<(const Match &other) {
+		return T_pos < other.T_pos;
+	}
+};
+
 template<typename TT>
 const TT::iterator prev(const typename TT::iterator &it) {
     auto pr = it;
     return --pr;
 }
 
-typedef vector<pair<uint32_t, uint32_t>> L_t;
 
-void print_L(const L_t &L) {
-    int i=0;
-    for (const auto &s: L) {
-        cerr << "L[" << i << "]=(" << s.first << ", " << s.second << ")" << endl;
-        ++i;
-    }
-}
-
-void print_skP(const Sketch& skP) {
-    int i=0;
-    for (const auto &p: skP) {
-        cerr << "skP[" << i << "]=" << p << endl;
-        ++i;
-    }
-}
-
-//const int window2score(const L_t &L, const Sketch& skP, int from_nucl, int to_nucl, int plen_nucl) {
+//void print_L(const vector<Match> &L) {
+//    int i=0;
+//    for (const auto &s: L) {
+//        cerr << "L[" << i << "]=(" << s.kmer_ord << ", " << s.T_pos << ", " << s.t_pos << ")" << endl;
+//        ++i;
+//    }
+//}
+//
+//void print_skP(const Sketch& skP) {
+//    int i=0;
+//    for (const auto &p: skP) {
+//        cerr << "skP[" << i << "]=" << p << endl;
+//        ++i;
+//    }
+//}
+//
+//const int window2score(const vector<Match> &L, const Sketch& skP, int from_nucl, int to_nucl, int plen_nucl) {
 //    int xmin = 0;
 //    auto l = L.end(), r = L.begin();
 //	for(auto s = L.begin(); s != L.end(); ++s) {
@@ -66,13 +81,21 @@ void print_skP(const Sketch& skP) {
 //    return xmin;
 //}
 
+void unpack(uint64_t idx, uint32_t *T_pos, uint32_t *t_pos) {
+	*T_pos = (uint32_t)(idx >> 32);
+	*t_pos = (uint32_t)(((idx << 32) >> 32) >> 1);
+	//uint32_t T_pos = (uint32_t)((*idx_p) >> 32); 					// Position in reference
+	//uint32_t t_pos = (uint32_t)((( (*idx_p) << 32) >> 32) >> 1); 	// Position in sketch
+	//uint32_t t_pos = ( (*idx_p) ^ ((uint64_t)T_pos << 32) ) >> 1; 	// Position in sketch
+}
+
 void init(
 		// input
 		const Sketch& p,
 		const mm_idx_t *tidx,
 		// output
 		vector<int32_t> *hist,
-		L_t *L) {
+		vector<Match> *L) {
 
 	unordered_map<uint64_t, uint32_t> hash2ord;
 	uint32_t kmers = 0;
@@ -91,39 +114,44 @@ void init(
 
 			int nHits;
 			auto *idx_p = mm_idx_get(tidx, kmer_hash, &nHits);
-			for (int i = 0; i < nHits; ++i, ++idx_p)// Iterate over all occurrences
-				L->push_back(make_pair(kmer_ord, ((uint32_t)(*idx_p))>>1));  // Push (hash value, k-mer position in sketch) pair
+			for (int i = 0; i < nHits; ++i, ++idx_p) {					// Iterate over all occurrences
+				Match m;
+				m.kmer_ord = kmer_ord;
+				unpack(*idx_p, &m.T_pos, &m.t_pos);
+				//cout << "kmer_hash=" << m.kmer_ord << ", T_pos=" << m.T_pos << ", t_pos=" << m.t_pos << endl;
+				L->push_back(m); // Push (k-mer ord in p, k-mer position in reference, k-mer position in sketch) pair
+			}
 		}
 	}
 
 	//Sort L by ascending positions in reference
-	sort(L->begin(), L->end(), [](const pair<uint32_t, uint32_t>& hpa, const pair<uint32_t, uint32_t>& hpb) {
-		return hpa.second < hpb.second;
-	});
+	sort(L->begin(), L->end());
 
-	//for (auto it: *hash2ord)
-	//	cout << "hash2ord: " << it.first << " " << it.second << endl;
-	//for (auto it: *L)
-	//	cout << "L: " << it.first << " " << it.second << endl;
-	//for (auto it: *hist)
-	//	cout << "hist: " << it.first << " " << it.second << endl;
+//	for (auto it: hash2ord)
+//		cout << "hash2ord: " << it.first << " " << it.second << endl;
+//	for (auto it: *L)
+//		cout << "L: " << setw(5) << right << it.kmer_ord
+//			 << " " << setw(10) << right << it.T_pos
+//			 << " " << setw(10) << right << it.t_pos << endl;
+//	for (int i=0; i<hist->size(); i++)
+//		cout << "hist[" << i << "]: " << (*hist)[i] << endl;
 }
 
 int32_t scoreX1000(const Sketch& p, int s_sz, int xmin) {
     assert (s_sz >= 0);
     assert(p.size() + s_sz - xmin > 0);
     auto scj = 1000 * xmin / (p.size() + s_sz - xmin);
-    //cout << scj << endl;
+    //cout << scj << ", " << xmin << ", " << p.size() << ", " << s_sz << endl;
     assert (0 <= scj && scj <= 1000);
     return scj;
 }
 
 const vector<Thomology> sweep(const Sketch& p, const mm_idx_t *tidx, const int Plen_nucl, const int k) {
     vector<int32_t> hist;  // rem[kmer_hash] = #occurences in `p` - #occurences in `s`
-    vector<pair<uint32_t, uint32_t>> s;    // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
+    vector<Match> L;    // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
 	vector<Thomology> res;                 // List of tripples <i, j, score> of matches
 
-    init(p, tidx, &hist, &s);
+    init(p, tidx, &hist, &L);
 
     int xmin = 0;
     Thomology best(0, 0, 0);            // <i, j, score>
@@ -134,28 +162,32 @@ const vector<Thomology> sweep(const Sketch& p, const mm_idx_t *tidx, const int P
 
     // Increase the left point end of the window [l,r) one by one.
     int i = 0, j = 0;
-	for(auto l = s.begin(), r = s.begin(); l != s.end(); ++l, ++i) {
+	for(auto l = L.begin(), r = L.begin(); l != L.end(); ++l, ++i) {
         // Increase the right end of the window [l,r) until it gets out.
-        for(; r != s.end() && r->second + k <= l->second + Plen_nucl; ++r, ++j) {
+        for(; r != L.end() && r->T_pos + k <= l->T_pos + Plen_nucl; ++r, ++j) {
 			// If taking this kmer from T increases the intersection with P 
-			if (--hist[r->first] >= 0)
+			if (--hist[r->kmer_ord] >= 0)
 				++xmin;
-			assert (l->second <= r->second);
+			assert (l->T_pos <= r->T_pos);
         }
 
-		int s_sz = r-l;  // TODO: fix! S is from T, not L
+		//cout << "l->t_pos=" << l->t_pos << ", prev(r)->t_pos=" << prev(r)->t_pos << endl;
+		//int s_sz = r - l;
+		int s_sz = prev(r)->t_pos - l->t_pos + 1;
+		assert(s_sz >= 0);
+		
+		//int s_sz = r - l;  // TODO: fix! S is from T, not L
         auto scj = scoreX1000(p, s_sz, xmin);
         //cout << "i=" << i << ", j=" << j << ", l=" << l->second << ", r=" << r->second << ", |s|=" << s_sz << ", xmin=" << xmin << ", |s|=" << (r-l) <<  ", scj=" << scj << endl;
 
-        // If better than best
         if (scj > get<2>(best)) {
             //cout << "s=r-l=" << r-l << endl;
             //cout << "denom: " << skP.size() + (r-l) - xmin << endl;
-            best = Thomology(l->second, prev(r)->second, scj);
+            best = Thomology(l->T_pos, prev(r)->T_pos, scj);
         }
 
         // Prepare for the next step by moving `l` to the right
-		if (++hist[l->first] > 0)
+		if (++hist[l->kmer_ord] > 0)
 			--xmin;
 
         assert(xmin >= 0);
@@ -169,67 +201,42 @@ const vector<Thomology> sweep(const Sketch& p, const mm_idx_t *tidx, const int P
     return res;
 }
 
-// Score for the current window
-//double scj = 1.0*xmin / (2*len - xmin);
-//cout << "Curr: " << l->second << " " << r->second << " " << xmin << endl;
-//cout << "Best: " << get<0>(best) << " " << get<1>(best) << " " << get<2>(best) << endl;
-
 int main(int argc, char **argv){
-	//Flag to save that scores are to be normalized
-	bool normalize = NORM_FLAG_DEFAULT;
-	//Flag to state if we are interested in nested results
-	bool noNesting = NESTING_FLAG_DEFAULT;
-	//The k-mer length
-	uint32_t kmerLen = K;
-	//The window size
-	uint32_t w = W;
-	//Scoring weights
-	uint32_t comWght = DEFAULT_WEIGHT;
+	bool normalize = NORM_FLAG_DEFAULT; 		//Flag to save that scores are to be normalized
+	bool noNesting = NESTING_FLAG_DEFAULT; 		//Flag to state if we are interested in nested results
+	uint32_t kmerLen = K; 						//The k-mer length
+	uint32_t w = W; 							//The window size
+	uint32_t comWght = DEFAULT_WEIGHT; 			//Scoring weights
 	float uniWght = DEFAULT_WEIGHT;
-	//The t-homology threshold
-	float tThres = T;
-	//Intercept and decent to interpolate thresholds
-	float dec = 0;
+	float tThres = T; 							//The t-homology threshold
+	float dec = 0; 								//Intercept and decent to interpolate thresholds
 	float inter = 0;
-	//Input file names
-	string pFile, tFile, bLstFl = "highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";
-	//An input sequence
-	string seq;
-	//A file stream
-	ifstream fStr;
+	string pFile, tFile, bLstFl = "highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
+	string seq; 								//An input sequence
+	ifstream fStr; 								//A file stream
 
 	//A hash table to store black listed k-mers
 	// unordered_map<uint64_t, char> bLstmers;
 
-	//An index option struct
-	mm_idxopt_t iopt;
-	//A mapping options struct
-	mm_mapopt_t mopt;
-	//An index reader
-	mm_idx_reader_t *r;
-	//A pointer to the text index
-	const mm_idx_t *tidx;
-	//A pointer to the pattern index
-	const mm_idx_t *pidx;
-	//A vector of pattern sketches
-	vector<tuple<string, uint32_t, Sketch>> pSks;
-	//An iterator to iterate over pattern sketches
-	vector<tuple<string, uint32_t, Sketch>>::const_iterator p;
+	mm_idxopt_t iopt; 							//An index option struct
+	mm_mapopt_t mopt; 							//A mapping options struct
+	mm_idx_reader_t *r; 						//An index reader
+	const mm_idx_t *tidx; 						//A pointer to the text index
+	const mm_idx_t *pidx; 						//A pointer to the pattern index
+	vector<tuple<string, uint32_t, Sketch>> pSks; //A vector of pattern sketches
+	vector<tuple<string, uint32_t, Sketch>>::const_iterator p; //An iterator to iterate over pattern sketches
 
 	//Parse arguments
 	if(!prsArgs(argc, argv, pFile, tFile, kmerLen, w, hFrac, bLstFl, comWght, uniWght, tThres, normalize, dec, inter, noNesting)){//TODO: Tests for this function need to be adapted!
-		//Display help message
-		dsHlp();
+		dsHlp(); //Display help message
 		return 1;
 	}
 
 	//Set index options to default
 	mm_set_opt(0, &iopt, &mopt);
-	//Adjust k if necessary
-	iopt.k = kmerLen;
+	iopt.k = kmerLen; //Adjust k if necessary
 	iopt.w = w;
-	//Open an index reader //TODO: We do not allow yet to use a prebuilt index
-	r = mm_idx_reader_open(tFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);
+	r = mm_idx_reader_open(tFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);  //Open an index reader //TODO: We do not allow yet to use a prebuilt index
 
 	//Check if index could be opened successfully
 	if(r == NULL){
@@ -238,8 +245,6 @@ int main(int argc, char **argv){
 	}
 
 	bLstmers = readBlstKmers(bLstFl);
-
-	// TODO: ignore blacklisted kmers in the index
 
 	//Construct index of reference
 	if((tidx = mm_idx_reader_read(r, 1)) == 0){//TODO: Make use of multithreading here!
@@ -274,8 +279,7 @@ int main(int argc, char **argv){
 		return -1; 
 	}
 
-	//Open stream to read in patterns
-	fStr.open(pFile);
+	fStr.open(pFile);  //Open stream to read in patterns
 
     string text;
     //readFASTA(tFile, text);

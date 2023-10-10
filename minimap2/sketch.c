@@ -184,6 +184,12 @@ static inline int tq_shift(tiny_queue_t *q)
 // 	// 	kv_push(mm128_t, km, *p, min);
 // }
 
+mm128_t value128(mm128_t xy, uint64_t hcnt) {
+	//printf("hash: %lu, T_pos: %lu, t_pos: %lu\n", xy.x, xy.y, hcnt);
+	xy.y = (uint64_t)(xy.y>>1)<<32 | (uint64_t)hcnt<<1 | (xy.y & 1);
+	return xy;
+}
+
 /**
  * Find symmetric (w,k)-minimizers on a DNA sequence
  *
@@ -274,9 +280,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
 					//Print position
 					// printf("%lu\n", ((buf[j].y << 32) >> 33) + 1 - k);
 
-					int zp = (int) ((buf[j].y << 63) >> 63);
-					//buf[j].y = (buf[j].y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;  // 278, 300, 323, 344, 369, 390 and 414
-					kv_push(mm128_t, km, *p, buf[j]);
+					kv_push(mm128_t, km, *p, value128(buf[j], hcnt));
 					++hcnt;
 				}
 			}
@@ -296,9 +300,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
 					//Print position
 					// printf("%lu\n", ((buf[j].y << 32) >> 33) + 1 - k);
 
-					int zp = (int) ((buf[j].y << 63) >> 63);
-					//buf[j].y = (buf[j].y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
-					kv_push(mm128_t, km, *p, buf[j]);
+					kv_push(mm128_t, km, *p, value128(buf[j], hcnt));
 					++hcnt;
 				}
 			}
@@ -319,9 +321,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
 				//Print position
 				// printf("%lu\n", ((min.y << 32) >> 33) + 1 - k);
 
-				int zp = (int) ((min.y << 63) >> 63);
-				//min.y = (min.y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
-				kv_push(mm128_t, km, *p, min);
+				kv_push(mm128_t, km, *p, value128(min, hcnt));
 				++hcnt;
 			}
 			min = info, min_pos = buf_pos;
@@ -340,9 +340,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
 				//Print position
 				// printf("%lu\n", ((min.y << 32) >> 33) + 1 - k);
 
-				int zp = (int) ((min.y << 63) >> 63);
-				//min.y = (min.y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
-				kv_push(mm128_t, km, *p, min);
+				kv_push(mm128_t, km, *p, value128(min, hcnt));
 				++hcnt;
 			}
 			for (j = buf_pos + 1, min.x = UINT64_MAX; j < w; ++j) // the two loops are necessary when there are identical k-mers
@@ -365,9 +363,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
 						//Print position
 						// printf("%lu\n", ((buf[j].y << 32) >> 33) + 1 - k);
 
-						int zp = (int) ((buf[j].y << 63) >> 63);
-						//buf[j].y = (buf[j].y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
-						kv_push(mm128_t, km, *p, buf[j]);
+						kv_push(mm128_t, km, *p, value128(buf[j], hcnt));
 						++hcnt;
 					}
 				}
@@ -386,9 +382,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
 						//Print position
 						// printf("%lu\n", ((buf[j].y << 32) >> 33) + 1 - k);
 
-						int zp = (int) ((buf[j].y << 63) >> 63);
-						//buf[j].y = (buf[j].y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
-						kv_push(mm128_t, km, *p, buf[j]);
+						kv_push(mm128_t, km, *p, value128(buf[j], hcnt));
 						++hcnt;
 					}
 				}
@@ -410,9 +404,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
 		//Print position
 		// printf("%lu\n", ((min.y << 32) >> 33) + 1 - k);
 
-		int zp = (int) ((min.y << 63) >> 63);
-		//min.y = (min.y >> 32) << 32 | (uint32_t)hcnt<<1 | zp;
-		kv_push(mm128_t, km, *p, min);
+		kv_push(mm128_t, km, *p, value128(min, hcnt));
 		++hcnt;
 	}
 }
