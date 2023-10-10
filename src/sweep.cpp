@@ -71,7 +71,7 @@ void init(
 		const Sketch& p,
 		const mm_idx_t *tidx,
 		// output
-		unordered_map<uint32_t, int32_t> *hist,
+		vector<int32_t> *hist,
 		L_t *L) {
 
 	unordered_map<uint64_t, uint32_t> hash2ord;
@@ -83,14 +83,11 @@ void init(
 		auto kmer_hash = *p_it;
 		auto ord_it = hash2ord.find(kmer_hash);
 		if (ord_it != hash2ord.end()) {
-			kmer_ord = ord_it->second;
-			++(hist->at(kmer_ord));
+			++(*hist)[ord_it->second];
 		} else {
-			kmer_ord = kmers;
-			assert(hist->find(kmer_ord) == hist->end());
-			(*hist)[kmer_ord] = 1;
-			hash2ord[kmer_hash] = kmers;
-			++kmers;
+			kmer_ord = hist->size();
+			hash2ord[kmer_hash] = kmer_ord;
+			hist->push_back(1);
 
 			int nHits;
 			auto *idx_p = mm_idx_get(tidx, kmer_hash, &nHits);
@@ -122,7 +119,7 @@ int32_t scoreX1000(const Sketch& p, int s_sz, int xmin) {
 }
 
 const vector<Thomology> sweep(const Sketch& p, const mm_idx_t *tidx, const int Plen_nucl, const int k) {
-    unordered_map<uint32_t, int32_t> hist;  // rem[kmer_hash] = #occurences in `p` - #occurences in `s`
+    vector<int32_t> hist;  // rem[kmer_hash] = #occurences in `p` - #occurences in `s`
     vector<pair<uint32_t, uint32_t>> s;    // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
 	vector<Thomology> res;                 // List of tripples <i, j, score> of matches
 
@@ -141,7 +138,7 @@ const vector<Thomology> sweep(const Sketch& p, const mm_idx_t *tidx, const int P
         // Increase the right end of the window [l,r) until it gets out.
         for(; r != s.end() && r->second + k <= l->second + Plen_nucl; ++r, ++j) {
 			// If taking this kmer from T increases the intersection with P 
-			if (--hist.at(r->first) >= 0)
+			if (--hist[r->first] >= 0)
 				++xmin;
 			assert (l->second <= r->second);
         }
@@ -158,7 +155,7 @@ const vector<Thomology> sweep(const Sketch& p, const mm_idx_t *tidx, const int P
         }
 
         // Prepare for the next step by moving `l` to the right
-		if (++hist.at(l->first) > 0)
+		if (++hist[l->first] > 0)
 			--xmin;
 
         assert(xmin >= 0);
