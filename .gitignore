@@ -7,3 +7,6 @@ simulations
 src/eskemap
 src/sweep
 out/
+.vscode/settings.json
+*.out
+*.err

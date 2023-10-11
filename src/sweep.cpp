@@ -34,12 +34,13 @@ struct Match {
 	}
 };
 
-template<typename TT>
-const TT::iterator prev(const typename TT::iterator &it) {
-    auto pr = it;
-    return --pr;
+template<typename TT> auto prev(const typename TT::iterator &it) {
+    auto pr = it; return --pr;
 }
 
+template<typename TT> auto next(const typename TT::iterator &it) {
+    auto pr = it; return ++pr;
+}
 
 //void print_L(const vector<Match> &L) {
 //    int i=0;
@@ -137,24 +138,57 @@ void init(
 //		cout << "hist[" << i << "]: " << (*hist)[i] << endl;
 }
 
-int32_t scoreX1000(const Sketch& p, int s_sz, int xmin) {
+double J(const Sketch& p, const vector<Match>::iterator l, const vector<Match>::iterator r, int xmin) {
+	int s_sz = prev(r)->t_pos - l->t_pos + 1;
+	if (s_sz < 0)
+		return 0;
     assert (s_sz >= 0);
     assert(p.size() + s_sz - xmin > 0);
-    auto scj = 1000 * xmin / (p.size() + s_sz - xmin);
-    //cout << scj << ", " << xmin << ", " << p.size() << ", " << s_sz << endl;
-    assert (0 <= scj && scj <= 1000);
+    double scj = 1.0 * xmin / (p.size() + s_sz - xmin);
+    assert (0 <= scj && scj <= 1.0);
     return scj;
 }
 
-const vector<Thomology> sweep(const Sketch& p, const mm_idx_t *tidx, const int Plen_nucl, const int k) {
-    vector<int32_t> hist;  // rem[kmer_hash] = #occurences in `p` - #occurences in `s`
-    vector<Match> L;    // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
-	vector<Thomology> res;                 // List of tripples <i, j, score> of matches
+inline bool better_extend_right(const Sketch &p, const vector<int32_t> &hist, const vector<Match> &L,
+		const vector<Match>::iterator l, const vector<Match>::iterator r,
+		int xmin, const int Plen_nucl, const int k) {
+	if (r == L.end())
+		return false;
+	bool extension_stays_within_window = r->T_pos + k <= l->T_pos + Plen_nucl;
+	auto r_next = next(r);
+	bool extension_improves_jaccard = r_next != L.end() && J(p, l, r, xmin) < J(p, l, r_next, xmin + (hist[r_next->kmer_ord] > 0));
+	return extension_stays_within_window || extension_improves_jaccard;
+}
 
-    init(p, tidx, &hist, &L);
+struct Mapping {
+	uint32_t l_T_pos;
+	uint32_t r_T_pos;
+	double J;  			// Jaccard score
+	Mapping() {}
+	Mapping(uint32_t _l_T_pos, uint32_t _r_T_pos, double _J)
+		: l_T_pos(_l_T_pos), r_T_pos(_r_T_pos), J(_J) {}
+};
+
+//This function outputs all given t-homologies
+inline void outputMappings(const vector<Mapping>& res, const uint32_t& pLen, const string &seqID, const string &text){
+	//Iterate over t-homologies
+	for(const auto &m: res) {
+        cout << seqID << "\t" << m.l_T_pos << "\t" << m.r_T_pos << "\t" << m.J << endl;
+        if (!text.empty())
+            cout << "   text: " << text.substr(m.l_T_pos, m.r_T_pos-m.l_T_pos+1) << endl;
+	}
+}
+
+
+const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Plen_nucl, const int k) {
+    vector<int32_t> hist;  		// rem[kmer_hash] = #occurences in `p` - #occurences in `s`
+    vector<Match> L;    		// for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
+	vector<Mapping> res;		// List of tripples <i, j, score> of matches
 
     int xmin = 0;
-    Thomology best(0, 0, 0);            // <i, j, score>
+    Mapping best(0, 0, 0);	// <i, j, score>
+
+    init(p, tidx, &hist, &L);
  
     //cerr << "|P| = " << Plen_nucl << ", |p| = " << skP.size() << endl;
     //cerr << "|L| = " << L.size() << endl;
@@ -164,26 +198,20 @@ const vector<Thomology> sweep(const Sketch& p, const mm_idx_t *tidx, const int P
     int i = 0, j = 0;
 	for(auto l = L.begin(), r = L.begin(); l != L.end(); ++l, ++i) {
         // Increase the right end of the window [l,r) until it gets out.
-        for(; r != L.end() && r->T_pos + k <= l->T_pos + Plen_nucl; ++r, ++j) {
+        for(; better_extend_right(p, hist, L, l, r, xmin, Plen_nucl, k); ++r, ++j) {
 			// If taking this kmer from T increases the intersection with P 
 			if (--hist[r->kmer_ord] >= 0)
 				++xmin;
 			assert (l->T_pos <= r->T_pos);
         }
-
-		//cout << "l->t_pos=" << l->t_pos << ", prev(r)->t_pos=" << prev(r)->t_pos << endl;
-		//int s_sz = r - l;
-		int s_sz = prev(r)->t_pos - l->t_pos + 1;
-		assert(s_sz >= 0);
 		
-		//int s_sz = r - l;  // TODO: fix! S is from T, not L
-        auto scj = scoreX1000(p, s_sz, xmin);
+        auto curr_J = J(p, l, r, xmin);
         //cout << "i=" << i << ", j=" << j << ", l=" << l->second << ", r=" << r->second << ", |s|=" << s_sz << ", xmin=" << xmin << ", |s|=" << (r-l) <<  ", scj=" << scj << endl;
 
-        if (scj > get<2>(best)) {
+        if (curr_J > best.J) {
             //cout << "s=r-l=" << r-l << endl;
             //cout << "denom: " << skP.size() + (r-l) - xmin << endl;
-            best = Thomology(l->T_pos, prev(r)->T_pos, scj);
+            best = Mapping(l->T_pos, prev(r)->T_pos, curr_J);
         }
 
         // Prepare for the next step by moving `l` to the right
@@ -301,8 +329,7 @@ int main(int argc, char **argv){
 
 			//Find t-homologies and output them
             auto res = sweep(sks, tidx, plen_nucl, iopt.k);
-			outputHoms(res, normalize, sks.size(), seqID, text);//TODO: Tests for this function need to be adaptated!
-			//outputHomsSeqs(res, normalize, sks.size());//TODO: Tests for this function need to be adaptated!
+			outputMappings(res, sks.size(), seqID, text);//TODO: Tests for this function need to be adaptated!
 		}
 
 		//Remove processed pattern sketches

@@ -57,21 +57,6 @@ inline void dsHlp(){
 	cerr << "   -h   --help       Display this help message" << endl;
 }
 
-//This function outputs all given t-homologies
-inline void outputHoms(const vector<Thomology>& homs, const bool& norm, const uint32_t& pLen, const string &seqID, const string &text){
-	//Iterate over t-homologies
-	for(vector<Thomology>::const_iterator h = homs.begin(); h != homs.end(); ++h){
-		//Normalize score before reporting if requested
-        auto i = get<0>(*h);
-        auto j = get<1>(*h);
-        double score = get<2>(*h);
-        if (norm) score /= max(pLen, j-i+1);
-        cout << seqID << "\t" << i << "\t" << j << "\t" << score << endl;
-        if (!text.empty())
-            cerr << "   text: " << text.substr(i, j-i+1) << endl;
-	}
-}
-
 //inline void outputHomsWithNucl(const vector<Thomology>& homs, const uint32_t& pLen){
 //	//Iterate over t-homologies
 //	for(vector<Thomology>::const_iterator h = homs.begin(); h != homs.end(); ++h){
