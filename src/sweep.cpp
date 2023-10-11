@@ -34,6 +34,25 @@ struct Match {
 	}
 };
 
+struct Mapping {
+	uint32_t l_T_pos;
+	uint32_t r_T_pos;
+	double J;  			// Jaccard score
+	Mapping() {}
+	Mapping(uint32_t _l_T_pos, uint32_t _r_T_pos, double _J)
+		: l_T_pos(_l_T_pos), r_T_pos(_r_T_pos), J(_J) {}
+};
+
+//This function outputs all given t-homologies
+inline void outputMappings(const vector<Mapping>& res, const uint32_t& pLen, const string &seqID, const string &text){
+	//Iterate over t-homologies
+	for(const auto &m: res) {
+        cout << seqID << "\t" << m.l_T_pos << "\t" << m.r_T_pos << "\t" << m.J << endl;
+        if (!text.empty())
+            cout << "   text: " << text.substr(m.l_T_pos, m.r_T_pos-m.l_T_pos+1) << endl;
+	}
+}
+
 template<typename TT> auto prev(const typename TT::iterator &it) {
     auto pr = it; return --pr;
 }
@@ -42,22 +61,6 @@ template<typename TT> auto next(const typename TT::iterator &it) {
     auto pr = it; return ++pr;
 }
 
-//void print_L(const vector<Match> &L) {
-//    int i=0;
-//    for (const auto &s: L) {
-//        cerr << "L[" << i << "]=(" << s.kmer_ord << ", " << s.T_pos << ", " << s.t_pos << ")" << endl;
-//        ++i;
-//    }
-//}
-//
-//void print_skP(const Sketch& skP) {
-//    int i=0;
-//    for (const auto &p: skP) {
-//        cerr << "skP[" << i << "]=" << p << endl;
-//        ++i;
-//    }
-//}
-//
 //const int window2score(const vector<Match> &L, const Sketch& skP, int from_nucl, int to_nucl, int plen_nucl) {
 //    int xmin = 0;
 //    auto l = L.end(), r = L.begin();
@@ -85,9 +88,6 @@ template<typename TT> auto next(const typename TT::iterator &it) {
 void unpack(uint64_t idx, uint32_t *T_pos, uint32_t *t_pos) {
 	*T_pos = (uint32_t)(idx >> 32);
 	*t_pos = (uint32_t)(((idx << 32) >> 32) >> 1);
-	//uint32_t T_pos = (uint32_t)((*idx_p) >> 32); 					// Position in reference
-	//uint32_t t_pos = (uint32_t)((( (*idx_p) << 32) >> 32) >> 1); 	// Position in sketch
-	//uint32_t t_pos = ( (*idx_p) ^ ((uint64_t)T_pos << 32) ) >> 1; 	// Position in sketch
 }
 
 void init(
@@ -138,47 +138,35 @@ void init(
 //		cout << "hist[" << i << "]: " << (*hist)[i] << endl;
 }
 
+// Returns the Jaccard score of the window [l,r)
 double J(const Sketch& p, const vector<Match>::iterator l, const vector<Match>::iterator r, int xmin) {
 	int s_sz = prev(r)->t_pos - l->t_pos + 1;
 	if (s_sz < 0)
 		return 0;
-    assert (s_sz >= 0);
     assert(p.size() + s_sz - xmin > 0);
     double scj = 1.0 * xmin / (p.size() + s_sz - xmin);
-    assert (0 <= scj && scj <= 1.0);
+    if (!(0.0 <= scj && scj <= 1.0))
+		cerr << "ERROR: scj=" << scj << ", xmin=" << xmin << ", p.size()=" << p.size() << ", s_sz=" << s_sz << ", l=" << l->t_pos << ", r=" << r->t_pos << endl;
+    assert (0.0 <= scj && scj <= 1.0);
     return scj;
 }
 
-inline bool better_extend_right(const Sketch &p, const vector<int32_t> &hist, const vector<Match> &L,
+// Returns true if the window [l,r) should be extended to the right
+inline bool should_extend_right(
+		const Sketch &p,
+		const vector<int32_t> &hist,
+		const vector<Match> &L,
 		const vector<Match>::iterator l, const vector<Match>::iterator r,
-		int xmin, const int Plen_nucl, const int k) {
+		const int xmin, const int Plen_nucl, const int k) {
 	if (r == L.end())
 		return false;
 	bool extension_stays_within_window = r->T_pos + k <= l->T_pos + Plen_nucl;
-	auto r_next = next(r);
-	bool extension_improves_jaccard = r_next != L.end() && J(p, l, r, xmin) < J(p, l, r_next, xmin + (hist[r_next->kmer_ord] > 0));
-	return extension_stays_within_window || extension_improves_jaccard;
+	if (extension_stays_within_window)
+		return true;
+	bool extension_improves_jaccard = J(p, l, r, xmin) < J(p, l, next(r), xmin + (hist[r->kmer_ord] > 0));
+	//assert(!extension_improves_jaccard);
+	return extension_improves_jaccard;
 }
-
-struct Mapping {
-	uint32_t l_T_pos;
-	uint32_t r_T_pos;
-	double J;  			// Jaccard score
-	Mapping() {}
-	Mapping(uint32_t _l_T_pos, uint32_t _r_T_pos, double _J)
-		: l_T_pos(_l_T_pos), r_T_pos(_r_T_pos), J(_J) {}
-};
-
-//This function outputs all given t-homologies
-inline void outputMappings(const vector<Mapping>& res, const uint32_t& pLen, const string &seqID, const string &text){
-	//Iterate over t-homologies
-	for(const auto &m: res) {
-        cout << seqID << "\t" << m.l_T_pos << "\t" << m.r_T_pos << "\t" << m.J << endl;
-        if (!text.empty())
-            cout << "   text: " << text.substr(m.l_T_pos, m.r_T_pos-m.l_T_pos+1) << endl;
-	}
-}
-
 
 const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Plen_nucl, const int k) {
     vector<int32_t> hist;  		// rem[kmer_hash] = #occurences in `p` - #occurences in `s`
@@ -186,7 +174,7 @@ const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Ple
 	vector<Mapping> res;		// List of tripples <i, j, score> of matches
 
     int xmin = 0;
-    Mapping best(0, 0, 0);	// <i, j, score>
+    Mapping best(0, 0, 0);		// <l_T, r_T, Jaccard_score>
 
     init(p, tidx, &hist, &L);
  
@@ -198,23 +186,19 @@ const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Ple
     int i = 0, j = 0;
 	for(auto l = L.begin(), r = L.begin(); l != L.end(); ++l, ++i) {
         // Increase the right end of the window [l,r) until it gets out.
-        for(; better_extend_right(p, hist, L, l, r, xmin, Plen_nucl, k); ++r, ++j) {
-			// If taking this kmer from T increases the intersection with P 
+        for(; should_extend_right(p, hist, L, l, r, xmin, Plen_nucl, k); ++r, ++j) {
+			// If taking this kmer from T increases the intersection with P.
 			if (--hist[r->kmer_ord] >= 0)
 				++xmin;
 			assert (l->T_pos <= r->T_pos);
         }
 		
+		// Update best.
         auto curr_J = J(p, l, r, xmin);
-        //cout << "i=" << i << ", j=" << j << ", l=" << l->second << ", r=" << r->second << ", |s|=" << s_sz << ", xmin=" << xmin << ", |s|=" << (r-l) <<  ", scj=" << scj << endl;
-
-        if (curr_J > best.J) {
-            //cout << "s=r-l=" << r-l << endl;
-            //cout << "denom: " << skP.size() + (r-l) - xmin << endl;
+        if (curr_J > best.J)
             best = Mapping(l->T_pos, prev(r)->T_pos, curr_J);
-        }
 
-        // Prepare for the next step by moving `l` to the right
+        // Prepare for the next step by moving `l` to the right.
 		if (++hist[l->kmer_ord] > 0)
 			--xmin;
 
