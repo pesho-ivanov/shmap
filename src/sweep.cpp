@@ -35,19 +35,25 @@ struct Match {
 };
 
 struct Mapping {
+	uint32_t k; 		// kmer size
+	uint32_t P_sz;     // pattern size |P| bp 
+	uint32_t p_sz;     // pattern sketch size |p| kmers
+	uint32_t matches;  // L.size()
 	uint32_t l_T_pos;
 	uint32_t r_T_pos;
+	uint32_t xmin;
 	double J;  			// Jaccard score
-	Mapping() {}
-	Mapping(uint32_t _l_T_pos, uint32_t _r_T_pos, double _J)
-		: l_T_pos(_l_T_pos), r_T_pos(_r_T_pos), J(_J) {}
+
+	Mapping(uint32_t k=0, uint32_t P_sz=0, uint32_t p_sz=0, uint32_t matches=0, uint32_t l_T_pos=0, uint32_t r_T_pos=0, uint32_t xmin=0, double J=0.0)
+		: k(k), P_sz(P_sz), p_sz(p_sz), matches(matches), l_T_pos(l_T_pos), r_T_pos(r_T_pos), xmin(xmin), J(J) {}
 };
 
 //This function outputs all given t-homologies
 inline void outputMappings(const vector<Mapping>& res, const uint32_t& pLen, const string &seqID, const string &text){
 	//Iterate over t-homologies
 	for(const auto &m: res) {
-        cout << seqID << "\t" << m.l_T_pos << "\t" << m.r_T_pos << "\t" << m.J << endl;
+		cout << seqID << "\t" << m.k << "\t" << m.P_sz << "\t" << m.p_sz << "\t"
+			<< m.matches << "\t" << m.l_T_pos << "\t" << m.r_T_pos << "\t" << m.xmin << "\t" << m.J << endl;
         if (!text.empty())
             cout << "   text: " << text.substr(m.l_T_pos, m.r_T_pos-m.l_T_pos+1) << endl;
 	}
@@ -161,11 +167,12 @@ inline bool should_extend_right(
 	if (r == L.end())
 		return false;
 	bool extension_stays_within_window = r->T_pos + k <= l->T_pos + Plen_nucl;
-	if (extension_stays_within_window)
-		return true;
-	bool extension_improves_jaccard = J(p, l, r, xmin) < J(p, l, next(r), xmin + (hist[r->kmer_ord] > 0));
+	return extension_stays_within_window;
+	//if (extension_stays_within_window)
+	//	return true;
+	//bool extension_improves_jaccard = J(p, l, r, xmin) < J(p, l, next(r), xmin + (hist[r->kmer_ord] > 0));
 	//assert(!extension_improves_jaccard);
-	return extension_improves_jaccard;
+	//return extension_improves_jaccard;
 }
 
 const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Plen_nucl, const int k) {
@@ -174,7 +181,10 @@ const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Ple
 	vector<Mapping> res;		// List of tripples <i, j, score> of matches
 
     int xmin = 0;
-    Mapping best(0, 0, 0);		// <l_T, r_T, Jaccard_score>
+    Mapping best;
+	best.k = k;
+	best.P_sz = Plen_nucl;
+	best.p_sz = p.size();
 
     init(p, tidx, &hist, &L);
  
@@ -196,7 +206,7 @@ const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Ple
 		// Update best.
         auto curr_J = J(p, l, r, xmin);
         if (curr_J > best.J)
-            best = Mapping(l->T_pos, prev(r)->T_pos, curr_J);
+            best = Mapping(k, Plen_nucl, p.size(), L.size(), l->T_pos, prev(r)->T_pos, xmin, curr_J);
 
         // Prepare for the next step by moving `l` to the right.
 		if (++hist[l->kmer_ord] > 0)
