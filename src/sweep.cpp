@@ -10,16 +10,6 @@
 double hFrac = HASH_RATIO;
 unordered_map<uint64_t, char> bLstmers;
 
-//unordered_map<uint65_t, uint32_t> zero_occurences(const Sketch& skP) {
-//    unordered_map<uint64_t, uint32_t> occs(skP.size());
-//
-//    //Fill occp
-//    for(Sketch::const_iterator fSkIt = skP.begin(); fSkIt != skP.end(); ++fSkIt)
-//        occs[*fSkIt] = 0;
-//    
-//    return occs;
-//}
-
 struct Match {
 	uint32_t kmer_ord;
 	uint32_t T_pos;
@@ -67,30 +57,6 @@ template<typename TT> auto next(const typename TT::iterator &it) {
     auto pr = it; return ++pr;
 }
 
-//const int window2score(const vector<Match> &L, const Sketch& skP, int from_nucl, int to_nucl, int plen_nucl) {
-//    int xmin = 0;
-//    auto l = L.end(), r = L.begin();
-//	for(auto s = L.begin(); s != L.end(); ++s) {
-//        if (from_nucl <= s->second && s->second + plen_nucl < to_nucl) {
-//            cout << "[" << from_nucl << ", " << to_nucl << "] includes sketch (" << s->first << ", " << s->second << ")" << endl; 
-//            if (s->second < l->second) l=s;
-//            if (s->second >= r->second) r=s;
-//            ++xmin;
-//        }
-//    }
-//
-//    if (l == L.end() && r == L.begin())
-//        l = r;
-//
-//    for (auto s=l; s<r; ++s)
-//        assert(from_nucl <= s->second && to_nucl <= s->second + plen_nucl);
-//
-//    auto scj = scoreX1000(skP, xmin, r-l);
-//    //auto scj = 0;
-//    cout << "[" << from_nucl << ", " << to_nucl << "] includes " << xmin << " sketches,"  << ", r-l=" << (r-l) <<  ", scj=" << scj << endl;
-//    return xmin;
-//}
-
 void unpack(uint64_t idx, uint32_t *T_pos, uint32_t *t_pos) {
 	*T_pos = (uint32_t)(idx >> 32);
 	*t_pos = (uint32_t)(((idx << 32) >> 32) >> 1);
@@ -103,7 +69,6 @@ void init(
 		// output
 		vector<int32_t> *hist,
 		vector<Match> *L) {
-
 	unordered_map<uint64_t, uint32_t> hash2ord;
 	uint32_t kmers = 0;
 	L->reserve(P_MULTIPLICITY * p.size());
@@ -125,7 +90,6 @@ void init(
 				Match m;
 				m.kmer_ord = kmer_ord;
 				unpack(*idx_p, &m.T_pos, &m.t_pos);
-				//cout << "kmer_hash=" << m.kmer_ord << ", T_pos=" << m.T_pos << ", t_pos=" << m.t_pos << endl;
 				L->push_back(m); // Push (k-mer ord in p, k-mer position in reference, k-mer position in sketch) pair
 			}
 		}
@@ -187,10 +151,6 @@ const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Ple
 	best.p_sz = p.size();
 
     init(p, tidx, &hist, &L);
- 
-    //cerr << "|P| = " << Plen_nucl << ", |p| = " << skP.size() << endl;
-    //cerr << "|L| = " << L.size() << endl;
-    //cerr << "k = " << k <<endl;
 
     // Increase the left point end of the window [l,r) one by one.
     int i = 0, j = 0;
@@ -215,9 +175,6 @@ const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Ple
         assert(xmin >= 0);
     }
 	assert (xmin == 0);
-
-    //auto scj = window2score(L, skP, 4681377, 4683857, plen_nucl);
-    //cout << "l=" << 4681377 << ", r=" << 4683857 << ", xmin=" << xmin << ", r-l=" << 4683857-4681377 <<  ", scj=" << scj << endl;
 
     res.push_back(best);
     return res;
