@@ -11,24 +11,52 @@
 #define DEFAULT_WEIGHT 1
 using Thomology = tuple<uint32_t, uint32_t, int32_t>;
 
-#define OPTIONS "a:b:ilh"
+//#define OPTIONS "a:b:ilh"
 #define T_HOM_OPTIONS "p:s:k:w:r:b:c:u:t:d:i:nNh"
-#define MIN_PARAM_NB 6
+//#define MIN_PARAM_NB 6
 #define MAX_RATIO 1.0
 #define NORM_FLAG_DEFAULT false
 #define PATTERN_BATCH_SIZE 250000
 #define STRING_BUFFER_SIZE_DEFAULT 50
 
+enum class elastic_t {
+    wrong = -1,
+    off = 0,
+    consecutive = 2,
+    random = 9
+}; 
+
+elastic_t str2elastic(string t) {
+    if (t == "off") return elastic_t::off;
+    if (t == "consecutive") return elastic_t::consecutive;
+    if (t == "random") return elastic_t::random;
+	return elastic_t::wrong;
+}
+
+std::string getElasticDescription(elastic_t e) {
+    switch (e) {
+        case elastic_t::off:
+            return "off";
+        case elastic_t::consecutive:
+            return "consecutive pairs of kmers";
+        case elastic_t::random:
+            return "random pairs of kmers";
+        default:	
+            return "unknown";
+    }
+}
+
 struct params_t {
-	bool normalize; //= NORM_FLAG_DEFAULT; 		//Flag to save that scores are to be normalized
-	uint32_t k; // = K; 						//The k-mer length
-	uint32_t w; // = W; 							//The window size
-	double hFrac; // = HASH_RATIO; 					//The FracMinHash ratio
-	//uint32_t comWght = DEFAULT_WEIGHT; 			//Scoring weights
-	//float uniWght = DEFAULT_WEIGHT;
-	float tThres; // = T; 							//The t-homology threshold
-	float dec; // = 0; 								//Intercept and decent to interpolate thresholds
-	float inter; // = 0;
+	bool normalize; 		//Flag to save that scores are to be normalized
+	uint32_t k;  						//The k-mer length
+	uint32_t w;  							//The window size
+	elastic_t elastic;
+	double hFrac;  					//The FracMinHash ratio
+	//uint32_t comWght; 			//Scoring weights
+	//float uniWght;
+	float tThres;  							//The t-homology threshold
+	float dec; 								//Intercept and decent to interpolate thresholds
+	float inter; 
 	string pFile, tFile;
 	string bLstFl; // = "highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
 
@@ -36,6 +64,7 @@ struct params_t {
 		normalize = NORM_FLAG_DEFAULT; 		//Flag to save that scores are to be normalized
 		k = K; 						//The k-mer length
 		w = W; 							//The window size
+		elastic = elastic_t::off;
 		hFrac = HASH_RATIO;
 		//comWght = DEFAULT_WEIGHT; 			//Scoring weights
 		//uniWght = DEFAULT_WEIGHT;
@@ -50,6 +79,7 @@ struct params_t {
 		out << "  normalize: " << normalize << endl;
 		out << "  k:         " << k << endl;
 		out << "  w:         " << w << endl;
+		out << "  elastic:   " << getElasticDescription(elastic) << endl;
 		out << "  hFrac:     " << hFrac << endl;
 		out << "  tThres:    " << tThres << endl;
 		out << "  dec:       " << dec << endl;
@@ -74,9 +104,7 @@ struct reader_t {
 	uint32_t T_sz;
 	string text;
 
-	reader_t() {
-	}
-
+	reader_t() {}
 	bool init(int argc, char **argv);
 };
 
@@ -91,6 +119,7 @@ inline void dsHlp(){
 	cerr << "Optional parameters with required argument:" << endl;
 	cerr << "   -k   --ksize             K-mer length to be used for sketches (default " << K << ")" << endl;
 	cerr << "   -w   --windowsize        Window size for minimizer sketching approach (default " << W << ")" << endl;
+	cerr << "   -e   --elastic           Elastic pairs of kmers {off, consecutive, random} [off]" << endl;
 	cerr << "   -r   --hashratio         FracMin hash ratio to be used for sketches (default " << HASH_RATIO << ")" << endl;
 	cerr << "   -b   --blacklist         File containing hashes to ignore for sketch calculation" << endl;
 	cerr << "   -c   --commonhashweight  Weight to reward common hashes (default " << DEFAULT_WEIGHT << ")" << endl;
@@ -112,6 +141,7 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
         {"text",               required_argument,  0, 's'},
         {"ksize",              required_argument,  0, 'k'},
         {"windowsize",         required_argument,  0, 'w'},
+        {"elastic",            required_argument,  0, 'e'},
         {"hashratio",          required_argument,  0, 'r'},
         {"blacklist",          required_argument,  0, 'b'},
         {"commonhashweight",   required_argument,  0, 'c'},
@@ -144,6 +174,14 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
 				}
 
 				params->k = atoi(optarg);
+				break;
+			case 'e':
+				//Elastic kmers
+				params->elastic = str2elastic(optarg);
+				if(params->elastic == elastic_t::wrong) {
+					cerr << "ERROR: Elastic parameter not from the list." << endl;
+					return false;
+				}
 				break;
 			case 'w':
 				//Window size should be positive
