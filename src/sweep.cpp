@@ -37,13 +37,16 @@ struct Mapping {
 };
 
 //This function outputs all given t-homologies
-inline void outputMappings(const vector<Mapping>& res, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text){
+inline void outputMappings(const params_t &params, const vector<Mapping>& res, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text){
 	//Iterate over t-homologies
 	for(auto m: res) {
-		int span = m.r_T_pos - m.l_T_pos + 1;  assert(span <= m.P_sz);
-		int shift = (m.P_sz - span) / 2;       assert(shift >= 0);
-//		m.l_T_pos -= shift; m.l_T_pos = max((uint32_t)0, m.l_T_pos);
-//		m.r_T_pos += shift; m.r_T_pos = min(T_sz-1, m.r_T_pos);
+		if (params.alignment_edges == alignment_edges_t::extend_equally) {
+			int span   = m.r_T_pos - m.l_T_pos + 1;  assert(span <= m.P_sz);
+			int shift  = (m.P_sz - span) / 2;       assert(shift >= 0);
+			m.l_T_pos -= shift; m.l_T_pos = max((uint32_t)0, m.l_T_pos);
+			m.r_T_pos += shift; m.r_T_pos = min(T_sz-1, m.r_T_pos);
+		}
+
 		cout << seqID << "\t" << m.k << "\t" << m.P_sz << "\t" << m.p_sz << "\t"
 			<< m.matches << "\t" << m.l_T_pos << "\t" << m.r_T_pos << "\t" << m.xmin << "\t" << m.J << endl;
         if (!text.empty())
@@ -268,7 +271,7 @@ int main(int argc, char **argv){
 
 			//Find t-homologies and output them
             auto res = sweep.map(sks, plen_nucl);
-			outputMappings(res, sks.size(), seqID, reader.T_sz, reader.text);//TODO: Tests for this function need to be adaptated!
+			outputMappings(params, res, sks.size(), seqID, reader.T_sz, reader.text);//TODO: Tests for this function need to be adaptated!
 		}
 
 		reader.pSks.clear();

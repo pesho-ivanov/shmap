@@ -42,7 +42,30 @@ std::string getElasticDescription(elastic_t e) {
         case elastic_t::random:
             return "random pairs of kmers";
         default:	
-            return "unknown";
+            return "wrong";
+    }
+}
+
+enum class alignment_edges_t {
+    wrong = -1,
+    sketch_edges = 0,
+    extend_equally = 1,
+}; 
+
+alignment_edges_t str2alignment_edges(string t) {
+    if (t == "sketch_edges") return alignment_edges_t::sketch_edges;
+    if (t == "extend_equally") return alignment_edges_t::extend_equally;
+	return alignment_edges_t::wrong;
+}
+
+std::string getAlignmentEdgesDescription(alignment_edges_t ae) {
+    switch (ae) {
+        case alignment_edges_t::sketch_edges:
+            return "Use the beginning of the first matched sketch and the end of the last matched sketch.";
+        case alignment_edges_t::extend_equally:
+            return "Make the length equal to |P| by extending the sketch edges equally.";
+        default:	
+            return "wrong";
     }
 }
 
@@ -51,6 +74,7 @@ struct params_t {
 	uint32_t k;  						//The k-mer length
 	uint32_t w;  							//The window size
 	elastic_t elastic;
+	alignment_edges_t alignment_edges;
 	double hFrac;  					//The FracMinHash ratio
 	//uint32_t comWght; 			//Scoring weights
 	//float uniWght;
@@ -65,28 +89,30 @@ struct params_t {
 		k = K; 						//The k-mer length
 		w = W; 							//The window size
 		elastic = elastic_t::off;
+		alignment_edges = alignment_edges_t::sketch_edges;
 		hFrac = HASH_RATIO;
 		//comWght = DEFAULT_WEIGHT; 			//Scoring weights
 		//uniWght = DEFAULT_WEIGHT;
 		tThres = T; 							//The t-homology threshold
 		dec = 0; 								//Intercept and decent to interpolate thresholds
 		inter = 0;
-		bLstFl = "highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
+		bLstFl = ""; //"highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
 	}
 
 	void print(std::ostream& out = std::cout) {
 		out << "Parameters:" << endl;
-		out << "  normalize: " << normalize << endl;
-		out << "  k:         " << k << endl;
-		out << "  w:         " << w << endl;
-		out << "  elastic:   " << getElasticDescription(elastic) << endl;
-		out << "  hFrac:     " << hFrac << endl;
-		out << "  tThres:    " << tThres << endl;
-		out << "  dec:       " << dec << endl;
-		out << "  inter:     " << inter << endl;
-		out << "  pFile:     " << pFile << endl;
-		out << "  tFile:     " << tFile << endl;
-		out << "  bLstFl:    " << bLstFl << endl;
+		out << "  normalize:       " << normalize << endl;
+		out << "  k:               " << k << endl;
+		out << "  w:               " << w << endl;
+		out << "  elastic:         " << getElasticDescription(elastic) << endl;
+		out << "  alignment_edges: " << getAlignmentEdgesDescription(alignment_edges) << endl;
+		out << "  hFrac:           " << hFrac << endl;
+		out << "  tThres:          " << tThres << endl;
+		out << "  dec:             " << dec << endl;
+		out << "  inter:           " << inter << endl;
+		out << "  pFile:           " << pFile << endl;
+		out << "  tFile:           " << tFile << endl;
+		out << "  bLstFl:          " << bLstFl << endl;
 	}
 };
 
@@ -120,6 +146,7 @@ inline void dsHlp(){
 	cerr << "   -k   --ksize             K-mer length to be used for sketches (default " << K << ")" << endl;
 	cerr << "   -w   --windowsize        Window size for minimizer sketching approach (default " << W << ")" << endl;
 	cerr << "   -e   --elastic           Elastic pairs of kmers {off, consecutive, random} [off]" << endl;
+	cerr << "   -a   --alignment_edges   Alignment interval {sketch_edges, extend equally} [sketch_edges]" << endl;
 	cerr << "   -r   --hashratio         FracMin hash ratio to be used for sketches (default " << HASH_RATIO << ")" << endl;
 	cerr << "   -b   --blacklist         File containing hashes to ignore for sketch calculation" << endl;
 	cerr << "   -c   --commonhashweight  Weight to reward common hashes (default " << DEFAULT_WEIGHT << ")" << endl;
@@ -142,6 +169,7 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
         {"ksize",              required_argument,  0, 'k'},
         {"windowsize",         required_argument,  0, 'w'},
         {"elastic",            required_argument,  0, 'e'},
+        {"alignment_edges",    required_argument,  0, 'a'},
         {"hashratio",          required_argument,  0, 'r'},
         {"blacklist",          required_argument,  0, 'b'},
         {"commonhashweight",   required_argument,  0, 'c'},
@@ -180,6 +208,14 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
 				params->elastic = str2elastic(optarg);
 				if(params->elastic == elastic_t::wrong) {
 					cerr << "ERROR: Elastic parameter not from the list." << endl;
+					return false;
+				}
+				break;
+			case 'a':
+				//Elastic kmers
+				params->alignment_edges = str2alignment_edges(optarg);
+				if(params->alignment_edges == alignment_edges_t::wrong) {
+					cerr << "ERROR: Alignment edges not from the list." << endl;
 					return false;
 				}
 				break;
@@ -404,7 +440,9 @@ bool reader_t::init(int argc, char **argv) {
 		return 1;
 	}
 
-	bLstmers = readBlstKmers(params.bLstFl);
+	if (!params.bLstFl.empty()) {
+		bLstmers = readBlstKmers(params.bLstFl);
+	}
 
 	//Construct index of reference
 	if((tidx = mm_idx_reader_read(r, 1)) == 0){ //TODO: Make use of multithreading here!

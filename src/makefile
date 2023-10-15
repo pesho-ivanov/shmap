@@ -13,7 +13,9 @@ sweep: sweep.cpp IO.h Index.h Measures.h Sketch.h
 
 run100: sweep
 	mkdir -p ../out
+	./sweep -s ../simulations/genomes/t2thumanChrY.fasta -p ../simulations/reads/100.fasta -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt >../out/sweep100.out
 	./sweep -s ../simulations/genomes/t2thumanChrY.fasta -p ../simulations/reads/100.fasta -k 15 >../out/sweep100.out
+	./sweep -s ../simulations/genomes/t2thumanChrY.fasta -p ../simulations/reads/100.fasta -k 15 -a extend_equally >../out/sweep100.out
 
 clean:
 	rm -f sweep
