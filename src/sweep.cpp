@@ -6,8 +6,6 @@
 #include "IO.h"
 #include "Index.h"
 
-//The FracMinHash ratio
-double hFrac = HASH_RATIO;
 unordered_map<uint64_t, char> bLstmers;
 
 struct Match {
@@ -39,9 +37,13 @@ struct Mapping {
 };
 
 //This function outputs all given t-homologies
-inline void outputMappings(const vector<Mapping>& res, const uint32_t& pLen, const string &seqID, const string &text){
+inline void outputMappings(const vector<Mapping>& res, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text){
 	//Iterate over t-homologies
-	for(const auto &m: res) {
+	for(auto m: res) {
+		int span = m.r_T_pos - m.l_T_pos + 1;  assert(span <= m.P_sz);
+		int shift = (m.P_sz - span) / 2;       assert(shift >= 0);
+//		m.l_T_pos -= shift; m.l_T_pos = max((uint32_t)0, m.l_T_pos);
+//		m.r_T_pos += shift; m.r_T_pos = min(T_sz-1, m.r_T_pos);
 		cout << seqID << "\t" << m.k << "\t" << m.P_sz << "\t" << m.p_sz << "\t"
 			<< m.matches << "\t" << m.l_T_pos << "\t" << m.r_T_pos << "\t" << m.xmin << "\t" << m.J << endl;
         if (!text.empty())
@@ -151,7 +153,7 @@ double J(size_t p_sz, const vector<Match>::iterator l, const vector<Match>::iter
 	int s_sz = prev(r)->t_pos - l->t_pos + 1;
 	if (s_sz < 0)
 		return 0;
-	p_sz *= 2, s_sz *= 2;  // to account for L2
+	//p_sz *= 2, s_sz *= 2;  // to account for L2
     assert(p_sz + s_sz - xmin > 0);
     double scj = 1.0 * xmin / (p_sz + s_sz - xmin);
     if (!(0.0 <= scj && scj <= 1.0))
@@ -202,9 +204,9 @@ const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Ple
 				++xmin;
 			assert (l->T_pos <= r->T_pos);
 
-			auto pair_ord = L2[r-L.begin()];
-			if (pair_ord<diff_hist.size() && --diff_hist[pair_ord] >= 0)
-				++xmin;
+			//auto pair_ord = L2[r-L.begin()];
+			//if (pair_ord<diff_hist.size() && --diff_hist[pair_ord] >= 0)
+			//	++xmin;
         }
 		
 		// Update best.
@@ -216,9 +218,9 @@ const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Ple
 		if (++diff_hist[l->kmer_ord] > 0)
 			--xmin;
 
-		auto pair_ord = L2[l-L.begin()];
-		if (pair_ord<diff_hist.size() && ++diff_hist[pair_ord] > 0)
-			--xmin;
+		//auto pair_ord = L2[l-L.begin()];
+		//if (pair_ord<diff_hist.size() && ++diff_hist[pair_ord] > 0)
+		//	--xmin;
 
         assert(xmin >= 0);
     }
@@ -229,109 +231,27 @@ const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Ple
 }
 
 int main(int argc, char **argv){
-	bool normalize = NORM_FLAG_DEFAULT; 		//Flag to save that scores are to be normalized
-	bool noNesting = NESTING_FLAG_DEFAULT; 		//Flag to state if we are interested in nested results
-	uint32_t kmerLen = K; 						//The k-mer length
-	uint32_t w = W; 							//The window size
-	uint32_t comWght = DEFAULT_WEIGHT; 			//Scoring weights
-	float uniWght = DEFAULT_WEIGHT;
-	float tThres = T; 							//The t-homology threshold
-	float dec = 0; 								//Intercept and decent to interpolate thresholds
-	float inter = 0;
-	string pFile, tFile, bLstFl = "highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
-	string seq; 								//An input sequence
-	ifstream fStr; 								//A file stream
-
-	//A hash table to store black listed k-mers
-	// unordered_map<uint64_t, char> bLstmers;
-
-	mm_idxopt_t iopt; 							//An index option struct
-	mm_mapopt_t mopt; 							//A mapping options struct
-	mm_idx_reader_t *r; 						//An index reader
-	const mm_idx_t *tidx; 						//A pointer to the text index
-	const mm_idx_t *pidx; 						//A pointer to the pattern index
-	vector<tuple<string, uint32_t, Sketch>> pSks; //A vector of pattern sketches
-	vector<tuple<string, uint32_t, Sketch>>::const_iterator p; //An iterator to iterate over pattern sketches
-
-	//Parse arguments
-	if(!prsArgs(argc, argv, pFile, tFile, kmerLen, w, hFrac, bLstFl, comWght, uniWght, tThres, normalize, dec, inter, noNesting)){//TODO: Tests for this function need to be adapted!
-		dsHlp(); //Display help message
-		return 1;
-	}
-
-	//Set index options to default
-	mm_set_opt(0, &iopt, &mopt);
-	iopt.k = kmerLen; //Adjust k if necessary
-	iopt.w = w;
-	r = mm_idx_reader_open(tFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);  //Open an index reader //TODO: We do not allow yet to use a prebuilt index
-
-	//Check if index could be opened successfully
-	if(r == NULL){
-		cerr << "ERROR: Text sequence file could not be read" << endl;
-		return -1;
-	}
-
-	bLstmers = readBlstKmers(bLstFl);
-
-	//Construct index of reference
-	if((tidx = mm_idx_reader_read(r, 1)) == 0){//TODO: Make use of multithreading here!
-		cerr << "ERROR: Text index cannot be read" << endl;
-		return -1;
-	}
-
-	//For simplicity we assume that an index always consists of only one part
-	if(mm_idx_reader_read(r, 1) != 0){
-		cerr << "ERROR: Text index consists of several parts! We cannot handle this yet" << endl;
-		return -1; 
-	}
-
-	//Open index reader to read pattern
-	r = mm_idx_reader_open(pFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);
-
-	//Check if index could be opened successfully
-	if(r == NULL){
-		cerr << "ERROR: Pattern sequence file could not be read" << endl;
-		return -1;
-	}
-
-	//Construct index of reference
-	if((pidx = mm_idx_reader_read(r, 1)) == 0){//TODO: Make use of multithreading here!
-		cerr << "ERROR: Pattern index cannot be read" << endl;
-		return -1;
-	}
-
-	//For simplicity we assume that an index always consists of only one part
-	if(mm_idx_reader_read(r, 1) != 0){
-		cerr << "ERROR: Pattern index consists of several parts! We cannot handle this yet" << endl;
-		return -1; 
-	}
-
-	fStr.open(pFile);  //Open stream to read in patterns
-
-    string text;
-    //readFASTA(tFile, text);
-	//Sketch tsk = buildMiniSketch(text, kmerLen, tidx->w, bLstmers);
-    //cerr << "|T| = " << text.size() << ", |t| = " << tsk.size() << endl;
+	reader_t reader;
+	auto res = reader.init(argc, argv);
+	assert(res == 0);
 
 	//Load pattern sequences in batches
-	// while(lPttnSks(fStr, kmerLen, hFrac, bLstmers, pSks) || !pSks.empty()){//TODO: Test for this function need to be adaptated!
-	while(lMiniPttnSks(fStr, kmerLen, tidx->w, bLstmers, pSks) || !pSks.empty()){//TODO: This function still needs to be tested!
+	while(lMiniPttnSks(reader.fStr, reader.kmerLen, reader.tidx->w, bLstmers, reader.pSks) || !reader.pSks.empty()){ //TODO: This function still needs to be tested!
 		//Iterate over pattern sketches
-		for(p = pSks.begin(); p != pSks.end(); ++p){
+		for(auto p = reader.pSks.begin(); p != reader.pSks.end(); ++p){
 			auto seqID = get<0>(*p);
             auto plen_nucl = get<1>(*p);
             auto sks = get<2>(*p);
 
 			//Calculate an adapted threshold if we have the necessary informations
-			if(dec != 0 && inter != 0) tThres = dec * plen_nucl + inter;
+			//float curr_tThres = (reader.dec != 0 && reader.inter != 0) ? reader.dec * plen_nucl + reader.inter : reader.tThres;
 
 			//Find t-homologies and output them
-            auto res = sweep(sks, tidx, plen_nucl, iopt.k);
-			outputMappings(res, sks.size(), seqID, text);//TODO: Tests for this function need to be adaptated!
+            auto res = sweep(sks, reader.tidx, plen_nucl, reader.iopt.k);
+			outputMappings(res, sks.size(), seqID, reader.T_sz, reader.text);//TODO: Tests for this function need to be adaptated!
 		}
 
-		//Remove processed pattern sketches
-		pSks.clear();
+		reader.pSks.clear();
 	}
 
 	return 0;

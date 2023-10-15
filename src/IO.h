@@ -4,6 +4,7 @@
 #include <getopt.h>
 #include <fstream>
 
+#include "Index.h"
 #include "Measures.h"
 
 #define T 0
@@ -19,19 +20,46 @@ using Thomology = tuple<uint32_t, uint32_t, int32_t>;
 #define PATTERN_BATCH_SIZE 250000
 #define STRING_BUFFER_SIZE_DEFAULT 50
 
-//This function prints usage infos
-inline void dspHlp(){
-	cerr << "CalcSim [-hil] [-a SEQ1] [-b SEQ2]" << endl << endl;
-	cerr << "Calculating sequence similarity based on their sketches." << endl << endl;
-	cerr << "Required parameters:" << endl;
-	cerr << "   -a   --seqa  First input sequence" << endl;
-	cerr << "   -b   --seqb  Second input sequence" << endl << endl;
-	cerr << "Required parameters without argument:" << endl;
-	cerr << "   -i   --intersim     Calculate similarity based on intersection measure" << endl;
-	cerr << "   -l   --algnHshsSim  Calculate similarity based on aligning hashes measure" << endl;
-	cerr << "Optional parameters without argument:" << endl;
-	cerr << "   -h   --help      Display this help message" << endl;
-}
+struct reader_t {
+	bool normalize = NORM_FLAG_DEFAULT; 		//Flag to save that scores are to be normalized
+	bool noNesting = NESTING_FLAG_DEFAULT; 		//Flag to state if we are interested in nested results
+	uint32_t kmerLen = K; 						//The k-mer length
+	uint32_t w = W; 							//The window size
+	double hFrac = HASH_RATIO; 					//The FracMinHash ratio
+	//uint32_t comWght = DEFAULT_WEIGHT; 			//Scoring weights
+	//float uniWght = DEFAULT_WEIGHT;
+	float tThres = T; 							//The t-homology threshold
+	float dec = 0; 								//Intercept and decent to interpolate thresholds
+	float inter = 0;
+	string pFile, tFile;
+	string bLstFl = "highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
+	ifstream fStr; 								//A file stream
+
+	mm_idxopt_t iopt; 							//An index option struct
+	mm_mapopt_t mopt; 							//A mapping options struct
+	mm_idx_reader_t *r; 						//An index reader
+	const mm_idx_t *tidx; 						//A pointer to the text index
+	const mm_idx_t *pidx; 						//A pointer to the pattern index
+	vector<tuple<string, uint32_t, Sketch>> pSks; //A vector of pattern sketches
+
+	uint32_t T_sz;
+	string text;
+
+	reader_t() {
+		normalize = NORM_FLAG_DEFAULT; 		//Flag to save that scores are to be normalized
+		noNesting = NESTING_FLAG_DEFAULT; 		//Flag to state if we are interested in nested results
+		kmerLen = K; 						//The k-mer length
+		w = W; 							//The window size
+		//comWght = DEFAULT_WEIGHT; 			//Scoring weights
+		//uniWght = DEFAULT_WEIGHT;
+		tThres = T; 							//The t-homology threshold
+		dec = 0; 								//Intercept and decent to interpolate thresholds
+		inter = 0;
+		bLstFl = "highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
+	}
+
+	bool init(int argc, char **argv);
+};
 
 //This function prints usage infos
 inline void dsHlp(){
@@ -57,104 +85,71 @@ inline void dsHlp(){
 	cerr << "   -h   --help       Display this help message" << endl;
 }
 
-//inline void outputHomsWithNucl(const vector<Thomology>& homs, const uint32_t& pLen){
-//	//Iterate over t-homologies
-//	for(vector<Thomology>::const_iterator h = homs.begin(); h != homs.end(); ++h){
-//		//Normalize score before reporting if requested
-//        cout << "i: " << get<0>(*h) << " j: " << get<1>(*h) << " score: " << (double) get<2>(*h) / max(pLen, get<1>(*h) - 
-//            get<0>(*h) + 1) << endl;
+//This function parses the program parameters. Returns false if given arguments are not valid
+//const bool prsArgs(int& nArgs, char** argList, string& seqa, string& seqb, Measure& msr){
+//	bool seqaGvn = false, seqbGvn = false;
+//	int option_index = 0, a;
+//
+//	//Check if enough arguments are given at all
+//	if(nArgs < MIN_PARAM_NB) return false;
+//
+//	static struct option long_options[] = {
+//        {"seqa",        required_argument,  0, 'a'},
+//        {"seqb",        required_argument,  0, 'b'},
+//        {"intersim",    no_argument,        0, 'i'},
+//        {"algnHshsSim", no_argument,        0, 'l'},
+//        {"help",        no_argument,        0, 'h'},
+//        {0,             0,                  0,  0 }
+//    };
+//
+//    //Parse all parameters given
+//	while ((a = getopt_long(nArgs, argList, OPTIONS, long_options, &option_index)) != -1){
+//		//Assign parameter values
+//		switch(a){
+//			case 'a':
+//				//Save input sequence
+//				seqa = optarg;
+//				//Note that we have seen one input sequence
+//				seqaGvn = true;
+//				break;
+//			case 'b':
+//				//Save input sequence
+//				seqb = optarg;
+//				//Note that we have seen one input sequence
+//				seqbGvn = true;
+//				break;
+//			case 'i':
+//				//Check if another measure was also given as a parameter
+//				if(msr != none && msr != intersec){
+//					cerr << "ERROR: Only one measure can be calculated at a time!" << endl;
+//
+//					return false;
+//				}
+//
+//				msr = intersec;
+//				break;
+//			case 'l':
+//				//Check if another measure was also given as a parameter
+//				if(msr != none && msr != algnWoutOffs){
+//					cerr << "ERROR: Only one measure can be calculated at a time!" << endl;
+//
+//					return false;
+//				}
+//
+//				msr = algnWoutOffs;
+//				break;
+//			case 'h':
+//				return false;
+//			default:
+//				break;
+//		}
 //	}
+//
+//	return seqaGvn && seqbGvn && msr != none;
 //}
 
-////This function parses the program parameters. Returns false if given arguments are not valid
-//const bool prsArgs(int& nArgs, char** argList, string& seqa, string& seqb, Measure& msr);
-//
-////This function parses the program parameters. Returns false if given arguments are not valid
-//const bool prsArgs(int& nArgs, char** argList, string& pFl, string& tFl, uint32_t& k, uint32_t& w, double& hFrac, string& blFl, 
-//	uint32_t& cw, float& uw, float& tThres, bool& norm, float& dec, float& inter, bool& noNesting);
-//
-////This function reads a file in FASTA format and returns true on success
-//const bool readFASTA(const string& filePath, string& seq);
-//
-////This function reads in batches of FASTA sequence entries from file and transforms them into sketches. Returns false if end of file
-////was reached.
-//const bool lPttnSks(ifstream& fStr, const uint32_t& k, const double& hFrac, const unordered_map<uint64_t, char>& bLstmers, 
-//	vector<tuple<string, uint32_t, Sketch>>& pSks);
-//
-////This function reads in batches of FASTA sequence entries from file and transforms them into minimap sketches. Returns false if end
-//// of file was reached.
-//const bool lMiniPttnSks(ifstream& fStr, const uint32_t& k, const uint32_t& w, const unordered_map<uint64_t, char>& blmers, 
-//	vector<tuple<string, uint32_t, Sketch>>& pSks);
-//
-////This function reads 64-bit numbers from file and returns them as a hash table
-//const unordered_map<uint64_t, char> readBlstKmers(const string& fname);
-
 //This function parses the program parameters. Returns false if given arguments are not valid
-const bool prsArgs(int& nArgs, char** argList, string& seqa, string& seqb, Measure& msr){
-	bool seqaGvn = false, seqbGvn = false;
-	int option_index = 0, a;
-
-	//Check if enough arguments are given at all
-	if(nArgs < MIN_PARAM_NB) return false;
-
-	static struct option long_options[] = {
-        {"seqa",        required_argument,  0, 'a'},
-        {"seqb",        required_argument,  0, 'b'},
-        {"intersim",    no_argument,        0, 'i'},
-        {"algnHshsSim", no_argument,        0, 'l'},
-        {"help",        no_argument,        0, 'h'},
-        {0,             0,                  0,  0 }
-    };
-
-    //Parse all parameters given
-	while ((a = getopt_long(nArgs, argList, OPTIONS, long_options, &option_index)) != -1){
-		//Assign parameter values
-		switch(a){
-			case 'a':
-				//Save input sequence
-				seqa = optarg;
-				//Note that we have seen one input sequence
-				seqaGvn = true;
-				break;
-			case 'b':
-				//Save input sequence
-				seqb = optarg;
-				//Note that we have seen one input sequence
-				seqbGvn = true;
-				break;
-			case 'i':
-				//Check if another measure was also given as a parameter
-				if(msr != none && msr != intersec){
-					cerr << "ERROR: Only one measure can be calculated at a time!" << endl;
-
-					return false;
-				}
-
-				msr = intersec;
-				break;
-			case 'l':
-				//Check if another measure was also given as a parameter
-				if(msr != none && msr != algnWoutOffs){
-					cerr << "ERROR: Only one measure can be calculated at a time!" << endl;
-
-					return false;
-				}
-
-				msr = algnWoutOffs;
-				break;
-			case 'h':
-				return false;
-			default:
-				break;
-		}
-	}
-
-	return seqaGvn && seqbGvn && msr != none;
-}
-
-//This function parses the program parameters. Returns false if given arguments are not valid
-const bool prsArgs(int& nArgs, char** argList, string& pFl, string& tFl, uint32_t& k, uint32_t& w, double& hFrac, string& blFl, 
-	uint32_t& cw, float& uw, float& tThres, bool& norm, float& dec, float& inter, bool& noNesting){
+const bool prsArgs(int& nArgs, char** argList, reader_t *reader){
 	int option_index = 0, a;
 
 	static struct option long_options[] = {
@@ -181,11 +176,11 @@ const bool prsArgs(int& nArgs, char** argList, string& pFl, string& tFl, uint32_
 		switch(a){
 			case 'p':
 				//Save input sequence
-				pFl = optarg;
+				reader->pFile = optarg;
 				break;
 			case 's':
 				//Save input sequence
-				tFl = optarg;
+				reader->tFile = optarg;
 				break;
 			case 'k':
 				//A k-mer length should be positive
@@ -194,7 +189,7 @@ const bool prsArgs(int& nArgs, char** argList, string& pFl, string& tFl, uint32_
 					return false;
 				}
 
-				k = atoi(optarg);
+				reader->kmerLen = atoi(optarg);
 				break;
 			case 'w':
 				//Window size should be positive
@@ -203,7 +198,7 @@ const bool prsArgs(int& nArgs, char** argList, string& pFl, string& tFl, uint32_
 					return false;
 				}
 
-				w = atoi(optarg);
+				reader->w = atoi(optarg);
 				break;
 			case 'r':
 				//Check if given value is reasonable to represent a ratio
@@ -213,46 +208,46 @@ const bool prsArgs(int& nArgs, char** argList, string& pFl, string& tFl, uint32_
 					return false;
 				}
 
-				hFrac = atof(optarg);
+				reader->hFrac = atof(optarg);
 				break;
 			case 'b':
 				//Save blacklist file name
-				blFl = optarg;
+				reader->bLstFl = optarg;
 				break;
-			case 'c':
-				//Weights should be positive
-				if(atoi(optarg) <= 0){
-					cerr << "ERROR: Common hash weight not applicable" << endl;
+			//case 'c':
+			//	//Weights should be positive
+			//	if(atoi(optarg) <= 0){
+			//		cerr << "ERROR: Common hash weight not applicable" << endl;
 
-					return false;
-				}
+			//		return false;
+			//	}
 
-				cw = atoi(optarg);
-				break;
-			case 'u':
-				//Weights should be positive
-				if(atof(optarg) <= 0){
-					cerr << "ERROR: Unique hash weight not applicable" << endl;
+			//	reader->cw = atoi(optarg);
+			//	break;
+			//case 'u':
+			//	//Weights should be positive
+			//	if(atof(optarg) <= 0){
+			//		cerr << "ERROR: Unique hash weight not applicable" << endl;
 
-					return false;
-				}
+			//		return false;
+			//	}
 
-				uw = atof(optarg);
-				break;
+			//	reader->uw = atof(optarg);
+			//	break;
 			case 't':
-				tThres = atof(optarg);
+				reader->tThres = atof(optarg);
 				break;
 			case 'd':
-				dec = atof(optarg);
+				reader->dec = atof(optarg);
 				break;
 			case 'i':
-				inter = atof(optarg);
+				reader->inter = atof(optarg);
 				break;
 			case 'n':
-				norm = true;
+				reader->normalize = true;
 				break;
 			case 'N':
-				noNesting = false;
+				reader->noNesting = false;
 				break;
 			case 'h':
 				return false;
@@ -261,7 +256,7 @@ const bool prsArgs(int& nArgs, char** argList, string& pFl, string& tFl, uint32_
 		}
 	}
 
-	return !pFl.empty() && !tFl.empty();
+	return !reader->pFile.empty() && !reader->tFile.empty();
 }
 
 //This function reads a file in FASTA format and returns true on success
@@ -459,6 +454,72 @@ const unordered_map<uint64_t, char> readBlstKmers(const string& fname){
 	while(iFile.getline(nb, STRING_BUFFER_SIZE_DEFAULT)) numbers[strtoull(nb, &end, 0)] = 1;
 
 	return numbers;
+}
+	
+bool reader_t::init(int argc, char **argv) {
+	//A hash table to store black listed k-mers
+	// unordered_map<uint64_t, char> bLstmers;
+
+	//Parse arguments
+	if(!prsArgs(argc, argv, this)){//TODO: Tests for this function need to be adapted!
+		dsHlp(); //Display help message
+		return 0;
+	}
+
+	//Set index options to default
+	mm_set_opt(0, &iopt, &mopt);
+	iopt.k = kmerLen; //Adjust k if necessary
+	iopt.w = w;
+	r = mm_idx_reader_open(tFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);  //Open an index reader //TODO: We do not allow yet to use a prebuilt index
+
+	//Check if index could be opened successfully
+	if(r == NULL){
+		cerr << "ERROR: Text sequence file could not be read" << endl;
+		return 1;
+	}
+
+	bLstmers = readBlstKmers(bLstFl);
+
+	//Construct index of reference
+	if((tidx = mm_idx_reader_read(r, 1)) == 0){ //TODO: Make use of multithreading here!
+		cerr << "ERROR: Text index cannot be read" << endl;
+		return 1;
+	}
+
+	//For simplicity we assume that an index always consists of only one part
+	if(mm_idx_reader_read(r, 1) != 0){
+		cerr << "ERROR: Text index consists of several parts! We cannot handle this yet" << endl;
+		return 1; 
+	}
+
+	//Open index reader to read pattern
+	r = mm_idx_reader_open(pFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);
+
+	//Check if index could be opened successfully
+	if(r == NULL){
+		cerr << "ERROR: Pattern sequence file could not be read" << endl;
+		return 1;
+	}
+
+	//Construct index of reference
+	if((pidx = mm_idx_reader_read(r, 1)) == 0){//TODO: Make use of multithreading here!
+		cerr << "ERROR: Pattern index cannot be read" << endl;
+		return 1;
+	}
+
+	//For simplicity we assume that an index always consists of only one part
+	if(mm_idx_reader_read(r, 1) != 0){
+		cerr << "ERROR: Pattern index consists of several parts! We cannot handle this yet" << endl;
+		return 1; 
+	}
+
+	T_sz = tidx->seq->len;  //The length of the text
+	fStr.open(pFile);  //Open stream to read in patterns
+
+	//readFASTA(tFile, text);
+	//Sketch tsk = buildMiniSketch(text, kmerLen, tidx->w, bLstmers);
+	//cerr << "|T| = " << text.size() << ", |t| = " << tsk.size() << endl;
+	return 0;
 }
 
 #endif

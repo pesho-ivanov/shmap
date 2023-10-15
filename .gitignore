@@ -11,3 +11,5 @@ out/
 *.out
 *.err
 __pycache__/
+src/sweep.d
+src/sweep.o
