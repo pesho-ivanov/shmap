@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import re
 
@@ -30,10 +32,6 @@ def parse_fasta_metadata(fasta_file):
 
     return pd.DataFrame(data)
 
-import matplotlib.pyplot as plt
-
-import numpy as np
-
 def plot_all_columns(df):
     n = len(df.columns)
     # Calculate the number of rows and columns for the grid
@@ -49,7 +47,7 @@ def plot_all_columns(df):
         ax = axes[i // cols, i % cols]
         # If the column is numeric, plot a histogram
         if pd.api.types.is_numeric_dtype(df[column]):
-            df[column].hist(ax=ax)
+            df[column].hist(ax=ax, bins=20)
             ax.set_title(f'Histogram of {column}')
             ax.set_xlabel(column)
             ax.set_ylabel('Frequency')
@@ -65,3 +63,31 @@ def plot_all_columns(df):
     
     plt.tight_layout()
     plt.show()
+
+# the intersection divided by the union of the reference intervals 
+def get_jaccard_nucl_overlap(row1, row2):
+    assert(row1['query_name'] == row2['query_name'])
+    if (row1['ref_start'] > row2['ref_end']) or (row2['ref_start'] > row1['ref_end']):
+        return 0
+    intersection = (min(row1['ref_end'], row2['ref_end']) - max(row1['ref_start'], row2['ref_start']))
+    union = (max(row1['ref_end'], row2['ref_end']) - min(row1['ref_start'], row2['ref_start']))
+    if union == 0:
+        return 0
+    return intersection / union
+
+# calculate the maximal jaccard of a row with all other rows with the same query_name in the dataframe
+def get_max_jaccard(row, groundtruth_df):
+    common = groundtruth_df[groundtruth_df['query_name'] == row['query_name']]
+    if common.shape[0] == 0:
+        return -1
+    return common.apply(lambda row2: get_jaccard_nucl_overlap(row, row2), axis=1).max()
+
+# add a column to the tested_df with the maximal intersection with a groundtruth row with the same query_name
+def add_overlap_column(tested_df, groundtruth_df, intersection_column_name):
+    tested_df[intersection_column_name] = tested_df.apply(lambda row: get_max_jaccard(row, groundtruth_df), axis=1)
+
+# get the accuracy
+def get_accuracy(tested_df, groundtruth_df):
+    add_overlap_column(tested_df, groundtruth_df, 'overlap')
+    accuracy = tested_df[tested_df['overlap'] > 0.1].shape[0] / tested_df.shape[0]
+    return accuracy
