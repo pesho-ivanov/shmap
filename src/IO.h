@@ -16,23 +16,52 @@ using Thomology = tuple<uint32_t, uint32_t, int32_t>;
 #define MIN_PARAM_NB 6
 #define MAX_RATIO 1.0
 #define NORM_FLAG_DEFAULT false
-#define NESTING_FLAG_DEFAULT true
 #define PATTERN_BATCH_SIZE 250000
 #define STRING_BUFFER_SIZE_DEFAULT 50
 
-struct reader_t {
-	bool normalize = NORM_FLAG_DEFAULT; 		//Flag to save that scores are to be normalized
-	bool noNesting = NESTING_FLAG_DEFAULT; 		//Flag to state if we are interested in nested results
-	uint32_t kmerLen = K; 						//The k-mer length
-	uint32_t w = W; 							//The window size
-	double hFrac = HASH_RATIO; 					//The FracMinHash ratio
+struct params_t {
+	bool normalize; //= NORM_FLAG_DEFAULT; 		//Flag to save that scores are to be normalized
+	uint32_t k; // = K; 						//The k-mer length
+	uint32_t w; // = W; 							//The window size
+	double hFrac; // = HASH_RATIO; 					//The FracMinHash ratio
 	//uint32_t comWght = DEFAULT_WEIGHT; 			//Scoring weights
 	//float uniWght = DEFAULT_WEIGHT;
-	float tThres = T; 							//The t-homology threshold
-	float dec = 0; 								//Intercept and decent to interpolate thresholds
-	float inter = 0;
+	float tThres; // = T; 							//The t-homology threshold
+	float dec; // = 0; 								//Intercept and decent to interpolate thresholds
+	float inter; // = 0;
 	string pFile, tFile;
-	string bLstFl = "highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
+	string bLstFl; // = "highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
+
+	params_t() {
+		normalize = NORM_FLAG_DEFAULT; 		//Flag to save that scores are to be normalized
+		k = K; 						//The k-mer length
+		w = W; 							//The window size
+		hFrac = HASH_RATIO;
+		//comWght = DEFAULT_WEIGHT; 			//Scoring weights
+		//uniWght = DEFAULT_WEIGHT;
+		tThres = T; 							//The t-homology threshold
+		dec = 0; 								//Intercept and decent to interpolate thresholds
+		inter = 0;
+		bLstFl = "highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
+	}
+
+	void print(std::ostream& out = std::cout) {
+		out << "Parameters:" << endl;
+		out << "  normalize: " << normalize << endl;
+		out << "  k:         " << k << endl;
+		out << "  w:         " << w << endl;
+		out << "  hFrac:     " << hFrac << endl;
+		out << "  tThres:    " << tThres << endl;
+		out << "  dec:       " << dec << endl;
+		out << "  inter:     " << inter << endl;
+		out << "  pFile:     " << pFile << endl;
+		out << "  tFile:     " << tFile << endl;
+		out << "  bLstFl:    " << bLstFl << endl;
+	}
+};
+
+struct reader_t {
+	params_t params;
 	ifstream fStr; 								//A file stream
 
 	mm_idxopt_t iopt; 							//An index option struct
@@ -46,16 +75,6 @@ struct reader_t {
 	string text;
 
 	reader_t() {
-		normalize = NORM_FLAG_DEFAULT; 		//Flag to save that scores are to be normalized
-		noNesting = NESTING_FLAG_DEFAULT; 		//Flag to state if we are interested in nested results
-		kmerLen = K; 						//The k-mer length
-		w = W; 							//The window size
-		//comWght = DEFAULT_WEIGHT; 			//Scoring weights
-		//uniWght = DEFAULT_WEIGHT;
-		tThres = T; 							//The t-homology threshold
-		dec = 0; 								//Intercept and decent to interpolate thresholds
-		inter = 0;
-		bLstFl = "highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
 	}
 
 	bool init(int argc, char **argv);
@@ -63,8 +82,8 @@ struct reader_t {
 
 //This function prints usage infos
 inline void dsHlp(){
-	cerr << "eskemap [-hn] [-p PATTERN_FILE] [-s TEXT_FILE] [-k KMER_LEN] [-r HASH_RATIO] [-b BLACKLIST] [-c COM_HASH_WGHT] [-u UNI\
-	_HASH_WGHT] [-t HOM_THRES] [-d DECENT] [-i INTERCEPT] [-N NESTING]" << endl << endl;
+	cerr << "sweep [-hn] [-p PATTERN_FILE] [-s TEXT_FILE] [-k KMER_LEN] [-r HASH_RATIO] [-b BLACKLIST] [-c COM_HASH_WGHT] [-u UNI\
+	_HASH_WGHT] [-t HOM_THRES] [-d DECENT] [-i INTERCEPT]" << endl << endl;
 	cerr << "Find sketch-based pattern similarity in text." << endl << endl;
 	cerr << "Required parameters:" << endl;
 	cerr << "   -p   --pattern  Pattern sequences file (FASTA format)" << endl;
@@ -81,75 +100,11 @@ inline void dsHlp(){
 	cerr << "   -i   --intercept         Intercept required for dynamic threshold selection" << endl;
 	cerr << "Optional parameters without argument:" << endl;
 	cerr << "   -n   --normalize  Normalize scores by length" << endl;
-	cerr << "   -N   --nesting    Output nested homologies" << endl;
 	cerr << "   -h   --help       Display this help message" << endl;
 }
 
 //This function parses the program parameters. Returns false if given arguments are not valid
-//const bool prsArgs(int& nArgs, char** argList, string& seqa, string& seqb, Measure& msr){
-//	bool seqaGvn = false, seqbGvn = false;
-//	int option_index = 0, a;
-//
-//	//Check if enough arguments are given at all
-//	if(nArgs < MIN_PARAM_NB) return false;
-//
-//	static struct option long_options[] = {
-//        {"seqa",        required_argument,  0, 'a'},
-//        {"seqb",        required_argument,  0, 'b'},
-//        {"intersim",    no_argument,        0, 'i'},
-//        {"algnHshsSim", no_argument,        0, 'l'},
-//        {"help",        no_argument,        0, 'h'},
-//        {0,             0,                  0,  0 }
-//    };
-//
-//    //Parse all parameters given
-//	while ((a = getopt_long(nArgs, argList, OPTIONS, long_options, &option_index)) != -1){
-//		//Assign parameter values
-//		switch(a){
-//			case 'a':
-//				//Save input sequence
-//				seqa = optarg;
-//				//Note that we have seen one input sequence
-//				seqaGvn = true;
-//				break;
-//			case 'b':
-//				//Save input sequence
-//				seqb = optarg;
-//				//Note that we have seen one input sequence
-//				seqbGvn = true;
-//				break;
-//			case 'i':
-//				//Check if another measure was also given as a parameter
-//				if(msr != none && msr != intersec){
-//					cerr << "ERROR: Only one measure can be calculated at a time!" << endl;
-//
-//					return false;
-//				}
-//
-//				msr = intersec;
-//				break;
-//			case 'l':
-//				//Check if another measure was also given as a parameter
-//				if(msr != none && msr != algnWoutOffs){
-//					cerr << "ERROR: Only one measure can be calculated at a time!" << endl;
-//
-//					return false;
-//				}
-//
-//				msr = algnWoutOffs;
-//				break;
-//			case 'h':
-//				return false;
-//			default:
-//				break;
-//		}
-//	}
-//
-//	return seqaGvn && seqbGvn && msr != none;
-//}
-
-//This function parses the program parameters. Returns false if given arguments are not valid
-const bool prsArgs(int& nArgs, char** argList, reader_t *reader){
+const bool prsArgs(int& nArgs, char** argList, params_t *params){
 	int option_index = 0, a;
 
 	static struct option long_options[] = {
@@ -165,7 +120,6 @@ const bool prsArgs(int& nArgs, char** argList, reader_t *reader){
         {"decent",             required_argument,  0, 'd'},
         {"intercept",          required_argument,  0, 'i'},
         {"normalize",          no_argument,        0, 'n'},
-        {"nesting",            no_argument,        0, 'N'},
         {"help",               no_argument,        0, 'h'},
         {0,                    0,                  0,  0 }
     };
@@ -176,11 +130,11 @@ const bool prsArgs(int& nArgs, char** argList, reader_t *reader){
 		switch(a){
 			case 'p':
 				//Save input sequence
-				reader->pFile = optarg;
+				params->pFile = optarg;
 				break;
 			case 's':
 				//Save input sequence
-				reader->tFile = optarg;
+				params->tFile = optarg;
 				break;
 			case 'k':
 				//A k-mer length should be positive
@@ -189,7 +143,7 @@ const bool prsArgs(int& nArgs, char** argList, reader_t *reader){
 					return false;
 				}
 
-				reader->kmerLen = atoi(optarg);
+				params->k = atoi(optarg);
 				break;
 			case 'w':
 				//Window size should be positive
@@ -198,7 +152,7 @@ const bool prsArgs(int& nArgs, char** argList, reader_t *reader){
 					return false;
 				}
 
-				reader->w = atoi(optarg);
+				params->w = atoi(optarg);
 				break;
 			case 'r':
 				//Check if given value is reasonable to represent a ratio
@@ -208,11 +162,11 @@ const bool prsArgs(int& nArgs, char** argList, reader_t *reader){
 					return false;
 				}
 
-				reader->hFrac = atof(optarg);
+				params->hFrac = atof(optarg);
 				break;
 			case 'b':
 				//Save blacklist file name
-				reader->bLstFl = optarg;
+				params->bLstFl = optarg;
 				break;
 			//case 'c':
 			//	//Weights should be positive
@@ -235,19 +189,16 @@ const bool prsArgs(int& nArgs, char** argList, reader_t *reader){
 			//	reader->uw = atof(optarg);
 			//	break;
 			case 't':
-				reader->tThres = atof(optarg);
+				params->tThres = atof(optarg);
 				break;
 			case 'd':
-				reader->dec = atof(optarg);
+				params->dec = atof(optarg);
 				break;
 			case 'i':
-				reader->inter = atof(optarg);
+				params->inter = atof(optarg);
 				break;
 			case 'n':
-				reader->normalize = true;
-				break;
-			case 'N':
-				reader->noNesting = false;
+				params->normalize = true;
 				break;
 			case 'h':
 				return false;
@@ -256,7 +207,7 @@ const bool prsArgs(int& nArgs, char** argList, reader_t *reader){
 		}
 	}
 
-	return !reader->pFile.empty() && !reader->tFile.empty();
+	return !params->pFile.empty() && !params->tFile.empty();
 }
 
 //This function reads a file in FASTA format and returns true on success
@@ -305,69 +256,6 @@ const bool readFASTA(const string& filePath, string& seq){
 
 	return true;
 }
-
-//This function reads in batches of FASTA sequence entries from file and transforms them into sketches. Returns false if end of file
-//was reached.
-//const bool lPttnSks(ifstream& fStr, const uint32_t& k, const double& hFrac, const unordered_map<uint64_t, char>& bLstmers, 
-//	vector<tuple<string, uint32_t, Sketch>>& pSks){
-//	bool headerRead, idRead = false, lnBrkDiscvd = false;
-//	char c;
-//	string seq, seqID;
-//
-//	//Check if the file is open
-//	if(!fStr.is_open()) return false;
-//
-//	//If this function is called iteratively, the '>' of the next entry has already been read
-//	headerRead = fStr.gcount() != 0;
-//
-//	//Read in file character by character
-//	while(fStr.get(c)){
-//		//An entry's sequence is complete if we find a second header (which can only start after at least one line break) in the 
-//		//file
-//		if(c == '>' && headerRead && lnBrkDiscvd){
-//			//Add sequence's sketch, length and id to result vector
-//			pSks.push_back(make_tuple(seqID, seq.length(), buildSketch(seq, k, hFrac, bLstmers)));
-//			//Clear sequence id
-//			seqID.clear();
-//			//Clear sequence
-//			seq.clear();
-//
-//			//Check if enough sequences have been read
-//			if(pSks.size() == PATTERN_BATCH_SIZE) return true;
-//
-//			//Reset id-read flag
-//			idRead = false;
-//			//Reset line-break-discovered flag
-//			lnBrkDiscvd = false;
-//			continue;
-//		}
-//
-//		//Note if we have completely read the sequence id
-//		idRead = idRead || (headerRead && c == ' ' && !lnBrkDiscvd);
-//		//Note if we have found the first line break after a new header started
-//		lnBrkDiscvd = lnBrkDiscvd || c == '\n';
-//
-//		//Update sequence id if we are still reading it
-//		if(headerRead && !lnBrkDiscvd && !idRead){
-//			seqID += c;
-//			continue;
-//		}
-//
-//		//Note if we have found the beginning of a header
-//		headerRead = headerRead || (c == '>');
-//
-//		//There is no sequence to load in the header line
-//		if(headerRead && !lnBrkDiscvd) continue;
-//
-//		//We are only interested in unambigous, unmasked nucleotides
-//		if(c == 'A' || c == 'C' || c == 'G' || c == 'T') seq += c;
-//	}
-//
-//	//Add last entry's sketch and sequence id to result vector if it is not empty
-//	if(!seq.empty()) pSks.push_back(make_tuple(seqID, seq.length(), buildSketch(seq, k, hFrac, bLstmers)));
-//
-//	return false;
-//}
 
 //This function reads in batches of FASTA sequence entries from file and transforms them into minimap sketches. Returns false if end
 // of file was reached.
@@ -461,16 +349,16 @@ bool reader_t::init(int argc, char **argv) {
 	// unordered_map<uint64_t, char> bLstmers;
 
 	//Parse arguments
-	if(!prsArgs(argc, argv, this)){//TODO: Tests for this function need to be adapted!
+	if(!prsArgs(argc, argv, &params)){//TODO: Tests for this function need to be adapted!
 		dsHlp(); //Display help message
 		return 0;
 	}
 
 	//Set index options to default
 	mm_set_opt(0, &iopt, &mopt);
-	iopt.k = kmerLen; //Adjust k if necessary
-	iopt.w = w;
-	r = mm_idx_reader_open(tFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);  //Open an index reader //TODO: We do not allow yet to use a prebuilt index
+	iopt.k = params.k; //Adjust k if necessary
+	iopt.w = params.w;
+	r = mm_idx_reader_open(params.tFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);  //Open an index reader //TODO: We do not allow yet to use a prebuilt index
 
 	//Check if index could be opened successfully
 	if(r == NULL){
@@ -478,7 +366,7 @@ bool reader_t::init(int argc, char **argv) {
 		return 1;
 	}
 
-	bLstmers = readBlstKmers(bLstFl);
+	bLstmers = readBlstKmers(params.bLstFl);
 
 	//Construct index of reference
 	if((tidx = mm_idx_reader_read(r, 1)) == 0){ //TODO: Make use of multithreading here!
@@ -493,7 +381,7 @@ bool reader_t::init(int argc, char **argv) {
 	}
 
 	//Open index reader to read pattern
-	r = mm_idx_reader_open(pFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);
+	r = mm_idx_reader_open(params.pFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);
 
 	//Check if index could be opened successfully
 	if(r == NULL){
@@ -514,7 +402,7 @@ bool reader_t::init(int argc, char **argv) {
 	}
 
 	T_sz = tidx->seq->len;  //The length of the text
-	fStr.open(pFile);  //Open stream to read in patterns
+	fStr.open(params.pFile);  //Open stream to read in patterns
 
 	//readFASTA(tFile, text);
 	//Sketch tsk = buildMiniSketch(text, kmerLen, tidx->w, bLstmers);

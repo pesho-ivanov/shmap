@@ -180,7 +180,7 @@ inline bool should_extend_right(
 	//return extension_improves_jaccard;
 }
 
-const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Plen_nucl, const int k) {
+const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const params_t &global_params, const uint32_t Plen_nucl) {
     vector<int32_t> diff_hist;  // rem[kmer_hash] = #occurences in `p` - #occurences in `s`
     vector<Match> L;    		// for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
 	vector<uint64_t> L2;		// for all consecutive matches in L
@@ -188,7 +188,7 @@ const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Ple
 
     int xmin = 0;
     Mapping best;
-	best.k = k;
+	best.k = global_params.k;
 	best.P_sz = Plen_nucl;
 	best.p_sz = p.size();
 
@@ -198,7 +198,7 @@ const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Ple
     int i = 0, j = 0;
 	for(auto l = L.begin(), r = L.begin(); l != L.end(); ++l, ++i) {
         // Increase the right end of the window [l,r) until it gets out.
-        for(; should_extend_right(p, diff_hist, L, l, r, xmin, Plen_nucl, k); ++r, ++j) {
+        for(; should_extend_right(p, diff_hist, L, l, r, xmin, Plen_nucl, global_params.k); ++r, ++j) {
 			// If taking this kmer from T increases the intersection with P.
 			if (--diff_hist[r->kmer_ord] >= 0)
 				++xmin;
@@ -212,7 +212,7 @@ const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Ple
 		// Update best.
         auto curr_J = J(p.size(), l, r, xmin);
         if (curr_J > best.J)
-            best = Mapping(k, Plen_nucl, p.size(), L.size(), l->T_pos, prev(r)->T_pos, xmin, curr_J);
+            best = Mapping(global_params.k, Plen_nucl, p.size(), L.size(), l->T_pos, prev(r)->T_pos, xmin, curr_J);
 
         // Prepare for the next step by moving `l` to the right.
 		if (++diff_hist[l->kmer_ord] > 0)
@@ -233,10 +233,14 @@ const vector<Mapping> sweep(const Sketch& p, const mm_idx_t *tidx, const int Ple
 int main(int argc, char **argv){
 	reader_t reader;
 	auto res = reader.init(argc, argv);
+	const params_t &params = reader.params;
 	assert(res == 0);
 
+	reader.params.print(cout);
+	reader.params.print(cerr);
+
 	//Load pattern sequences in batches
-	while(lMiniPttnSks(reader.fStr, reader.kmerLen, reader.tidx->w, bLstmers, reader.pSks) || !reader.pSks.empty()){ //TODO: This function still needs to be tested!
+	while(lMiniPttnSks(reader.fStr, params.k, reader.tidx->w, bLstmers, reader.pSks) || !reader.pSks.empty()){ //TODO: This function still needs to be tested!
 		//Iterate over pattern sketches
 		for(auto p = reader.pSks.begin(); p != reader.pSks.end(); ++p){
 			auto seqID = get<0>(*p);
@@ -247,7 +251,7 @@ int main(int argc, char **argv){
 			//float curr_tThres = (reader.dec != 0 && reader.inter != 0) ? reader.dec * plen_nucl + reader.inter : reader.tThres;
 
 			//Find t-homologies and output them
-            auto res = sweep(sks, reader.tidx, plen_nucl, reader.iopt.k);
+            auto res = sweep(sks, reader.tidx, params, plen_nucl);
 			outputMappings(res, sks.size(), seqID, reader.T_sz, reader.text);//TODO: Tests for this function need to be adaptated!
 		}
 
