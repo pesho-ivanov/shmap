@@ -256,12 +256,13 @@ int main(int argc, char **argv){
 	assert(res == 0);
 
 	Sweep sweep(reader.tidx, params);
-	reader.params.print(cerr, true);
 
 	if (!params.paramsFile.empty()) {
 		cerr << "Writing parameters to " << params.paramsFile << endl;
 		auto fout = ofstream(params.paramsFile);
 		reader.params.print(fout, false);
+	} else {
+		reader.params.print(cerr, true);
 	}
 
 	//Load pattern sequences in batches
