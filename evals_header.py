@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import re
+import glob
 
 def parse_fasta_metadata(fasta_file):
     with open(fasta_file, 'r') as f:
@@ -87,7 +88,8 @@ def add_overlap_column(tested_df, groundtruth_df, intersection_column_name):
     tested_df[intersection_column_name] = tested_df.apply(lambda row: get_max_jaccard(row, groundtruth_df), axis=1)
 
 # get the accuracy
-def get_accuracy(tested_df, groundtruth_df):
-    add_overlap_column(tested_df, groundtruth_df, 'overlap')
-    accuracy = tested_df[tested_df['overlap'] > 0.1].shape[0] / tested_df.shape[0]
-    return accuracy
+def get_accuracy(df):
+    correct = df[df['overlap'] > 0.1].shape[0]
+    all = df.shape[0]
+    accuracy = correct / all
+    return correct, all, accuracy

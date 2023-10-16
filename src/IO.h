@@ -3,6 +3,7 @@
 
 #include <getopt.h>
 #include <fstream>
+#include <map>
 
 #include "Index.h"
 #include "Measures.h"
@@ -12,7 +13,7 @@
 using Thomology = tuple<uint32_t, uint32_t, int32_t>;
 
 //#define OPTIONS "a:b:ilh"
-#define T_HOM_OPTIONS "p:s:k:w:r:b:c:u:t:d:i:nNh"
+#define T_HOM_OPTIONS "p:s:k:w:r:b:a:e:c:u:t:d:z:i:nNh"
 //#define MIN_PARAM_NB 6
 #define MAX_RATIO 1.0
 #define NORM_FLAG_DEFAULT false
@@ -38,9 +39,9 @@ std::string getElasticDescription(elastic_t e) {
         case elastic_t::off:
             return "off";
         case elastic_t::consecutive:
-            return "consecutive pairs of kmers";
+            return "consecutive";
         case elastic_t::random:
-            return "random pairs of kmers";
+            return "random";
         default:	
             return "wrong";
     }
@@ -49,7 +50,7 @@ std::string getElasticDescription(elastic_t e) {
 enum class alignment_edges_t {
     wrong = -1,
     sketch_edges = 0,
-    extend_equally = 1,
+    extend_equally = 1
 }; 
 
 alignment_edges_t str2alignment_edges(string t) {
@@ -61,9 +62,11 @@ alignment_edges_t str2alignment_edges(string t) {
 std::string getAlignmentEdgesDescription(alignment_edges_t ae) {
     switch (ae) {
         case alignment_edges_t::sketch_edges:
-            return "Use the beginning of the first matched sketch and the end of the last matched sketch.";
+            //return "Use the beginning of the first matched sketch and the end of the last matched sketch.";
+            return "sketch_edges";
         case alignment_edges_t::extend_equally:
-            return "Make the length equal to |P| by extending the sketch edges equally.";
+            //return "Make the length equal to |P| by extending the sketch edges equally.";
+            return "extend_equally";
         default:	
             return "wrong";
     }
@@ -82,6 +85,7 @@ struct params_t {
 	float dec; 								//Intercept and decent to interpolate thresholds
 	float inter; 
 	string pFile, tFile;
+	string paramsFile;
 	string bLstFl; // = "highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
 
 	params_t() {
@@ -99,20 +103,33 @@ struct params_t {
 		bLstFl = ""; //"highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
 	}
 
-	void print(std::ostream& out = std::cout) {
-		out << "Parameters:" << endl;
-		out << "  normalize:       " << normalize << endl;
-		out << "  k:               " << k << endl;
-		out << "  w:               " << w << endl;
-		out << "  elastic:         " << getElasticDescription(elastic) << endl;
-		out << "  alignment_edges: " << getAlignmentEdgesDescription(alignment_edges) << endl;
-		out << "  hFrac:           " << hFrac << endl;
-		out << "  tThres:          " << tThres << endl;
-		out << "  dec:             " << dec << endl;
-		out << "  inter:           " << inter << endl;
-		out << "  pFile:           " << pFile << endl;
-		out << "  tFile:           " << tFile << endl;
-		out << "  bLstFl:          " << bLstFl << endl;
+	void print(std::ostream& out = std::cout, bool human = true) {
+		vector<pair<string, string>> m;
+		m.push_back({"normalize", std::to_string(normalize)});
+		m.push_back({"k", std::to_string(k)});
+		m.push_back({"w", std::to_string(w)});
+		m.push_back({"elastic", getElasticDescription(elastic)});
+		m.push_back({"alignment_edges", getAlignmentEdgesDescription(alignment_edges)});
+		m.push_back({"hFrac", std::to_string(hFrac)});
+		m.push_back({"tThres", std::to_string(tThres)});
+		m.push_back({"dec", std::to_string(dec)});
+		m.push_back({"inter", std::to_string(inter)});
+		m.push_back({"pFile", pFile});
+		m.push_back({"tFile", tFile});
+		m.push_back({"paramsFile", paramsFile});
+		m.push_back({"bLstFl", bLstFl});
+
+		if (human) {
+			out << "Parameters:" << endl;
+			for (auto& p : m)
+				out << std::setw(20) << std::right << p.first << ": " << p.second << endl;
+		} else {
+			for (auto& p : m)
+				out << p.first << "\t";
+			out << endl;
+			for (auto& p : m)
+				out << p.second << "\t";
+		}
 	}
 };
 
@@ -154,6 +171,7 @@ inline void dsHlp(){
 	cerr << "   -t   --hom_thres         Homology threshold (default " << T << ")" << endl;
 	cerr << "   -d   --decent            Decent required for dynamic threshold selection" << endl;
 	cerr << "   -i   --intercept         Intercept required for dynamic threshold selection" << endl;
+	cerr << "   -z   --params     		 Output file with parameters (tsv)" << endl << endl;
 	cerr << "Optional parameters without argument:" << endl;
 	cerr << "   -n   --normalize  Normalize scores by length" << endl;
 	cerr << "   -h   --help       Display this help message" << endl;
@@ -177,6 +195,7 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
         {"hom_thres",          required_argument,  0, 't'},
         {"decent",             required_argument,  0, 'd'},
         {"intercept",          required_argument,  0, 'i'},
+        {"params",             required_argument,  0, 'z'},
         {"normalize",          no_argument,        0, 'n'},
         {"help",               no_argument,        0, 'h'},
         {0,                    0,                  0,  0 }
@@ -193,6 +212,10 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
 			case 's':
 				//Save input sequence
 				params->tFile = optarg;
+				break;
+			case 'z':
+				//Save input sequence
+				params->paramsFile = optarg;
 				break;
 			case 'k':
 				//A k-mer length should be positive
@@ -212,7 +235,7 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
 				}
 				break;
 			case 'a':
-				//Elastic kmers
+			 	// alignment edges
 				params->alignment_edges = str2alignment_edges(optarg);
 				if(params->alignment_edges == alignment_edges_t::wrong) {
 					cerr << "ERROR: Alignment edges not from the list." << endl;
@@ -277,6 +300,7 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
 			case 'h':
 				return false;
 			default:
+				cerr << "Unknown option " << a << " '" << char(a) << "', " << optarg << endl ;
 				break;
 		}
 	}
