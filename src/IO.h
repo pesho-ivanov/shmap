@@ -8,15 +8,15 @@
 #include "Index.h"
 #include "Measures.h"
 
-#define T 0
+//#define T 0.9
 #define DEFAULT_WEIGHT 1
 using Thomology = tuple<uint32_t, uint32_t, int32_t>;
 
 //#define OPTIONS "a:b:ilh"
-#define T_HOM_OPTIONS "p:s:k:w:r:b:a:e:c:u:t:d:z:i:nNh"
+#define T_HOM_OPTIONS "p:s:k:w:r:b:a:e:c:u:t:d:z:i:x:nNh"
 //#define MIN_PARAM_NB 6
 #define MAX_RATIO 1.0
-#define NORM_FLAG_DEFAULT false
+//#define NORM_FLAG_DEFAULT false
 #define PATTERN_BATCH_SIZE 250000
 #define STRING_BUFFER_SIZE_DEFAULT 50
 
@@ -74,6 +74,7 @@ std::string getAlignmentEdgesDescription(alignment_edges_t ae) {
 
 struct params_t {
 	bool normalize; 		//Flag to save that scores are to be normalized
+	bool onlybest;          // Output up to one (best) mapping (if above the threshold)
 	uint32_t k;  						//The k-mer length
 	uint32_t w;  							//The window size
 	elastic_t elastic;
@@ -89,7 +90,8 @@ struct params_t {
 	string bLstFl; // = "highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
 
 	params_t() {
-		normalize = NORM_FLAG_DEFAULT; 		//Flag to save that scores are to be normalized
+		normalize = false; 		//Flag to save that scores are to be normalized
+		onlybest = false;
 		k = K; 						//The k-mer length
 		w = W; 							//The window size
 		elastic = elastic_t::off;
@@ -97,7 +99,7 @@ struct params_t {
 		hFrac = HASH_RATIO;
 		//comWght = DEFAULT_WEIGHT; 			//Scoring weights
 		//uniWght = DEFAULT_WEIGHT;
-		tThres = T; 							//The t-homology threshold
+		tThres = 0.9; 							//The t-homology threshold
 		dec = 0; 								//Intercept and decent to interpolate thresholds
 		inter = 0;
 		bLstFl = ""; //"highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
@@ -106,6 +108,7 @@ struct params_t {
 	void print(std::ostream& out = std::cout, bool human = true) {
 		vector<pair<string, string>> m;
 		m.push_back({"normalize", std::to_string(normalize)});
+		m.push_back({"onlybest", std::to_string(onlybest)});
 		m.push_back({"k", std::to_string(k)});
 		m.push_back({"w", std::to_string(w)});
 		m.push_back({"elastic", getElasticDescription(elastic)});
@@ -168,12 +171,13 @@ inline void dsHlp(){
 	cerr << "   -b   --blacklist         File containing hashes to ignore for sketch calculation" << endl;
 	cerr << "   -c   --commonhashweight  Weight to reward common hashes (default " << DEFAULT_WEIGHT << ")" << endl;
 	cerr << "   -u   --uniquehashweight  Weight to punish unique hashes (default " << DEFAULT_WEIGHT << ")" << endl;
-	cerr << "   -t   --hom_thres         Homology threshold (default " << T << ")" << endl;
+	cerr << "   -t   --hom_thres         Homology threshold (default " << 0.9 << ")" << endl;
 	cerr << "   -d   --decent            Decent required for dynamic threshold selection" << endl;
 	cerr << "   -i   --intercept         Intercept required for dynamic threshold selection" << endl;
 	cerr << "   -z   --params     		 Output file with parameters (tsv)" << endl << endl;
 	cerr << "Optional parameters without argument:" << endl;
 	cerr << "   -n   --normalize  Normalize scores by length" << endl;
+	cerr << "   -x   --onlybest   Output the best alignment if above threshold (otherwise none)" << endl;
 	cerr << "   -h   --help       Display this help message" << endl;
 }
 
@@ -197,6 +201,7 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
         {"intercept",          required_argument,  0, 'i'},
         {"params",             required_argument,  0, 'z'},
         {"normalize",          no_argument,        0, 'n'},
+        {"onlybest",           no_argument,        0, 'x'},
         {"help",               no_argument,        0, 'h'},
         {0,                    0,                  0,  0 }
     };
@@ -296,6 +301,9 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
 				break;
 			case 'n':
 				params->normalize = true;
+				break;
+			case 'x':
+				params->onlybest = true;
 				break;
 			case 'h':
 				return false;

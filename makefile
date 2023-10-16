@@ -15,19 +15,23 @@ all: sweep
 $(SWEEP_BIN): $(SRCS)
 	$(CC) $(CXX_STANDARD) $(CFLAGS) $< -o $@ $(LIBS)
 
-run: sweep
+eval_abe: sweep
 	mkdir -p ../out
 #	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 >out/sweep.out
 
-#	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -z out/sweep-b.params >out/sweep-b.out
-#	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z out/sweep-b-a.params >out/sweep-b-a.out
-#	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -z out/sweep-b-e.params >out/sweep-b-e.out
-#	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -a extend_equally -z out/sweep-b-e-a.params >out/sweep-b-e-a.out
+	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -z out/sweep-b.params >out/sweep-b.out
+	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z out/sweep-b-a.params >out/sweep-b-a.out
+	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -z out/sweep-b-e.params >out/sweep-b-e.out
+	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -a extend_equally -z out/sweep-b-e-a.params >out/sweep-b-e-a.out
 
 	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -z out/sweep.params >out/sweep.out
 	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -a extend_equally -z out/sweep-a.params >out/sweep-a.out
 	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -e consecutive -z out/sweep-e.params >out/sweep-e.out
 	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -e consecutive -a extend_equally -z out/sweep-e-a.params >out/sweep-e-a.out
+
+eval_multiple_alignments: sweep
+	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -x -z out/sweep-b-a.params >out/sweep-b-a-x.out
+	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z out/sweep-b-a.params >out/sweep-b-a.out
 
 clean:
 	rm -f sweep

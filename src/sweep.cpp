@@ -224,11 +224,17 @@ class Sweep {
 						++xmin;
 				}
 			}
-			
+
 			// Update best.
 			auto curr_J = J(p.size(), l, r, xmin);
-			if (curr_J > best.J)
-				best = Mapping(params.k, Plen_nucl, p.size(), L.size(), l->T_pos, prev(r)->T_pos, xmin, curr_J);
+			if (params.onlybest) {
+				if (curr_J > best.J)
+					best = Mapping(params.k, Plen_nucl, p.size(), L.size(), l->T_pos, prev(r)->T_pos, xmin, curr_J);
+			} else {
+				if (curr_J > params.tThres) {
+					res.push_back(Mapping(params.k, Plen_nucl, p.size(), L.size(), l->T_pos, prev(r)->T_pos, xmin, curr_J));
+				}
+			}
 
 			// Prepare for the next step by moving `l` to the right.
 			if (++diff_hist[l->kmer_ord] > 0)
@@ -244,7 +250,9 @@ class Sweep {
 		}
 		assert (xmin == 0);
 
-		res.push_back(best);
+		if (params.onlybest && best.J > params.tThres)
+			res.push_back(best);
+
 		return res;
 	}
 };
