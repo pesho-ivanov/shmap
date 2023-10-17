@@ -13,7 +13,7 @@
 using Thomology = tuple<uint32_t, uint32_t, int32_t>;
 
 //#define OPTIONS "a:b:ilh"
-#define T_HOM_OPTIONS "p:s:k:w:r:b:a:e:c:u:t:d:z:i:x:nNh"
+#define T_HOM_OPTIONS "p:s:k:w:r:b:a:e:c:u:t:d:z:i:x:o:nNh"
 //#define MIN_PARAM_NB 6
 #define MAX_RATIO 1.0
 //#define NORM_FLAG_DEFAULT false
@@ -75,6 +75,7 @@ std::string getAlignmentEdgesDescription(alignment_edges_t ae) {
 struct params_t {
 	bool normalize; 		//Flag to save that scores are to be normalized
 	bool onlybest;          // Output up to one (best) mapping (if above the threshold)
+	bool overlaps;          // Permit overlapping mappings 
 	uint32_t k;  						//The k-mer length
 	uint32_t w;  							//The window size
 	elastic_t elastic;
@@ -92,6 +93,7 @@ struct params_t {
 	params_t() {
 		normalize = false; 		//Flag to save that scores are to be normalized
 		onlybest = false;
+		overlaps = false;          // 
 		k = K; 						//The k-mer length
 		w = W; 							//The window size
 		elastic = elastic_t::off;
@@ -109,6 +111,7 @@ struct params_t {
 		vector<pair<string, string>> m;
 		m.push_back({"normalize", std::to_string(normalize)});
 		m.push_back({"onlybest", std::to_string(onlybest)});
+		m.push_back({"overlaps", std::to_string(overlaps)});
 		m.push_back({"k", std::to_string(k)});
 		m.push_back({"w", std::to_string(w)});
 		m.push_back({"elastic", getElasticDescription(elastic)});
@@ -175,6 +178,7 @@ inline void dsHlp(){
 	cerr << "   -d   --decent            Decent required for dynamic threshold selection" << endl;
 	cerr << "   -i   --intercept         Intercept required for dynamic threshold selection" << endl;
 	cerr << "   -z   --params     		 Output file with parameters (tsv)" << endl << endl;
+	cerr << "   -o   --overlaps     		 Permit overlapping mappings" << endl << endl;
 	cerr << "Optional parameters without argument:" << endl;
 	cerr << "   -n   --normalize  Normalize scores by length" << endl;
 	cerr << "   -x   --onlybest   Output the best alignment if above threshold (otherwise none)" << endl;
@@ -202,6 +206,7 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
         {"params",             required_argument,  0, 'z'},
         {"normalize",          no_argument,        0, 'n'},
         {"onlybest",           no_argument,        0, 'x'},
+        {"overlaps",           no_argument,        0, 'o'},
         {"help",               no_argument,        0, 'h'},
         {0,                    0,                  0,  0 }
     };
@@ -304,6 +309,9 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
 				break;
 			case 'x':
 				params->onlybest = true;
+				break;
+			case 'o':
+				params->overlaps = true;
 				break;
 			case 'h':
 				return false;
