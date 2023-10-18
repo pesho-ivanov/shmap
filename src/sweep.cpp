@@ -38,17 +38,21 @@ struct Mapping {
 		: k(k), P_sz(P_sz), p_sz(p_sz), matches(matches), T_l(T_l), T_r(T_r), xmin(xmin), J(J) {}
 };
 
-//This function outputs all given t-homologies
-inline void outputMappings(const params_t &params, const vector<Mapping>& res, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text){
-	//Iterate over t-homologies
-	for(auto m: res) {
+// Extends the mappings to the left and right
+void normalizeMappings(const params_t &params, vector<Mapping> *mappings, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text){
+	for(auto &m: *mappings) {
 		if (params.alignment_edges == alignment_edges_t::extend_equally) {
 			int span   = m.T_r - m.T_l + 1;  assert(span <= m.P_sz);
 			int shift  = (m.P_sz - span) / 2;       assert(shift >= 0);
 			m.T_l -= shift; m.T_l = max((uint32_t)0, m.T_l);
 			m.T_r += shift; m.T_r = min(T_sz-1, m.T_r);
 		}
+	}
+}
 
+// Outputs all given mappings
+void outputMappings(const params_t &params, const vector<Mapping>& res, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text){
+	for(auto m: res) {
 		cout << seqID << "\t" << m.k << "\t" << m.P_sz << "\t" << m.p_sz << "\t"
 			<< m.matches << "\t" << m.T_l << "\t" << m.T_r << "\t" << m.xmin << "\t" << m.J << endl;
         if (!text.empty())
@@ -63,6 +67,63 @@ template<typename TT> auto prev(const typename TT::iterator &it) {
 //template<typename TT> auto next(const typename TT::iterator &it) {
 //    auto pr = it; return ++pr;
 //}
+
+// Return only reasonable matches (i.e. those that are not J-dominated by
+// another overlapping match). Runs in O(|all|).
+vector<Mapping> filter_reasonable(const params_t &params, const vector<Mapping> &all, const uint32_t Plen_nucl) {
+	vector<Mapping> reasonable;
+	deque<Mapping> recent;
+
+	// Minimal separation between mappings to be considered reasonable
+	uint32_t sep = (1.0 - params.tThres) * Plen_nucl;
+
+	// The deque `recent' is sorted decreasingly by J
+	//					  _________`recent'_________
+	//                   /                          \
+	// ---------------- | High J ... Mid J ... Low J | current J
+	// already removed    deque.back ... deque.front    to add next
+	for (const auto &next: all) {
+		// 1. Prepare for adding `curr' by removing from the deque back all
+		//    mappings that are too far to the left. This keeps the deque
+		//    within |P| from back to front. A mapping can become reasonable
+		//    only after getting removed.
+		while(!recent.empty() && next.T_l - recent.back().T_l > sep) {
+			// If the mapping is not marked as unreasonable (coverted by a preivous better mapping)
+			if (recent.back().matches != -1) {
+				// Take the leftmost mapping.
+				reasonable.push_back(recent.back());
+				// Mark the next closeby mappings as not reasonable
+				for (auto it=recent.rbegin(); it!=recent.rend() && it->T_l - recent.back().T_l < sep; ++it)
+					it->matches = -1;
+			}
+			// Remove the mapping that is already too much behind.
+			recent.pop_back();
+		}
+		assert(recent.empty() || recent.back().T_r <= recent.front().T_r && recent.front().T_r <= next.T_r);
+
+		// Now all the mappings in `recent' are close to `curr' 
+		// 2. Remove from the deque front all mappings that are strictly
+		//    less similar than the current J. This keeps the deque sorted
+		//    descending in J from left to right
+		while(!recent.empty() && recent.front().J < next.J - EPS)
+			recent.pop_front();
+		assert(recent.empty() || (recent.back().J >= recent.front().J - EPS && recent.front().J >= next.J - EPS));
+
+		// 3. Add the next mapping to the front
+		recent.push_front(next);	 
+
+		// 4. If there is another mapping in the deque, it is near and better.
+		// Mark the 
+		if (recent.size() > 1)
+			recent.front().matches = -1;
+	}
+
+	// 5. Add the last mapping if it is reasonable
+	if (!recent.empty() && recent.back().matches != -1)
+		reasonable.push_back(recent.back());
+
+	return reasonable;
+}
 
 class Sweep {
 	const mm_idx_t *tidx;
@@ -147,15 +208,6 @@ class Sweep {
 				cerr << L->size() << " != " << L2->size() << endl;
 			assert(L->size() == L2->size());
 		}
-
-	//	for (auto it: hash2ord)
-	//		cerr << "hash2ord: " << it.first << " " << it.second << endl;
-	//	for (auto it: *L)
-	//		cerr << "L: " << setw(5) << right << it.kmer_ord
-	//			 << " " << setw(10) << right << it.T_r
-	//			 << " " << setw(10) << right << it.t_pos << endl;
-	//	for (int i=0; i<hist->size(); i++)
-	//		cerr << "hist[" << i << "]: " << (*hist)[i] << endl;
 	}
 
 	// Returns the Jaccard score of the window [l,r)
@@ -190,86 +242,6 @@ class Sweep {
 		//bool extension_improves_jaccard = J(p, l, r, xmin) < J(p, l, next(r), xmin + (hist[r->kmer_ord] > 0));
 		//assert(!extension_improves_jaccard);
 		//return extension_improves_jaccard;
-	}
-
-	// Return only reasonable matches (i.e. those that are not dominated by
-	// another overlapping match). Runs in O(|all|).
-	vector<Mapping> filter_reasonable(const vector<Mapping> &all, const uint32_t Plen_nucl) {
-		vector<Mapping> reasonable;
-		deque<Mapping> recent;
-
-		//cerr << "Filtering reasonable mappings:" << endl;
-
-		uint32_t sep = (1.0 - params.tThres) * Plen_nucl;
-		//cerr << "Separation: " << sep << " bp" << endl;
-
-		// print all mappings
-		//for (const auto &curr: all)
-		//	cerr << "All: " << curr.T_l << " " << curr.T_r << " " << curr.J << endl;
-
-		// The deque `recent' is sorted decreasingly by J
-		//					  _________`recent'_________
-		//                   /                          \
-		// ---------------- | High J ... Mid J ... Low J | current J
-		// already removed    deque.back ... deque.front    to add next
-		for (const auto &next: all) {
-			//cerr << "0. next: " << next.T_l << " " << next.T_r << " " << next.J << endl; 
-			//cerr << "0. recent: " << recent.size() << endl;
-			//cerr << "0. reasonable: " << reasonable.size() << endl;
-
-			// 1. Prepare for adding `curr' by removing from the deque back all
-			//    mappings that are too far to the left. This keeps the deque
-			//    within |P| from back to front. A mapping can become reasonable
-			//    only after getting removed.
-			while(!recent.empty() && next.T_l - recent.back().T_l > sep) {
-				//cerr << "1. span: " << next.T_l - recent.back().T_l << endl; 
-				// If the mapping is not marked as unreasonable (coverted by a preivous better mapping)
-				if (recent.back().matches != -1) {
-					// Take the leftmost mapping.
-					//cerr << "1. Push back to reasonable: " << recent.back().T_l << " " << recent.back().T_r << endl; 
-					reasonable.push_back(recent.back());
-					// Mark the next closeby mappings as not reasonable
-					for (auto it=recent.rbegin(); it!=recent.rend() && it->T_l - recent.back().T_l < sep; ++it) {
-						//cerr << "1. Marking as unreasonable: " << it->T_l << " " << it->T_r << endl;
-						it->matches = -1;
-					}
-				}
-				// Remove the mapping that is already too much behind.
-				//cerr << "1. Pop back: " << recent.back().T_l << " " << recent.back().T_r << endl; 
-				recent.pop_back();
-			}
-			assert(recent.empty() || recent.back().T_r <= recent.front().T_r && recent.front().T_r <= next.T_r);
-
-			// Now all the mappings in `recent' are close to `curr' 
-			// 2. Remove from the deque front all mappings that are strictly
-			//    less similar than the current J. This keeps the deque sorted
-			//    descending in J from left to right
-			while(!recent.empty() && recent.front().J < next.J - EPS) {
-				//cerr << "2. Pop front from recent: " << recent.back().T_l << " " << recent.back().T_r << endl; 
-				recent.pop_front();
-			}
-			assert(recent.empty() || (recent.back().J >= recent.front().J - EPS && recent.front().J >= next.J - EPS));
-
-			// 3. Add the next mapping to the front
-			recent.push_front(next);	 
-			//cerr << "3. Push front to recent: " << recent.front().T_l << " " << recent.front().T_r << endl; 
-
-			// 4. If there is another mapping in the deque, it is better and
-			//    closeby.
-			if (recent.size() > 1) {
-				//cerr << "4. Marking as unreasonable: " << recent.front().T_l << " " << recent.front().T_r << endl;
-				recent.front().matches = -1;
-			}
-
-		}
-
-		// 5. Add the last mapping if it is reasonable
-		if (!recent.empty() && recent.back().matches != -1) {
-			//cerr << "5. Push back to reasonable: " << recent.back().T_l << " " << recent.back().T_r << endl; 
-			reasonable.push_back(recent.back());
-		}
-
-		return reasonable;
 	}
 
   public:
@@ -343,7 +315,7 @@ class Sweep {
 		if (params.onlybest && best.J > params.tThres)
 			mappings.push_back(best);
 
-		return params.overlaps ? mappings : filter_reasonable(mappings, Plen_nucl);
+		return mappings;
 	}
 };
 
@@ -363,20 +335,21 @@ int main(int argc, char **argv){
 		reader.params.print(cerr, true);
 	}
 
-	//Load pattern sequences in batches
-	while(lMiniPttnSks(reader.fStr, params.k, reader.tidx->w, bLstmers, reader.pSks) || !reader.pSks.empty()){ //TODO: This function still needs to be tested!
-		//Iterate over pattern sketches
-		for(auto p = reader.pSks.begin(); p != reader.pSks.end(); ++p){
+	// Load pattern sequences in batches
+	while(lMiniPttnSks(reader.fStr, params.k, reader.tidx->w, bLstmers, reader.pSks) || !reader.pSks.empty()) { //TODO: This function still needs to be tested!
+		// Iterate over pattern sketches
+		for(auto p = reader.pSks.begin(); p != reader.pSks.end(); ++p) {
 			auto seqID = get<0>(*p);
-            auto plen_nucl = get<1>(*p);
+            auto Plen_nucl = get<1>(*p);
             auto sks = get<2>(*p);
 
 			//Calculate an adapted threshold if we have the necessary informations
 			//float curr_tThres = (reader.dec != 0 && reader.inter != 0) ? reader.dec * plen_nucl + reader.inter : reader.tThres;
 
-			//Find t-homologies and output them
-            auto res = sweep.map(sks, plen_nucl);
-			outputMappings(params, res, sks.size(), seqID, reader.T_sz, reader.text);//TODO: Tests for this function need to be adaptated!
+            auto mappings = sweep.map(sks, Plen_nucl);
+			auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(params, mappings, Plen_nucl);
+			normalizeMappings(params, &reasonable_mappings, sks.size(), seqID, reader.T_sz, reader.text);
+			outputMappings(params, reasonable_mappings, sks.size(), seqID, reader.T_sz, reader.text);
 		}
 
 		reader.pSks.clear();
