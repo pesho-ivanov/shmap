@@ -38,28 +38,6 @@ struct Mapping {
 		: k(k), P_sz(P_sz), p_sz(p_sz), matches(matches), T_l(T_l), T_r(T_r), xmin(xmin), J(J) {}
 };
 
-// Extends the mappings to the left and right
-void normalizeMappings(const params_t &params, vector<Mapping> *mappings, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text){
-	for(auto &m: *mappings) {
-		if (params.alignment_edges == alignment_edges_t::extend_equally) {
-			int span   = m.T_r - m.T_l + 1;  assert(span <= m.P_sz);
-			int shift  = (m.P_sz - span) / 2;       assert(shift >= 0);
-			m.T_l -= shift; m.T_l = max((uint32_t)0, m.T_l);
-			m.T_r += shift; m.T_r = min(T_sz-1, m.T_r);
-		}
-	}
-}
-
-// Outputs all given mappings
-void outputMappings(const params_t &params, const vector<Mapping>& res, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text){
-	for(auto m: res) {
-		cout << seqID << "\t" << m.k << "\t" << m.P_sz << "\t" << m.p_sz << "\t"
-			<< m.matches << "\t" << m.T_l << "\t" << m.T_r << "\t" << m.xmin << "\t" << m.J << endl;
-        if (!text.empty())
-            cerr << "   text: " << text.substr(m.T_l, m.T_r-m.T_l+1) << endl;
-	}
-}
-
 template<typename TT> auto prev(const typename TT::iterator &it) {
     auto pr = it; return --pr;
 }
@@ -67,63 +45,6 @@ template<typename TT> auto prev(const typename TT::iterator &it) {
 //template<typename TT> auto next(const typename TT::iterator &it) {
 //    auto pr = it; return ++pr;
 //}
-
-// Return only reasonable matches (i.e. those that are not J-dominated by
-// another overlapping match). Runs in O(|all|).
-vector<Mapping> filter_reasonable(const params_t &params, const vector<Mapping> &all, const uint32_t Plen_nucl) {
-	vector<Mapping> reasonable;
-	deque<Mapping> recent;
-
-	// Minimal separation between mappings to be considered reasonable
-	uint32_t sep = (1.0 - params.tThres) * Plen_nucl;
-
-	// The deque `recent' is sorted decreasingly by J
-	//					  _________`recent'_________
-	//                   /                          \
-	// ---------------- | High J ... Mid J ... Low J | current J
-	// already removed    deque.back ... deque.front    to add next
-	for (const auto &next: all) {
-		// 1. Prepare for adding `curr' by removing from the deque back all
-		//    mappings that are too far to the left. This keeps the deque
-		//    within |P| from back to front. A mapping can become reasonable
-		//    only after getting removed.
-		while(!recent.empty() && next.T_l - recent.back().T_l > sep) {
-			// If the mapping is not marked as unreasonable (coverted by a preivous better mapping)
-			if (recent.back().matches != -1) {
-				// Take the leftmost mapping.
-				reasonable.push_back(recent.back());
-				// Mark the next closeby mappings as not reasonable
-				for (auto it=recent.rbegin(); it!=recent.rend() && it->T_l - recent.back().T_l < sep; ++it)
-					it->matches = -1;
-			}
-			// Remove the mapping that is already too much behind.
-			recent.pop_back();
-		}
-		assert(recent.empty() || recent.back().T_r <= recent.front().T_r && recent.front().T_r <= next.T_r);
-
-		// Now all the mappings in `recent' are close to `curr' 
-		// 2. Remove from the deque front all mappings that are strictly
-		//    less similar than the current J. This keeps the deque sorted
-		//    descending in J from left to right
-		while(!recent.empty() && recent.front().J < next.J - EPS)
-			recent.pop_front();
-		assert(recent.empty() || (recent.back().J >= recent.front().J - EPS && recent.front().J >= next.J - EPS));
-
-		// 3. Add the next mapping to the front
-		recent.push_front(next);	 
-
-		// 4. If there is another mapping in the deque, it is near and better.
-		// Mark the 
-		if (recent.size() > 1)
-			recent.front().matches = -1;
-	}
-
-	// 5. Add the last mapping if it is reasonable
-	if (!recent.empty() && recent.back().matches != -1)
-		reasonable.push_back(recent.back());
-
-	return reasonable;
-}
 
 class Sweep {
 	const mm_idx_t *tidx;
@@ -152,6 +73,7 @@ class Sweep {
 		}
 	}
 
+	// Initializes the histogram of the pattern and the list of matches
 	void init(
 			// input
 			const Sketch& p,
@@ -318,6 +240,85 @@ class Sweep {
 		return mappings;
 	}
 };
+
+// Return only reasonable matches (i.e. those that are not J-dominated by
+// another overlapping match). Runs in O(|all|).
+vector<Mapping> filter_reasonable(const params_t &params, const vector<Mapping> &all, const uint32_t Plen_nucl) {
+	vector<Mapping> reasonable;
+	deque<Mapping> recent;
+
+	// Minimal separation between mappings to be considered reasonable
+	uint32_t sep = (1.0 - params.tThres) * Plen_nucl;
+
+	// The deque `recent' is sorted decreasingly by J
+	//					  _________`recent'_________
+	//                   /                          \
+	// ---------------- | High J ... Mid J ... Low J | current J
+	// already removed    deque.back ... deque.front    to add next
+	for (const auto &next: all) {
+		// 1. Prepare for adding `curr' by removing from the deque back all
+		//    mappings that are too far to the left. This keeps the deque
+		//    within |P| from back to front. A mapping can become reasonable
+		//    only after getting removed.
+		while(!recent.empty() && next.T_l - recent.back().T_l > sep) {
+			// If the mapping is not marked as unreasonable (coverted by a preivous better mapping)
+			if (recent.back().matches != -1) {
+				// Take the leftmost mapping.
+				reasonable.push_back(recent.back());
+				// Mark the next closeby mappings as not reasonable
+				for (auto it=recent.rbegin(); it!=recent.rend() && it->T_l - recent.back().T_l < sep; ++it)
+					it->matches = -1;
+			}
+			// Remove the mapping that is already too much behind.
+			recent.pop_back();
+		}
+		assert(recent.empty() || recent.back().T_r <= recent.front().T_r && recent.front().T_r <= next.T_r);
+
+		// Now all the mappings in `recent' are close to `curr' 
+		// 2. Remove from the deque front all mappings that are strictly
+		//    less similar than the current J. This keeps the deque sorted
+		//    descending in J from left to right
+		while(!recent.empty() && recent.front().J < next.J - EPS)
+			recent.pop_front();
+		assert(recent.empty() || (recent.back().J >= recent.front().J - EPS && recent.front().J >= next.J - EPS));
+
+		// 3. Add the next mapping to the front
+		recent.push_front(next);	 
+
+		// 4. If there is another mapping in the deque, it is near and better.
+		// Mark the 
+		if (recent.size() > 1)
+			recent.front().matches = -1;
+	}
+
+	// 5. Add the last mapping if it is reasonable
+	if (!recent.empty() && recent.back().matches != -1)
+		reasonable.push_back(recent.back());
+
+	return reasonable;
+}
+
+// Extends the mappings to the left and right
+void normalizeMappings(const params_t &params, vector<Mapping> *mappings, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text){
+	for(auto &m: *mappings) {
+		if (params.alignment_edges == alignment_edges_t::extend_equally) {
+			int span   = m.T_r - m.T_l + 1;  assert(span <= m.P_sz);
+			int shift  = (m.P_sz - span) / 2;       assert(shift >= 0);
+			m.T_l -= shift; m.T_l = max((uint32_t)0, m.T_l);
+			m.T_r += shift; m.T_r = min(T_sz-1, m.T_r);
+		}
+	}
+}
+
+// Outputs all given mappings
+void outputMappings(const params_t &params, const vector<Mapping>& res, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text){
+	for(auto m: res) {
+		cout << seqID << "\t" << m.k << "\t" << m.P_sz << "\t" << m.p_sz << "\t"
+			<< m.matches << "\t" << m.T_l << "\t" << m.T_r << "\t" << m.xmin << "\t" << m.J << endl;
+        if (!text.empty())
+            cerr << "   text: " << text.substr(m.T_l, m.T_r-m.T_l+1) << endl;
+	}
+}
 
 int main(int argc, char **argv){
 	reader_t reader;
