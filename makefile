@@ -1,10 +1,10 @@
 CC = g++
 CXX_STANDARD = -std=c++2a
-CFLAGS = -g -O3 -march=native -lm -lpthread -Wno-unused-result
+CFLAGS = -g -O3 -march=native -lm -lpthread -Wall -Wextra -Wno-unused-parameter  -Wno-unused-result 
 LIBS = minimap2/libminimap2.a -lz
 DEPFLAGS = -MMD -MP
 
-SRCS = src/sweep.cpp src/IO.h src/Index.h src/Measures.h src/Sketch.h
+SRCS = src/sweep.cpp src/IO.h src/Sketch.h
 SWEEP_BIN = ./sweep
 
 CHR_Y = simulations/genomes/t2thumanChrY.fasta
@@ -30,8 +30,8 @@ eval_abe: sweep
 	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -e consecutive -a extend_equally -z out/sweep-e-a.params >out/sweep-e-a.out
 
 eval_multiple_alignments: sweep
-#	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -x -z out/sweep-b-a.params >out/sweep-b-a-x.out
-	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z out/sweep-b-a.params >out/sweep-b-a.out 2>out/sweep-b-a.cerr
+	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -x -z out/sweep-b-a.params >out/sweep-b-a-x.out
+#	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z out/sweep-b-a.params >out/sweep-b-a.out 2>out/sweep-b-a.cerr
 #	$(SWEEP_BIN) -s $(CHR_Y) -p $(READS_ESKEMAP) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -o -z out/sweep-b-a.params >out/sweep-b-a-o.out 2>out/sweep-b-a-o.cerr
 
 debug: sweep
