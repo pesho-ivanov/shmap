@@ -5,7 +5,6 @@
 
 #include "Sketch.h"
 #include "IO.h"
-#include "Index.h"
 
 const float EPS = 1e-7;
 unordered_map<uint64_t, char> bLstmers;

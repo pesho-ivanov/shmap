@@ -5,9 +5,10 @@
 #include <fstream>
 #include <map>
 
-#include "Index.h"
-#include "Measures.h"
+//#include "Index.h"
+//#include "Measures.h"
 
+#define INDEX_DEFAULT_DUMP_FILE "indexDump.idx"
 //#define T 0.9
 #define DEFAULT_WEIGHT 1
 using Thomology = tuple<uint32_t, uint32_t, int32_t>;
