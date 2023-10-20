@@ -44,11 +44,11 @@ using PairSketch = list<pair<uint32_t, uint64_t>>;
 using Sketch = vector<pair<int32_t, uint64_t>>;
 
 //A compare function to sort hashes in a sketch
-inline const bool smHshsFrst(const pair<uint32_t, uint64_t>& left, const pair<uint32_t, uint64_t>& right){ return left.second < right.second; }
+inline const bool smHshsFrst(const pair<uint32_t, uint64_t>& left, const pair<uint32_t, uint64_t>& right) { return left.second < right.second; }
 
 //This function returns a numerical value for each nucleotide base
-inline uint64_t getBaseNb(const char& c){
-	switch(c){
+inline uint64_t getBaseNb(const char& c) {
+	switch(c) {
 		case 'A':
 			return 0;
 		case 'C':
@@ -64,14 +64,14 @@ inline uint64_t getBaseNb(const char& c){
 }
 
 //This function calculates the reverse complement of a DNA sequence
-string revComp(const string &seq){
+string revComp(const string &seq) {
 	//The result string
 	string revSeq;
 
 	//Go through the query from the end to the beginning
-	for(int32_t i = seq.length() - 1; i >= 0; --i){
+	for(int32_t i = seq.length() - 1; i >= 0; --i) {
 		//Check which base we are dealing with and append its complement
-		switch(seq[i]){
+		switch(seq[i]) {
 			case NUCL_BASE_A:
 				revSeq += CMPL_BASE_A;
 				break;
@@ -96,7 +96,7 @@ string revComp(const string &seq){
 
 //This function calculates a hash for the given numerical representation of a k-mer and a mask of the form (4**k)-1 where k is the k-mer length;
 //it originates from the minimap2 source code (the function hash64 in sketch.c)
-static inline uint64_t getHash(uint64_t kmer, uint64_t mask){
+static inline uint64_t getHash(uint64_t kmer, uint64_t mask) {
 	kmer = (~kmer + (kmer << 21)) & mask; // kmer = (kmer << 21) - kmer - 1;
 	kmer = kmer ^ kmer >> 24;
 	kmer = ((kmer + (kmer << 3)) + (kmer << 8)) & mask; // kmer * 265
@@ -108,18 +108,17 @@ static inline uint64_t getHash(uint64_t kmer, uint64_t mask){
 }
 
 //This function calculates the numerical representation of a k-mer
-uint64_t calcKmerNb(const string& kmer){
+uint64_t calcKmerNb(const string& kmer) {
 	uint64_t kmerNb = 0;
-
-	for(string::const_iterator c = kmer.begin(); c != kmer.end(); ++c) kmerNb = (kmerNb << 2) + getBaseNb(*c);
-
+	for(string::const_iterator c = kmer.begin(); c != kmer.end(); ++c)
+		kmerNb = (kmerNb << 2) + getBaseNb(*c);
 	return kmerNb;
 }
 
 //This function builds a minimap2 sketch of a sequence by querying from a prebuilt minimap index; this function is influenced by the
 // code of "The minimizer Jaccard estimator is biased and inconsistent." from Belbasi et al. (function 
 //"winnowed_minimizers_linear(perm,windowSize)" in file "winnowed_minimizers.py").
-const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_t& w, const unordered_map<uint64_t, char>& blmers){
+const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_t& w, const unordered_map<uint64_t, char>& blmers) {
 	uint32_t lastIdx = UINT32_MAX;
 	int32_t windowBorder;
 	const uint64_t mask = pow(ALPHABET_SIZE, k) - 1;
@@ -129,7 +128,7 @@ const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_
 	Sketch sk;
 
 	//If the sequence is smaller than k we are done
-	if(seq.length() < k){
+	if(seq.length() < k) {
 		cerr << "WARNING: Length of input sequence " << seq << " is smaller than k (k=" << k << ")" << endl;
 		return sk;
 	}
@@ -138,7 +137,7 @@ const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_
 	sk.reserve(seq.length() * 0.03);
 
 	//Iterate over k-mer starting positions in sequence
-	for(int32_t i = 0; i < seq.length() - k + 1; ++i){
+	for(int32_t i = 0; i < seq.length() - k + 1; ++i) {
 		// TODO: don't take the substr each time, work only with 1 letter at a time
 		kmerBitSeq = calcKmerNb(seq.substr(i, k));
 		revKmerBitSeq = calcKmerNb(revComp(seq.substr(i, k)));
@@ -149,7 +148,7 @@ const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_
 
 		//Depending on which is lexicographically smaller, we consider either the k-mer or its reverse complement
 		// TODO: rewrite shorter
-		if(kmerBitSeq < revKmerBitSeq){
+		if(kmerBitSeq < revKmerBitSeq) {
 			//Calculate k-mer's hash
 			kmerHash = getHash(kmerBitSeq, mask);
 		} else{
@@ -169,14 +168,14 @@ const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_
 			windowKmers.erase(windowKmers.begin());
 
 		//Choose a minimizer as soon as we have the first full window of k-mers and make sure we do the same minimizer a second time
-		if(windowBorder >= 0 && !windowKmers.empty()){
-			if(lastIdx != windowKmers.front().first && !blmers.contains(windowKmers.front().second)){
+		if(windowBorder >= 0 && !windowKmers.empty()) {
+			if(lastIdx != windowKmers.front().first && !blmers.contains(windowKmers.front().second)) {
 				lastIdx = windowKmers.front().first;
 				sk.push_back(windowKmers.front());
 			}
 
 			//If the same k-mer appears several times inside the window and it has the smallest hash we want to save all occurrences
-			while(windowKmers.size() > 1 && windowKmers.front().second == windowKmers[1].second){
+			while(windowKmers.size() > 1 && windowKmers.front().second == windowKmers[1].second) {
 				windowKmers.erase(windowKmers.begin());
 				lastIdx = windowKmers.front().first;
 
@@ -188,12 +187,12 @@ const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_
 	}
 
 	//In case we have never seen a full window of k-mers take the one with the smallest hash seen for the sketch
-	if(windowBorder < 0 && !windowKmers.empty()){
+	if(windowBorder < 0 && !windowKmers.empty()) {
 		//Blacklisted k-mers are not added
 		if(!blmers.contains(windowKmers.front().second)) sk.push_back(windowKmers.front());
 
 		//If the same k-mer appears several times inside the window and it has the smallest hash we want to save all occurrences
-		while(windowKmers.size() > 1 && windowKmers.front().second == windowKmers[1].second){
+		while(windowKmers.size() > 1 && windowKmers.front().second == windowKmers[1].second) {
 			windowKmers.erase(windowKmers.begin());
 
 			//Blacklisted k-mers are not added

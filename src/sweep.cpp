@@ -92,8 +92,22 @@ class Sweep {
 		}
 	}
 
+	struct idx_result_t {
+		int32_t kmer_pos;
+		uint32_t kmer_ord;
+		const uint64_t *idx_p;
+		int nHits;
+
+		idx_result_t(int32_t kmer_pos, uint32_t kmer_ord, const uint64_t *idx_p, int nHits) :
+			kmer_pos(kmer_pos), kmer_ord(kmer_ord), idx_p(idx_p), nHits(nHits) {}
+
+		bool operator<(const idx_result_t &other) {
+			return nHits < other.nHits;
+		}
+	};
+
 	// Initializes the histogram of the pattern and the list of matches
-	void init(
+	void match_kmers(
 			// input
 			const Sketch& p,
 			// output
@@ -103,6 +117,9 @@ class Sweep {
 		unordered_map<uint64_t, uint32_t> hash2ord;
 		vector<uint64_t> ord2hash;
 		L->reserve(P_MULTIPLICITY * p.size());
+
+		vector<idx_result_t> match_lists;
+		match_lists.reserve(p.size());
 
 		uint64_t kmer_hash, prev_kmer_hash = 0;
 		for(auto p_it = p.begin(); p_it != p.end(); ++p_it, prev_kmer_hash = kmer_hash) {
@@ -121,19 +138,33 @@ class Sweep {
 				// Add kmer matches to L
 				int nHits;
 				auto *idx_p = mm_idx_get(tidx, kmer_hash, &nHits);
-				for (int i = 0; i < nHits; ++i, ++idx_p) {					// Iterate over all occurrences
-					Match m;
-					m.P_l = kmer_pos;
-					m.kmer_ord = kmer_ord;
-					unpack(*idx_p, &m.T_r, &m.t_pos);
-					L->push_back(m); // Push (k-mer ord in p, k-mer position in reference, k-mer position in sketch) pair
-				}
+				if (nHits > 0)
+					match_lists.push_back(idx_result_t(kmer_pos, kmer_ord, idx_p, nHits));
 			}
+		}
+
+		//Sort by number of hits and get MAX_SEEDS of kmers with the lowest number of hits.
+		sort(match_lists.begin(), match_lists.end());
+		int total_hits = 0;
+		const int MAX_SEEDS = 500, MAX_TOTAL_HITS = 100000;
+		for (int seed=0; seed<min(MAX_SEEDS, (int)match_lists.size()); seed++) {
+			auto &res = match_lists[seed];
+			//cerr << "seed=" << seed << ", nHits=" << res.nHits << endl;
+			for (int i = 0; i < res.nHits; ++i, ++res.idx_p) {					// Iterate over all occurrences
+				Match m;
+				m.P_l = res.kmer_pos;
+				m.kmer_ord = res.kmer_ord;
+				unpack(*res.idx_p, &m.T_r, &m.t_pos);
+				L->push_back(m); // Push (k-mer ord in p, k-mer position in reference, k-mer position in sketch) pair
+			}
+			if ((total_hits += res.nHits) >= MAX_TOTAL_HITS)
+				break;
 		}
 
 		//Sort L by ascending positions in reference
 		sort(L->begin(), L->end());
 
+		// Add elastic kmers
 		if (params.elastic == elastic_t::consecutive) {
 			if (L->size() == 0)
 				return;
@@ -213,7 +244,7 @@ class Sweep {
 
 		//cerr << "Mapping " << p.size() << " kmers of length " << Plen_nucl << endl;
 
-		init(p, &diff_hist, &L, &L2);
+		match_kmers(p, &diff_hist, &L, &L2);
 
 		// Increase the left point end of the window [l,r) one by one.
 		// O(matches)
@@ -337,7 +368,7 @@ vector<Mapping> filter_reasonable(const params_t &params, const vector<Mapping> 
 }
 
 // Extends the mappings to the left and right
-void normalizeMappings(const params_t &params, vector<Mapping> *mappings, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text){
+void normalizeMappings(const params_t &params, vector<Mapping> *mappings, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text) {
 	for(auto &m: *mappings) {
 		if (params.alignment_edges == alignment_edges_t::extend_equally) {
 			int span   = m.T_r - m.T_l + 1;
@@ -353,9 +384,9 @@ void normalizeMappings(const params_t &params, vector<Mapping> *mappings, const 
 }
 
 // Outputs all given mappings
-void outputMappings(const params_t &params, const vector<Mapping>& res, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text){
+void outputMappings(const params_t &params, const vector<Mapping>& res, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text) {
 	for(auto m: res) {
-		m.print();
+		//m.print();
 		cout << seqID << "\t" << m.k << "\t" << m.P_sz << "\t" << m.p_sz << "\t"
 			<< m.matches << "\t" << m.T_l << "\t" << m.T_r << "\t" << m.xmin << "\t" << m.J << "\t" << m.map_time << endl;
         if (!text.empty())
@@ -363,7 +394,7 @@ void outputMappings(const params_t &params, const vector<Mapping>& res, const ui
 	}
 }
 
-int main(int argc, char **argv){
+int main(int argc, char **argv) {
 	reader_t reader;
 	auto res = reader.init(argc, argv);
 	const params_t &params = reader.params;
@@ -379,10 +410,11 @@ int main(int argc, char **argv){
 		reader.params.print(cerr, true);
 	}
 
-	cerr << "Aligning reads from" << params.pFile << "..." << endl;
+	//cerr << "aligning reads from " << params.pFile << "..." << endl;
 
 	// Load pattern sequences in batches
-	while(lMiniPttnSks(reader.fStr, params.k, reader.tidx->w, bLstmers, reader.pSks) || !reader.pSks.empty()) { //TODO: This function still needs to be tested!
+	while(cerr << "Sketching..." << endl, lMiniPttnSks(reader.fStr, params.k, reader.tidx->w, bLstmers, reader.pSks) || !reader.pSks.empty()) { //TODO: This function still needs to be tested!
+		cerr << "Aligning..." << endl;
 		// Iterate over pattern sketches
 		for(auto p = reader.pSks.begin(); p != reader.pSks.end(); ++p) {
 			auto seqID = get<0>(*p);
@@ -391,7 +423,7 @@ int main(int argc, char **argv){
 
 			//Calculate an adapted threshold if we have the necessary informations
 			//float curr_tThres = (reader.dec != 0 && reader.inter != 0) ? reader.dec * plen_nucl + reader.inter : reader.tThres;
-			cerr << ".";
+			//cerr << ".";
 
             auto mappings = sweep.map(sks, Plen_nucl);
 			auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(params, mappings, Plen_nucl);

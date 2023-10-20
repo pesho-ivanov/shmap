@@ -160,7 +160,7 @@ struct reader_t {
 };
 
 //This function prints usage infos
-inline void dsHlp(){
+inline void dsHlp() {
 	cerr << "sweep [-hn] [-p PATTERN_FILE] [-s TEXT_FILE] [-k KMER_LEN] [-r HASH_RATIO] [-b BLACKLIST] [-c COM_HASH_WGHT] [-u UNI\
 	_HASH_WGHT] [-t HOM_THRES] [-d DECENT] [-i INTERCEPT]" << endl << endl;
 	cerr << "Find sketch-based pattern similarity in text." << endl << endl;
@@ -188,7 +188,7 @@ inline void dsHlp(){
 }
 
 //This function parses the program parameters. Returns false if given arguments are not valid
-const bool prsArgs(int& nArgs, char** argList, params_t *params){
+const bool prsArgs(int& nArgs, char** argList, params_t *params) {
 	int option_index = 0, a;
 
 	#define T_HOM_OPTIONS "p:s:k:w:e:a:r:b:c:u:t:d:i:z:nxoh"
@@ -215,9 +215,9 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
     };
 
     //Parse all parameters given
-	while ((a = getopt_long(nArgs, argList, T_HOM_OPTIONS, long_options, &option_index)) != -1){
+	while ((a = getopt_long(nArgs, argList, T_HOM_OPTIONS, long_options, &option_index)) != -1) {
 		//Assign parameter values
-		switch(a){
+		switch(a) {
 			case 'p':
 				//Save input sequence
 				params->pFile = optarg;
@@ -232,7 +232,7 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
 				break;
 			case 'k':
 				//A k-mer length should be positive
-				if(atoi(optarg) <= 0){
+				if(atoi(optarg) <= 0) {
 					cerr << "ERROR: K-mer length not applicable" << endl;
 					return false;
 				}
@@ -257,7 +257,7 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
 				break;
 			case 'w':
 				//Window size should be positive
-				if(atoi(optarg) <= 0){
+				if(atoi(optarg) <= 0) {
 					cerr << "ERROR: Window size not applicable" << endl;
 					return false;
 				}
@@ -266,7 +266,7 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
 				break;
 			case 'r':
 				//Check if given value is reasonable to represent a ratio
-				if(atof(optarg) <= 0 || atof(optarg) > MAX_RATIO){
+				if(atof(optarg) <= 0 || atof(optarg) > MAX_RATIO) {
 					cerr << "ERROR: Given hash ratio not applicable" << endl;
 
 					return false;
@@ -280,7 +280,7 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
 				break;
 			//case 'c':
 			//	//Weights should be positive
-			//	if(atoi(optarg) <= 0){
+			//	if(atoi(optarg) <= 0) {
 			//		cerr << "ERROR: Common hash weight not applicable" << endl;
 
 			//		return false;
@@ -290,7 +290,7 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
 			//	break;
 			//case 'u':
 			//	//Weights should be positive
-			//	if(atof(optarg) <= 0){
+			//	if(atof(optarg) <= 0) {
 			//		cerr << "ERROR: Unique hash weight not applicable" << endl;
 
 			//		return false;
@@ -334,7 +334,7 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params){
 //		tor to store the sketch would have to be elongated several times which might be time consuming. On the other hand, it might
 //		also be time consuming to handle the complete sequence in memory first. Eventually, it will depend on a try to find out
 //		what is the better alternative. Could also be that it does not matter at all!
-const bool readFASTA(const string& filePath, string& seq){
+const bool readFASTA(const string& filePath, string& seq) {
 	bool headerRead = false, lnBrkDiscvd = false;
 	char c;
 
@@ -345,18 +345,18 @@ const bool readFASTA(const string& filePath, string& seq){
 	if(!fStr.is_open()) return false;
 
 	//Read in file character by character
-	while(fStr.get(c)){
+	while(fStr.get(c)) {
 		//We are done if we find a second header (which can only start after at least one line break) in the file
 		if(c == '>' && headerRead && lnBrkDiscvd) break;
 
 		//Header lines are skipped
-		if(c == '>'){
+		if(c == '>') {
 			headerRead = true;
 			continue;
 		}
 
 		//The first line break indicates that we have left the header line
-		if(c == '\n'){
+		if(c == '\n') {
 			lnBrkDiscvd = true;
 			continue;
 		}
@@ -377,7 +377,7 @@ const bool readFASTA(const string& filePath, string& seq){
 //This function reads in batches of FASTA sequence entries from file and transforms them into minimap sketches. Returns false if end
 // of file was reached.
 const bool lMiniPttnSks(ifstream& fStr, const uint32_t& k, const uint32_t& w, const unordered_map<uint64_t, char>& blmers, 
-	vector<tuple<string, uint32_t, Sketch>>& pSks){
+	vector<tuple<string, uint32_t, Sketch>>& pSks) {
 	bool headerRead, idRead = false, lnBrkDiscvd = false;
 	char c;
 	string seq, seqID;
@@ -389,10 +389,10 @@ const bool lMiniPttnSks(ifstream& fStr, const uint32_t& k, const uint32_t& w, co
 	headerRead = fStr.gcount() != 0;
 
 	//Read in file character by character
-	while(fStr.get(c)){
+	while(fStr.get(c)) {
 		//An entry's sequence is complete if we find a second header (which can only start after at least one line break) in the 
 		//file
-		if(c == '>' && headerRead && lnBrkDiscvd){
+		if(c == '>' && headerRead && lnBrkDiscvd) {
 			//Add sequence's sketch, length and id to result vector
 			pSks.push_back(make_tuple(seqID, seq.length(), buildMiniSketch(seq, k, w, blmers)));//TODO: This function still needs to be tested!
             //cout << "pattern: " << seq << endl;
@@ -417,7 +417,7 @@ const bool lMiniPttnSks(ifstream& fStr, const uint32_t& k, const uint32_t& w, co
 		lnBrkDiscvd = lnBrkDiscvd || c == '\n';
 
 		//Update sequence id if we are still reading it
-		if(headerRead && !lnBrkDiscvd && !idRead){
+		if(headerRead && !lnBrkDiscvd && !idRead) {
 			seqID += c;
 			continue;
 		}
@@ -442,21 +442,20 @@ const bool lMiniPttnSks(ifstream& fStr, const uint32_t& k, const uint32_t& w, co
 }
 
 //This function reads 64-bit numbers from file and returns them as a hash table
-const unordered_map<uint64_t, char> readBlstKmers(const string& fname){
+const unordered_map<uint64_t, char> readBlstKmers(const string& fname) {
 	char nb[STRING_BUFFER_SIZE_DEFAULT];
 	char* end;
 	ifstream iFile(fname);
 	unordered_map<uint64_t, char> numbers;
 
-	//Check if file could be opened
-	if(!iFile.is_open()){
+	if(!iFile.is_open()) {
 		cerr << "readBlstKmers: WARNING input file could not be opened. Hash table will be empty!" << endl;
-
 		return numbers;
 	}
 
-	//Read numbers
-	while(iFile.getline(nb, STRING_BUFFER_SIZE_DEFAULT)) numbers[strtoull(nb, &end, 0)] = 1;
+	//Read kmer hashes
+	while(iFile.getline(nb, STRING_BUFFER_SIZE_DEFAULT))
+		numbers[strtoull(nb, &end, 0)] = 1;
 
 	return numbers;
 }
@@ -468,7 +467,7 @@ bool reader_t::init(int argc, char **argv) {
 	cerr << "Reading index " << params.tFile << "..." << endl;
 
 	//Parse arguments
-	if(!prsArgs(argc, argv, &params)){//TODO: Tests for this function need to be adapted!
+	if(!prsArgs(argc, argv, &params)) {//TODO: Tests for this function need to be adapted!
 		dsHlp(); //Display help message
 		return 0;
 	}
@@ -480,7 +479,7 @@ bool reader_t::init(int argc, char **argv) {
 	r = mm_idx_reader_open(params.tFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);  //Open an index reader //TODO: We do not allow yet to use a prebuilt index
 
 	//Check if index could be opened successfully
-	if(r == NULL){
+	if(r == NULL) {
 		cerr << "ERROR: Text sequence file could not be read" << endl;
 		return 1;
 	}
@@ -490,13 +489,13 @@ bool reader_t::init(int argc, char **argv) {
 	}
 
 	//Construct index of reference
-	if((tidx = mm_idx_reader_read(r, 1)) == 0){ //TODO: Make use of multithreading here!
+	if((tidx = mm_idx_reader_read(r, 1)) == 0) { //TODO: Make use of multithreading here!
 		cerr << "ERROR: Text index cannot be read" << endl;
 		return 1;
 	}
 
 	//For simplicity we assume that an index always consists of only one part
-	if(mm_idx_reader_read(r, 1) != 0){
+	if(mm_idx_reader_read(r, 1) != 0) {
 		cerr << "ERROR: Text index consists of several parts! We cannot handle this yet" << endl;
 		return 1; 
 	}
@@ -505,19 +504,19 @@ bool reader_t::init(int argc, char **argv) {
 	r = mm_idx_reader_open(params.pFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);
 
 	//Check if index could be opened successfully
-	if(r == NULL){
+	if(r == NULL) {
 		cerr << "ERROR: Pattern sequence file could not be read" << endl;
 		return 1;
 	}
 
 	//Construct index of reference
-	if((pidx = mm_idx_reader_read(r, 1)) == 0){//TODO: Make use of multithreading here!
+	if((pidx = mm_idx_reader_read(r, 1)) == 0) {//TODO: Make use of multithreading here!
 		cerr << "ERROR: Pattern index cannot be read" << endl;
 		return 1;
 	}
 
 	//For simplicity we assume that an index always consists of only one part
-	if(mm_idx_reader_read(r, 1) != 0){
+	if(mm_idx_reader_read(r, 1) != 0) {
 		cerr << "ERROR: Pattern index consists of several parts! We cannot handle this yet" << endl;
 		return 1; 
 	}
