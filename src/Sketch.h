@@ -41,7 +41,7 @@ using namespace std;
 //A PairSketch is a list of offset hash pairs
 using PairSketch = list<pair<uint32_t, uint64_t>>;
 //A Sketch is a list of hashes
-using Sketch = vector<uint64_t>;
+using Sketch = vector<pair<int32_t, uint64_t>>;
 
 //A compare function to sort hashes in a sketch
 inline const bool smHshsFrst(const pair<uint32_t, uint64_t>& left, const pair<uint32_t, uint64_t>& right){ return left.second < right.second; }
@@ -125,13 +125,12 @@ const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_
 	const uint64_t mask = pow(ALPHABET_SIZE, k) - 1;
 	uint64_t kmerHash, kmerBitSeq, revKmerBitSeq;
 	//This stores pairs of k-mer starting positions and their hashes within the current window
-	vector<pair<int32_t, uint64_t>> windowKmers;
+	vector<pair<int32_t, uint64_t>> windowKmers; // TODO: this can be sped up by using a fixed-size cyclic array with two pointers for begin and end
 	Sketch sk;
 
 	//If the sequence is smaller than k we are done
 	if(seq.length() < k){
 		cerr << "WARNING: Length of input sequence " << seq << " is smaller than k (k=" << k << ")" << endl;
-
 		return sk;
 	}
 
@@ -140,6 +139,7 @@ const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_
 
 	//Iterate over k-mer starting positions in sequence
 	for(int32_t i = 0; i < seq.length() - k + 1; ++i){
+		// TODO: don't take the substr each time, work only with 1 letter at a time
 		kmerBitSeq = calcKmerNb(seq.substr(i, k));
 		revKmerBitSeq = calcKmerNb(revComp(seq.substr(i, k)));
 		windowBorder = i - (w - 1);
@@ -148,6 +148,7 @@ const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_
 		if(kmerBitSeq == revKmerBitSeq) continue;
 
 		//Depending on which is lexicographically smaller, we consider either the k-mer or its reverse complement
+		// TODO: rewrite shorter
 		if(kmerBitSeq < revKmerBitSeq){
 			//Calculate k-mer's hash
 			kmerHash = getHash(kmerBitSeq, mask);
@@ -157,19 +158,21 @@ const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_
 		}
 		
 		//Remove all pairs with a larger hash from the back
-		while(!windowKmers.empty() && windowKmers.back().second > kmerHash) windowKmers.pop_back();
+		while(!windowKmers.empty() && windowKmers.back().second > kmerHash)
+			windowKmers.pop_back();
 
 		//Add current k-mer hash to windowKmers
 		windowKmers.push_back(make_pair(i, kmerHash));
 
 		//Remove pairs of k-mers which are no longer inside the window
-		while(!windowKmers.empty() && windowKmers.front().first < windowBorder) windowKmers.erase(windowKmers.begin());
+		while(!windowKmers.empty() && windowKmers.front().first < windowBorder)
+			windowKmers.erase(windowKmers.begin());
 
 		//Choose a minimizer as soon as we have the first full window of k-mers and make sure we do the same minimizer a second time
 		if(windowBorder >= 0 && !windowKmers.empty()){
 			if(lastIdx != windowKmers.front().first && !blmers.contains(windowKmers.front().second)){
 				lastIdx = windowKmers.front().first;
-				sk.push_back(windowKmers.front().second);
+				sk.push_back(windowKmers.front());
 			}
 
 			//If the same k-mer appears several times inside the window and it has the smallest hash we want to save all occurrences
@@ -178,7 +181,8 @@ const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_
 				lastIdx = windowKmers.front().first;
 
 				//Blacklisted k-mers are not added
-				if(!blmers.contains(windowKmers.front().second)) sk.push_back(windowKmers.front().second);
+				if(!blmers.contains(windowKmers.front().second))
+					sk.push_back(windowKmers.front());
 			}
 		}
 	}
@@ -186,14 +190,14 @@ const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_
 	//In case we have never seen a full window of k-mers take the one with the smallest hash seen for the sketch
 	if(windowBorder < 0 && !windowKmers.empty()){
 		//Blacklisted k-mers are not added
-		if(!blmers.contains(windowKmers.front().second)) sk.push_back(windowKmers.front().second);
+		if(!blmers.contains(windowKmers.front().second)) sk.push_back(windowKmers.front());
 
 		//If the same k-mer appears several times inside the window and it has the smallest hash we want to save all occurrences
 		while(windowKmers.size() > 1 && windowKmers.front().second == windowKmers[1].second){
 			windowKmers.erase(windowKmers.begin());
 
 			//Blacklisted k-mers are not added
-			if(!blmers.contains(windowKmers.front().second)) sk.push_back(windowKmers.front().second);
+			if(!blmers.contains(windowKmers.front().second)) sk.push_back(windowKmers.front());
 		}
 	}
 

@@ -5,9 +5,6 @@
 #include <fstream>
 #include <map>
 
-//#include "Index.h"
-//#include "Measures.h"
-
 #define INDEX_DEFAULT_DUMP_FILE "indexDump.idx"
 //#define T 0.9
 #define DEFAULT_WEIGHT 1
@@ -51,12 +48,14 @@ std::string getElasticDescription(elastic_t e) {
 enum class alignment_edges_t {
     wrong = -1,
     sketch_edges = 0,
-    extend_equally = 1
+    extend_equally = 1,
+    fine = 2
 }; 
 
 alignment_edges_t str2alignment_edges(string t) {
     if (t == "sketch_edges") return alignment_edges_t::sketch_edges;
     if (t == "extend_equally") return alignment_edges_t::extend_equally;
+    if (t == "fine") return alignment_edges_t::fine;
 	return alignment_edges_t::wrong;
 }
 
@@ -68,6 +67,8 @@ std::string getAlignmentEdgesDescription(alignment_edges_t ae) {
         case alignment_edges_t::extend_equally:
             //return "Make the length equal to |P| by extending the sketch edges equally.";
             return "extend_equally";
+        case alignment_edges_t::fine:
+            return "fine";
         default:	
             return "wrong";
     }
@@ -98,7 +99,7 @@ struct params_t {
 		k = K; 						//The k-mer length
 		w = W; 							//The window size
 		elastic = elastic_t::off;
-		alignment_edges = alignment_edges_t::sketch_edges;
+		alignment_edges = alignment_edges_t::fine;
 		hFrac = HASH_RATIO;
 		//comWght = DEFAULT_WEIGHT; 			//Scoring weights
 		//uniWght = DEFAULT_WEIGHT;
@@ -170,7 +171,7 @@ inline void dsHlp(){
 	cerr << "   -k   --ksize             K-mer length to be used for sketches (default " << K << ")" << endl;
 	cerr << "   -w   --windowsize        Window size for minimizer sketching approach (default " << W << ")" << endl;
 	cerr << "   -e   --elastic           Elastic pairs of kmers {off, consecutive, random} [off]" << endl;
-	cerr << "   -a   --alignment_edges   Alignment interval {sketch_edges, extend equally} [sketch_edges]" << endl;
+	cerr << "   -a   --alignment_edges   Alignment interval {sketch_edges, extend_equally, fine} [fine]" << endl;
 	cerr << "   -r   --hashratio         FracMin hash ratio to be used for sketches (default " << HASH_RATIO << ")" << endl;
 	cerr << "   -b   --blacklist         File containing hashes to ignore for sketch calculation" << endl;
 	cerr << "   -c   --commonhashweight  Weight to reward common hashes (default " << DEFAULT_WEIGHT << ")" << endl;
@@ -190,6 +191,7 @@ inline void dsHlp(){
 const bool prsArgs(int& nArgs, char** argList, params_t *params){
 	int option_index = 0, a;
 
+	#define T_HOM_OPTIONS "p:s:k:w:e:a:r:b:c:u:t:d:i:z:nxoh"
 	static struct option long_options[] = {
         {"pattern",            required_argument,  0, 'p'},
         {"text",               required_argument,  0, 's'},
@@ -462,6 +464,8 @@ const unordered_map<uint64_t, char> readBlstKmers(const string& fname){
 bool reader_t::init(int argc, char **argv) {
 	//A hash table to store black listed k-mers
 	// unordered_map<uint64_t, char> bLstmers;
+
+	cerr << "Reading index " << params.tFile << "..." << endl;
 
 	//Parse arguments
 	if(!prsArgs(argc, argv, &params)){//TODO: Tests for this function need to be adapted!

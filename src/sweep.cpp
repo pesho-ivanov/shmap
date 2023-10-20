@@ -2,6 +2,7 @@
 #include <iostream>
 #include <iomanip>
 #include <deque>
+#include <set>
 
 #include "Sketch.h"
 #include "IO.h"
@@ -11,12 +12,13 @@ unordered_map<uint64_t, char> bLstmers;
 
 struct Match {
 	uint32_t kmer_ord;
+	uint32_t P_l;
 	uint32_t T_r;
 	uint32_t t_pos;
 
 	Match() {}
-	Match(uint32_t _kmer_ord, uint32_t _T_pos, uint32_t _t_pos)
-		: kmer_ord(_kmer_ord), T_r(_T_pos), t_pos(_t_pos) {}
+//	Match(uint32_t _kmer_ord, uint32_t _T_pos, uint32_t _t_pos)
+//		: kmer_ord(_kmer_ord), T_r(_T_pos), t_pos(_t_pos) {}
 
 	bool operator<(const Match &other) {
 		return T_r < other.T_r;
@@ -31,10 +33,28 @@ struct Mapping {
 	uint32_t T_l;      // the position of the leftmost nucleotide of the mapping
 	uint32_t T_r;      // the position of the rightmost nucleotide of the mapping
 	uint32_t xmin;     // the number of kmers in the intersection between the pattern and its mapping in `t'
+	uint32_t dT_l;      // delta to be applied before output
+	uint32_t dT_r;      // -- || --
 	double J;          // Jaccard score/similarity [0;1]
+	clock_t map_time;
 
-	Mapping(uint32_t k=0, uint32_t P_sz=0, uint32_t p_sz=0, uint32_t matches=0, uint32_t T_l=0, uint32_t T_r=0, uint32_t xmin=0, double J=0.0)
-		: k(k), P_sz(P_sz), p_sz(p_sz), matches(matches), T_l(T_l), T_r(T_r), xmin(xmin), J(J) {}
+	Mapping(uint32_t k=0, uint32_t P_sz=0, uint32_t p_sz=0, uint32_t matches=0, uint32_t T_l=0, uint32_t T_r=0, uint32_t xmin=0, uint32_t dT_l=0, uint32_t dT_r=0, double J=0.0)
+		: k(k), P_sz(P_sz), p_sz(p_sz), matches(matches), T_l(T_l), T_r(T_r), xmin(xmin), dT_l(dT_l), dT_r(dT_r), J(J) {}
+
+	void print() {
+		cerr << "k=" << k 
+			<< " |P|=" << P_sz
+			<< " |p|=" << p_sz
+			<< " matches=" << matches
+			<< " T_l=" << T_l
+			<< " T_r=" << T_r
+			<< " xmin=" << xmin
+			<< " dT_l=" << dT_l
+			<< " dT_r=" << dT_r
+			<< " J=" << J
+			<< " map_time=" << map_time
+			<< endl;
+	}
 };
 
 template<typename TT> auto prev(const typename TT::iterator &it) {
@@ -86,7 +106,8 @@ class Sweep {
 
 		uint64_t kmer_hash, prev_kmer_hash = 0;
 		for(auto p_it = p.begin(); p_it != p.end(); ++p_it, prev_kmer_hash = kmer_hash) {
-			kmer_hash = *p_it;
+			auto kmer_pos = p_it->first;
+			kmer_hash = p_it->second;
 			uint32_t kmer_ord;
 
 			// Add xor'ed consecuent pattern kmers to p_hist 
@@ -102,6 +123,7 @@ class Sweep {
 				auto *idx_p = mm_idx_get(tidx, kmer_hash, &nHits);
 				for (int i = 0; i < nHits; ++i, ++idx_p) {					// Iterate over all occurrences
 					Match m;
+					m.P_l = kmer_pos;
 					m.kmer_ord = kmer_ord;
 					unpack(*idx_p, &m.T_r, &m.t_pos);
 					L->push_back(m); // Push (k-mer ord in p, k-mer position in reference, k-mer position in sketch) pair
@@ -179,6 +201,9 @@ class Sweep {
 		vector<Match> L;    		// for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
 		vector<uint64_t> L2;		// for all consecutive matches in L
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
+		clock_t begin_time = clock();
+
+		multiset<int32_t> P_l_set;
 
 		int xmin = 0;
 		Mapping best;
@@ -196,6 +221,7 @@ class Sweep {
 		for(auto l = L.begin(), r = L.begin(); l != L.end(); ++l, ++i) {
 			// Increase the right end of the window [l,r) until it gets out.
 			for(; should_extend_right(p, diff_hist, L, l, r, xmin, Plen_nucl, params.k); ++r, ++j) {
+				P_l_set.insert(r->P_l);
 				// If taking this kmer from T increases the intersection with P.
 				if (--diff_hist[r->kmer_ord] >= 0)
 					++xmin;
@@ -210,15 +236,26 @@ class Sweep {
 
 			// Update best.
 			auto curr_J = J(p.size(), l, r, xmin);
-			if (params.onlybest) {
-				if (curr_J > best.J)
-					best = Mapping(params.k, Plen_nucl, p.size(), L.size(), l->T_r, prev(r)->T_r, xmin, curr_J);
-			} else {
-				if (curr_J > params.tThres) {
-					mappings.push_back(Mapping(params.k, Plen_nucl, p.size(), L.size(), l->T_r, prev(r)->T_r, xmin, curr_J));
+			auto m = Mapping(params.k, Plen_nucl, p.size(), L.size(), l->T_r, prev(r)->T_r, xmin, 0, 0, curr_J);
+
+			if (params.alignment_edges == alignment_edges_t::fine) {
+				if (P_l_set.size() > 0) {
+					m.dT_l = - *P_l_set.begin();
+					m.dT_r = Plen_nucl - (*P_l_set.rbegin()+params.k);
 				}
 			}
 
+			if (params.onlybest) {
+				if (curr_J > best.J) {
+					best = m;
+				}
+			} else {
+				if (curr_J > params.tThres) {
+					mappings.push_back(m);
+				}
+			}
+
+			P_l_set.erase(P_l_set.find(l->P_l));
 			// Prepare for the next step by moving `l` to the right.
 			if (++diff_hist[l->kmer_ord] > 0)
 				--xmin;
@@ -233,8 +270,10 @@ class Sweep {
 		}
 		assert (xmin == 0);
 
-		if (params.onlybest && best.J > params.tThres)
+		if (params.onlybest) { // && best.J > params.tThres)
+			best.map_time = clock() - begin_time;
 			mappings.push_back(best);
+		}
 
 		return mappings;
 	}
@@ -301,10 +340,14 @@ vector<Mapping> filter_reasonable(const params_t &params, const vector<Mapping> 
 void normalizeMappings(const params_t &params, vector<Mapping> *mappings, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text){
 	for(auto &m: *mappings) {
 		if (params.alignment_edges == alignment_edges_t::extend_equally) {
-			int span   = m.T_r - m.T_l + 1;  assert(span <= m.P_sz);
+			int span   = m.T_r - m.T_l + 1;
+			//assert(span <= m.P_sz);
 			int shift  = (m.P_sz - span) / 2;       assert(shift >= 0);
 			m.T_l -= shift; m.T_l = max((uint32_t)0, m.T_l);
 			m.T_r += shift; m.T_r = min(T_sz-1, m.T_r);
+		} else if (params.alignment_edges == alignment_edges_t::fine) {
+			m.T_l += m.dT_l;
+			m.T_r += m.dT_r;
 		}
 	}
 }
@@ -312,8 +355,9 @@ void normalizeMappings(const params_t &params, vector<Mapping> *mappings, const 
 // Outputs all given mappings
 void outputMappings(const params_t &params, const vector<Mapping>& res, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text){
 	for(auto m: res) {
+		m.print();
 		cout << seqID << "\t" << m.k << "\t" << m.P_sz << "\t" << m.p_sz << "\t"
-			<< m.matches << "\t" << m.T_l << "\t" << m.T_r << "\t" << m.xmin << "\t" << m.J << endl;
+			<< m.matches << "\t" << m.T_l << "\t" << m.T_r << "\t" << m.xmin << "\t" << m.J << "\t" << m.map_time << endl;
         if (!text.empty())
             cerr << "   text: " << text.substr(m.T_l, m.T_r-m.T_l+1) << endl;
 	}
@@ -328,12 +372,14 @@ int main(int argc, char **argv){
 	Sweep sweep(reader.tidx, params);
 
 	if (!params.paramsFile.empty()) {
-		cerr << "Writing parameters to " << params.paramsFile << endl;
+		cerr << "Writing parameters to " << params.paramsFile << "..." << endl;
 		auto fout = ofstream(params.paramsFile);
 		reader.params.print(fout, false);
 	} else {
 		reader.params.print(cerr, true);
 	}
+
+	cerr << "Aligning reads from" << params.pFile << "..." << endl;
 
 	// Load pattern sequences in batches
 	while(lMiniPttnSks(reader.fStr, params.k, reader.tidx->w, bLstmers, reader.pSks) || !reader.pSks.empty()) { //TODO: This function still needs to be tested!
@@ -345,6 +391,7 @@ int main(int argc, char **argv){
 
 			//Calculate an adapted threshold if we have the necessary informations
 			//float curr_tThres = (reader.dec != 0 && reader.inter != 0) ? reader.dec * plen_nucl + reader.inter : reader.tThres;
+			cerr << ".";
 
             auto mappings = sweep.map(sks, Plen_nucl);
 			auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(params, mappings, Plen_nucl);
