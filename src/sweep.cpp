@@ -36,7 +36,7 @@ struct Mapping {
 	uint32_t dT_l;      // delta to be applied before output
 	uint32_t dT_r;      // -- || --
 	double J;          // Jaccard score/similarity [0;1]
-	clock_t map_time;
+	double map_time;
 
 	Mapping(uint32_t k=0, uint32_t P_sz=0, uint32_t p_sz=0, uint32_t matches=0, uint32_t T_l=0, uint32_t T_r=0, uint32_t xmin=0, uint32_t dT_l=0, uint32_t dT_r=0, double J=0.0)
 		: k(k), P_sz(P_sz), p_sz(p_sz), matches(matches), T_l(T_l), T_r(T_r), xmin(xmin), dT_l(dT_l), dT_r(dT_r), J(J) {}
@@ -232,7 +232,6 @@ class Sweep {
 		vector<Match> L;    		// for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
 		vector<uint64_t> L2;		// for all consecutive matches in L
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
-		clock_t begin_time = clock();
 
 		multiset<int32_t> P_l_set;
 
@@ -302,7 +301,6 @@ class Sweep {
 		assert (xmin == 0);
 
 		if (params.onlybest) { // && best.J > params.tThres)
-			best.map_time = clock() - begin_time;
 			mappings.push_back(best);
 		}
 
@@ -431,13 +429,15 @@ int main(int argc, char **argv) {
 			auto seqID = get<0>(*p);
             auto Plen_nucl = get<1>(*p);
             auto sks = get<2>(*p);
-
-			//Calculate an adapted threshold if we have the necessary informations
-			//float curr_tThres = (reader.dec != 0 && reader.inter != 0) ? reader.dec * plen_nucl + reader.inter : reader.tThres;
+			clock_t begin_map_time = clock();
 
             auto mappings = sweep.map(sks, Plen_nucl);
 			auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(params, mappings, Plen_nucl);
 			normalizeMappings(params, &reasonable_mappings, sks.size(), seqID, reader.T_sz, reader.text);
+
+			double all_map_time = 1.0 * (clock() - begin_map_time) / CLOCKS_PER_SEC;
+			for (auto &m: reasonable_mappings)
+				m.map_time = all_map_time / mappings.size();
 			outputMappings(params, reasonable_mappings, sks.size(), seqID, reader.T_sz, reader.text);
 
 			// stats
