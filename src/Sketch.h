@@ -44,7 +44,7 @@ using PairSketch = list<pair<uint32_t, uint64_t>>;
 using Sketch = vector<pair<int32_t, uint64_t>>;
 
 //A compare function to sort hashes in a sketch
-inline const bool smHshsFrst(const pair<uint32_t, uint64_t>& left, const pair<uint32_t, uint64_t>& right) { return left.second < right.second; }
+inline bool smHshsFrst(const pair<uint32_t, uint64_t>& left, const pair<uint32_t, uint64_t>& right) { return left.second < right.second; }
 
 //This function returns a numerical value for each nucleotide base
 inline uint64_t getBaseNb(const char& c) {
@@ -137,7 +137,7 @@ const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_
 	sk.reserve(seq.length() * 0.03);
 
 	//Iterate over k-mer starting positions in sequence
-	for(int32_t i = 0; i < seq.length() - k + 1; ++i) {
+	for(int32_t i = 0; i < (int)seq.length() - k + 1; ++i) {
 		// TODO: don't take the substr each time, work only with 1 letter at a time
 		kmerBitSeq = calcKmerNb(seq.substr(i, k));
 		revKmerBitSeq = calcKmerNb(revComp(seq.substr(i, k)));

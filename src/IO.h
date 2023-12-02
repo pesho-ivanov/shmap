@@ -11,7 +11,9 @@
 using Thomology = tuple<uint32_t, uint32_t, int32_t>;
 
 //#define OPTIONS "a:b:ilh"
-#define T_HOM_OPTIONS "p:s:k:w:r:b:a:e:c:u:t:d:z:i:x:o:nNh"
+//#define T_HOM_OPTIONS "p:s:k:w:r:b:a:e:c:u:t:d:z:i:x:o:nNh"
+#define T_HOM_OPTIONS "p:s:k:w:e:a:r:b:c:u:t:d:i:z:nxoh"
+
 //#define MIN_PARAM_NB 6
 #define MAX_RATIO 1.0
 //#define NORM_FLAG_DEFAULT false
@@ -191,7 +193,6 @@ inline void dsHlp() {
 const bool prsArgs(int& nArgs, char** argList, params_t *params) {
 	int option_index = 0, a;
 
-	#define T_HOM_OPTIONS "p:s:k:w:e:a:r:b:c:u:t:d:i:z:nxoh"
 	static struct option long_options[] = {
         {"pattern",            required_argument,  0, 'p'},
         {"text",               required_argument,  0, 's'},

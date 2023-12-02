@@ -341,7 +341,7 @@ vector<Mapping> filter_reasonable(const params_t &params, const vector<Mapping> 
 			// Remove the mapping that is already too much behind.
 			recent.pop_back();
 		}
-		assert(recent.empty() || recent.back().T_r <= recent.front().T_r && recent.front().T_r <= next.T_r);
+		assert(recent.empty() || (recent.back().T_r <= recent.front().T_r && recent.front().T_r <= next.T_r));
 
 		// Now all the mappings in `recent' are close to `curr' 
 		// 2. Remove from the deque front all mappings that are strictly
@@ -395,6 +395,10 @@ void outputMappings(const params_t &params, const vector<Mapping>& res, const ui
 }
 
 int main(int argc, char **argv) {
+	double total_sketching_time=0, total_mapping_time=0, total_time=0;
+	clock_t total_start = clock();
+	int total_reads = 0, unmapped_reads = 0;
+
 	reader_t reader;
 	auto res = reader.init(argc, argv);
 	const params_t &params = reader.params;
@@ -413,8 +417,15 @@ int main(int argc, char **argv) {
 	//cerr << "aligning reads from " << params.pFile << "..." << endl;
 
 	// Load pattern sequences in batches
-	while(cerr << "Sketching..." << endl, lMiniPttnSks(reader.fStr, params.k, reader.tidx->w, bLstmers, reader.pSks) || !reader.pSks.empty()) { //TODO: This function still needs to be tested!
+	while(true) {
+		cerr << "Sketching..." << endl;
+		clock_t start_sketching = clock();
+		if (!lMiniPttnSks(reader.fStr, params.k, reader.tidx->w, bLstmers, reader.pSks) && reader.pSks.empty())
+			break;
+		total_sketching_time += clock() - start_sketching;
+
 		cerr << "Aligning..." << endl;
+		clock_t start_mapping = clock();
 		// Iterate over pattern sketches
 		for(auto p = reader.pSks.begin(); p != reader.pSks.end(); ++p) {
 			auto seqID = get<0>(*p);
@@ -423,16 +434,28 @@ int main(int argc, char **argv) {
 
 			//Calculate an adapted threshold if we have the necessary informations
 			//float curr_tThres = (reader.dec != 0 && reader.inter != 0) ? reader.dec * plen_nucl + reader.inter : reader.tThres;
-			//cerr << ".";
 
             auto mappings = sweep.map(sks, Plen_nucl);
 			auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(params, mappings, Plen_nucl);
 			normalizeMappings(params, &reasonable_mappings, sks.size(), seqID, reader.T_sz, reader.text);
 			outputMappings(params, reasonable_mappings, sks.size(), seqID, reader.T_sz, reader.text);
-		}
 
+			// stats
+			++total_reads;
+			if (mappings.empty()) ++unmapped_reads;
+		}
 		reader.pSks.clear();
+		total_mapping_time += clock() - start_mapping;
 	}
+	total_time = double(clock() - total_start) / CLOCKS_PER_SEC;
+	total_sketching_time /= CLOCKS_PER_SEC;
+	total_mapping_time /= CLOCKS_PER_SEC;
+
+	cerr << "Total reads:          " << total_reads << endl;
+	cerr << "Unmapped reads:       " << unmapped_reads << " (" << 100.0 * unmapped_reads / total_reads << "%)" << endl;
+	cerr << "Total time:           " << total_time << endl;
+	cerr << "Total sketching time: " << total_sketching_time << " (" << 100*total_sketching_time / total_time << "\% of total)" << endl;
+	cerr << "Total   mapping time: " << total_mapping_time << " (" << 100*total_mapping_time / total_time << "\% of total)" << endl;
 
 	return 0;
 }
