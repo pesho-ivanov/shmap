@@ -10,6 +10,8 @@
 const float EPS = 1e-7;
 unordered_map<uint64_t, char> bLstmers;
 
+clock_t sorting_time;
+
 struct Match {
 	uint32_t kmer_ord;
 	uint32_t P_l;
@@ -168,8 +170,10 @@ class Sweep {
 				break;
 		}
 
+		clock_t _ = clock();
 		//Sort L by ascending positions in reference
 		sort(L->begin(), L->end());
+		sorting_time += clock() - _;
 
 		// Add elastic kmers
 		if (params.elastic == elastic_t::consecutive) {
@@ -476,12 +480,14 @@ int main(int argc, char **argv) {
 	total_time = double(clock() - total_start) / CLOCKS_PER_SEC;
 	total_sketching_time /= CLOCKS_PER_SEC;
 	total_mapping_time /= CLOCKS_PER_SEC;
+	sorting_time /= CLOCKS_PER_SEC;
 
 	cerr << "Total reads:          " << total_reads << endl;
 	cerr << "Unmapped reads:       " << unmapped_reads << " (" << 100.0 * unmapped_reads / total_reads << "%)" << endl;
 	cerr << "Total time:           " << total_time << endl;
 	cerr << "Total sketching time: " << total_sketching_time << " (" << 100*total_sketching_time / total_time << "\% of total)" << endl;
 	cerr << "Total   mapping time: " << total_mapping_time << " (" << 100*total_mapping_time / total_time << "\% of total)" << endl;
+	cerr << "        Sorting time: " << sorting_time << " (" << 100*sorting_time / total_time << "\% of total)" << endl;
 
 	return 0;
 }
