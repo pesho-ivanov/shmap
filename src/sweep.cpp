@@ -15,6 +15,7 @@ struct Match {
 	uint32_t P_l;
 	uint32_t T_r;
 	uint32_t t_pos;
+	bool strand;  // 0 - forward, 1 - reverse
 
 	Match() {}
 //	Match(uint32_t _kmer_ord, uint32_t _T_pos, uint32_t _t_pos)
@@ -22,6 +23,10 @@ struct Match {
 
 	bool operator<(const Match &other) {
 		return T_r < other.T_r;
+	}
+
+	char get_strand() const {
+		return strand ? '-' : '+';
 	}
 };
 
@@ -69,9 +74,11 @@ class Sweep {
 	const mm_idx_t *tidx;
 	const params_t &params;
 
-	void unpack(uint64_t idx, uint32_t *T_r, uint32_t *t_pos) {
-		*T_r = (uint32_t)(idx >> 32);
-		*t_pos = (uint32_t)(((idx << 32) >> 32) >> 1);
+	void unpack(uint64_t idx, Match *m) {
+		m->T_r    = (uint32_t)(idx >> 32);
+		m->t_pos  = (uint32_t)(((idx << 32) >> 32) >> 1);
+		m->strand = (uint32_t(idx) << 31) >> 31;
+		//cerr << "strand: " << m->strand << endl;
 	}
 
 	// return if the kmer has not been seen before
@@ -154,7 +161,7 @@ class Sweep {
 				Match m;
 				m.P_l = res.kmer_pos;
 				m.kmer_ord = res.kmer_ord;
-				unpack(*res.idx_p, &m.T_r, &m.t_pos);
+				unpack(*res.idx_p, &m);
 				L->push_back(m); // Push (k-mer ord in p, k-mer position in reference, k-mer position in sketch) pair
 			}
 			if ((total_hits += res.nHits) >= MAX_TOTAL_HITS)
@@ -366,7 +373,7 @@ vector<Mapping> filter_reasonable(const params_t &params, const vector<Mapping> 
 }
 
 // Extends the mappings to the left and right
-void normalizeMappings(const params_t &params, vector<Mapping> *mappings, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text) {
+void normalize_mappings(const params_t &params, vector<Mapping> *mappings, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text) {
 	for(auto &m: *mappings) {
 		if (params.alignment_edges == alignment_edges_t::extend_equally) {
 			int span   = m.T_r - m.T_l + 1;
@@ -382,11 +389,30 @@ void normalizeMappings(const params_t &params, vector<Mapping> *mappings, const 
 }
 
 // Outputs all given mappings
-void outputMappings(const params_t &params, const vector<Mapping>& res, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const string &text) {
+void mappings2paf(const params_t &params, const vector<Mapping>& res, const uint32_t P_sz, const uint32_t pLen, const string &seqID, const uint32_t T_sz, const char *T_name, const string &text) {
 	for(auto m: res) {
 		//m.print();
-		cout << seqID << "\t" << m.k << "\t" << m.P_sz << "\t" << m.p_sz << "\t"
-			<< m.matches << "\t" << m.T_l << "\t" << m.T_r << "\t" << m.xmin << "\t" << m.J << "\t" << m.map_time << endl;
+		// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
+		cout << seqID << "\t"  // Query sequence name
+			<< P_sz << "\t"   // query sequence length
+			<< 0 << "\t"   // query start (0-based; closed)
+			<< P_sz << "\t"   // query end (0-based; open)
+			<< "+" << "\t"   // m.get_strand() //strand; TODO
+			<< T_name << "\t"   // reference name
+			<< T_sz << "\t"  // target sequence length
+			<< m.T_l << "\t"  // target start on original strand (0-based)
+			<< m.T_r << "\t"  // target start on original strand (0-based)
+			<< -1 << "\t"  // Number of residue matches
+			<< -1 << "\t"  // Alignment block length
+			<< 255 << "\t"  // Mapping quality (0-255; 255 for missing)
+		// ----- end of required PAF fields -----
+			<< "k:i:" << m.k << "\t"
+			<< "P:i:" << m.P_sz << "\t"
+			<< "p:i:" << m.p_sz << "\t"
+			<< "M:i:" << m.matches << "\t" // matches of `p` in `s` [kmers]
+			<< "I:i:" << m.xmin << "\t"  // intersection of `p` and `s` [kmers]
+			<< "J:f:" << m.J << "\t"  // Jaccard similarity [0; 1]
+			<< "MT:f:" << m.map_time << endl;
         if (!text.empty())
             cerr << "   text: " << text.substr(m.T_l, m.T_r-m.T_l+1) << endl;
 	}
@@ -416,29 +442,29 @@ int main(int argc, char **argv) {
 
 	// Load pattern sequences in batches
 	while(true) {
-		cerr << "Sketching..." << endl;
+		cerr << "Sketching a batch of reads..." << endl;
 		clock_t start_sketching = clock();
 		if (!lMiniPttnSks(reader.fStr, params.k, reader.tidx->w, bLstmers, reader.pSks) && reader.pSks.empty())
 			break;
 		total_sketching_time += clock() - start_sketching;
 
-		cerr << "Aligning..." << endl;
+		cerr << "Aligning a batch of reads..." << endl;
 		clock_t start_mapping = clock();
 		// Iterate over pattern sketches
 		for(auto p = reader.pSks.begin(); p != reader.pSks.end(); ++p) {
 			auto seqID = get<0>(*p);
-            auto Plen_nucl = get<1>(*p);
+            auto P_sz = get<1>(*p);
             auto sks = get<2>(*p);
 			clock_t begin_map_time = clock();
 
-            auto mappings = sweep.map(sks, Plen_nucl);
-			auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(params, mappings, Plen_nucl);
-			normalizeMappings(params, &reasonable_mappings, sks.size(), seqID, reader.T_sz, reader.text);
+            auto mappings = sweep.map(sks, P_sz);
+			auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(params, mappings, P_sz);
+			normalize_mappings(params, &reasonable_mappings, sks.size(), seqID, reader.T_sz, reader.text);
 
 			double all_map_time = 1.0 * (clock() - begin_map_time) / CLOCKS_PER_SEC;
 			for (auto &m: reasonable_mappings)
 				m.map_time = all_map_time / mappings.size();
-			outputMappings(params, reasonable_mappings, sks.size(), seqID, reader.T_sz, reader.text);
+			mappings2paf(params, reasonable_mappings, P_sz, sks.size(), seqID, reader.T_sz, reader.tidx->seq->name, reader.text);
 
 			// stats
 			++total_reads;
