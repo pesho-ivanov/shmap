@@ -9,7 +9,7 @@ reads=out/reads-ChrY
 pbsim \
        $ref \
        --model_qc  model_qc_clr \
-       --accuracy-mean 0.85\
+       --accuracy-mean 0.99\
        --accuracy-sd 0\
        --depth 1\
        --prefix $reads\

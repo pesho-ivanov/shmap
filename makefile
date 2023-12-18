@@ -12,7 +12,7 @@ ESKEMAP_BIN = eskemap
 EDLIB_BIN = ~/libs/edlib/build/bin/edlib-aligner
 
 REF = newevals/t2tChrY.fa
-READS = newevals/out/reads-ChrY.fa
+READS = newevals/reads-ChrY-positive.fa
 
 all: sweep
 
@@ -44,8 +44,12 @@ debug: sweep
 	$(SWEEP_BIN) -s $(REF) -p simulations/reads/1.fasta $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z out/sweep-1.params >out/sweep-1.out 2>out/sweep-1.cerr
 
 run_sweep: sweep
-	time $(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -a fine -x -z newevals/out/sweep.params >newevals/out/sweep.paf
-	paftools.js mapeval newevals/out/sweep.paf
+	time $(SWEEP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 25 -z -S 100 -M 1000 newevals/out/sweep.params >newevals/out/sweep.paf 2>newevals/out/sweep.log
+	paftools.js mapeval newevals/out/sweep.paf | tee newevals/out/sweep.eval
+
+sweep_max_seeds_eval:
+	time $(SWEEP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 15 -z -S 100 -M 1000 newevals/out/sweep.params >newevals/out/sweep.paf 2>newevals/out/sweep.log
+	paftools.js mapeval newevals/out/sweep.paf | tee newevals/out/sweep.eval
 
 run_minimap:
 	$(MINIMAP_BIN) -x map-hifi -t 1 $(REF) $(READS) >out/minimap-Y.paf

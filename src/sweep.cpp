@@ -155,8 +155,12 @@ class Sweep {
 		//Sort by number of hits and get MAX_SEEDS of kmers with the lowest number of hits.
 		sort(match_lists.begin(), match_lists.end());
 		int total_hits = 0;
-		const int MAX_SEEDS = 500, MAX_TOTAL_HITS = 100000;
-		for (int seed=0; seed<min(MAX_SEEDS, (int)match_lists.size()); seed++) {
+		//const int MAX_SEEDS = 1000, MAX_TOTAL_HITS = 100000;
+		for (int seed=0; seed<(int)match_lists.size(); seed++) {
+			if (seed > params.max_seeds) {
+				++seeds_limit_reached;
+				break;
+			}
 			auto &res = match_lists[seed];
 			//cerr << "seed=" << seed << ", nHits=" << res.nHits << endl;
 			for (int i = 0; i < res.nHits; ++i, ++res.idx_p) {					// Iterate over all occurrences
@@ -166,8 +170,10 @@ class Sweep {
 				unpack(*res.idx_p, &m);
 				L->push_back(m); // Push (k-mer ord in p, k-mer position in reference, k-mer position in sketch) pair
 			}
-			if ((total_hits += res.nHits) >= MAX_TOTAL_HITS)
+			if ((total_hits += res.nHits) > params.max_matches) {
+				++matches_limit_reached;
 				break;
+			}
 		}
 
 		clock_t _ = clock();
@@ -205,6 +211,8 @@ class Sweep {
 		}
 		assert(p_sz + s_sz - xmin > 0);
 		double scj = 1.0 * xmin / (p_sz + s_sz - xmin);
+		//if (scj >= 0.9)
+		//	cerr << "J: p_sz=" << p_sz << ", s_sz=" << s_sz << ", xmin=" << xmin << ", l=" << l->t_pos << ", r=" << r->t_pos << ", scj=" << scj << endl;
 		if (!(0.0 <= scj && scj <= 1.0))
 			cerr << "ERROR: scj=" << scj << ", xmin=" << xmin << ", p_sz=" << p_sz << ", s_sz=" << s_sz << ", l=" << l->t_pos << ", r=" << r->t_pos << endl;
 		//assert (0.0 <= scj && scj <= 1.0);
@@ -230,6 +238,10 @@ class Sweep {
 	}
 
   public:
+	// stats
+	int seeds_limit_reached = 0;
+	int matches_limit_reached = 0;
+
 	Sweep(const mm_idx_t *tidx, const params_t &params)
 		: tidx(tidx), params(params) {
 			if (params.tThres < 0.0 || params.tThres > 1.0) {
@@ -275,9 +287,8 @@ class Sweep {
 				}
 			}
 
-			// Update best.
 			auto curr_J = J(p.size(), l, r, xmin);
-			auto m = Mapping(params.k, Plen_nucl, p.size(), L.size(), l->T_r, prev(r)->T_r, xmin, 0, 0, curr_J);
+			auto m = Mapping(params.k, Plen_nucl, p.size(), L.size(), l->T_r, prev(r)->T_r, xmin, 0, 0, curr_J);  // TODO: create only if curr_J is high enough
 
 			if (params.alignment_edges == alignment_edges_t::fine) {
 				if (P_l_set.size() > 0) {
@@ -411,12 +422,12 @@ void mappings2paf(const params_t &params, const vector<Mapping>& res, const uint
 			<< 255 << "\t"  // Mapping quality (0-255; 255 for missing)
 		// ----- end of required PAF fields -----
 			<< "k:i:" << m.k << "\t"
-			<< "P:i:" << m.P_sz << "\t"
+			//<< "P:i:" << m.P_sz << "\t"  // redundant
 			<< "p:i:" << m.p_sz << "\t"
 			<< "M:i:" << m.matches << "\t" // matches of `p` in `s` [kmers]
 			<< "I:i:" << m.xmin << "\t"  // intersection of `p` and `s` [kmers]
 			<< "J:f:" << m.J << "\t"  // Jaccard similarity [0; 1]
-			<< "MT:f:" << m.map_time << endl;
+			<< "t:f:" << m.map_time << endl;
         if (!text.empty())
             cerr << "   text: " << text.substr(m.T_l, m.T_r-m.T_l+1) << endl;
 	}
@@ -426,6 +437,8 @@ int main(int argc, char **argv) {
 	double total_sketching_time=0, total_mapping_time=0, total_time=0;
 	clock_t total_start = clock();
 	int total_reads = 0, unmapped_reads = 0;
+	double total_J = 0.0;
+	int total_mappings = 0;
 
 	reader_t reader;
 	auto res = reader.init(argc, argv);
@@ -466,8 +479,11 @@ int main(int argc, char **argv) {
 			normalize_mappings(params, &reasonable_mappings, sks.size(), seqID, reader.T_sz, reader.text);
 
 			double all_map_time = 1.0 * (clock() - begin_map_time) / CLOCKS_PER_SEC;
-			for (auto &m: reasonable_mappings)
+			for (auto &m: reasonable_mappings) {
 				m.map_time = all_map_time / mappings.size();
+				total_J += m.J;
+				total_mappings ++;
+			}
 			mappings2paf(params, reasonable_mappings, P_sz, sks.size(), seqID, reader.T_sz, reader.tidx->seq->name, reader.text);
 
 			// stats
@@ -477,14 +493,21 @@ int main(int argc, char **argv) {
 		reader.pSks.clear();
 		total_mapping_time += clock() - start_mapping;
 	}
+
 	total_time = double(clock() - total_start) / CLOCKS_PER_SEC;
 	total_sketching_time /= CLOCKS_PER_SEC;
 	total_mapping_time /= CLOCKS_PER_SEC;
 	sorting_time /= CLOCKS_PER_SEC;
 
+	// TODO: report average Jaccard similarity
 	cerr << "Total reads:          " << total_reads << endl;
+	cerr << "Seed limit reached:   " << sweep.seeds_limit_reached << " (" << 100.0 * sweep.seeds_limit_reached / total_reads << ")" << endl;
+	cerr << "Matches limit reached:" << sweep.matches_limit_reached << " (" << 100.0 * sweep.matches_limit_reached / total_reads << ")" << endl;
 	cerr << "Unmapped reads:       " << unmapped_reads << " (" << 100.0 * unmapped_reads / total_reads << "%)" << endl;
+	cerr << "Average J:            " << total_J / total_mappings << endl;
+	cerr << endl;
 	cerr << "Total time:           " << total_time << endl;
+	cerr << "Average time per read:" << total_time / total_reads << endl;
 	cerr << "Total sketching time: " << total_sketching_time << " (" << 100*total_sketching_time / total_time << "\% of total)" << endl;
 	cerr << "Total   mapping time: " << total_mapping_time << " (" << 100*total_mapping_time / total_time << "\% of total)" << endl;
 	cerr << "        Sorting time: " << sorting_time << " (" << 100*sorting_time / total_time << "\% of total)" << endl;

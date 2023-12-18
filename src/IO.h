@@ -10,9 +10,7 @@
 #define DEFAULT_WEIGHT 1
 using Thomology = tuple<uint32_t, uint32_t, int32_t>;
 
-//#define OPTIONS "a:b:ilh"
-//#define T_HOM_OPTIONS "p:s:k:w:r:b:a:e:c:u:t:d:z:i:x:o:nNh"
-#define T_HOM_OPTIONS "p:s:k:w:e:a:r:b:c:u:t:d:i:z:nxoh"
+#define T_HOM_OPTIONS "p:s:k:w:e:a:r:b:S:M:t:d:i:z:nxoh"
 
 //#define MIN_PARAM_NB 6
 #define MAX_RATIO 1.0
@@ -85,8 +83,8 @@ struct params_t {
 	elastic_t elastic;
 	alignment_edges_t alignment_edges;
 	double hFrac;  					//The FracMinHash ratio
-	//uint32_t comWght; 			//Scoring weights
-	//float uniWght;
+	uint32_t max_seeds;  							//Maximum seeds in a sketch
+	uint32_t max_matches;  							//Maximum seed matches in a sketch
 	float tThres;  							//The t-homology threshold
 	float dec; 								//Intercept and decent to interpolate thresholds
 	float inter; 
@@ -103,8 +101,8 @@ struct params_t {
 		elastic = elastic_t::off;
 		alignment_edges = alignment_edges_t::fine;
 		hFrac = HASH_RATIO;
-		//comWght = DEFAULT_WEIGHT; 			//Scoring weights
-		//uniWght = DEFAULT_WEIGHT;
+		max_seeds = 10000;
+		max_matches = 1000000;
 		tThres = 0.9; 							//The t-homology threshold
 		dec = 0; 								//Intercept and decent to interpolate thresholds
 		inter = 0;
@@ -176,8 +174,8 @@ inline void dsHlp() {
 	cerr << "   -a   --alignment_edges   Alignment interval {sketch_edges, extend_equally, fine} [fine]" << endl;
 	cerr << "   -r   --hashratio         FracMin hash ratio to be used for sketches (default " << HASH_RATIO << ")" << endl;
 	cerr << "   -b   --blacklist         File containing hashes to ignore for sketch calculation" << endl;
-	cerr << "   -c   --commonhashweight  Weight to reward common hashes (default " << DEFAULT_WEIGHT << ")" << endl;
-	cerr << "   -u   --uniquehashweight  Weight to punish unique hashes (default " << DEFAULT_WEIGHT << ")" << endl;
+	cerr << "   -S   --max_seeds         Max seeds in a sketch" << endl;
+	cerr << "   -M   --max_matches       Max seed matches in a sketch" << endl;
 	cerr << "   -t   --hom_thres         Homology threshold (default " << 0.9 << ")" << endl;
 	cerr << "   -d   --decent            Decent required for dynamic threshold selection" << endl;
 	cerr << "   -i   --intercept         Intercept required for dynamic threshold selection" << endl;
@@ -202,8 +200,10 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params) {
         {"alignment_edges",    required_argument,  0, 'a'},
         {"hashratio",          required_argument,  0, 'r'},
         {"blacklist",          required_argument,  0, 'b'},
-        {"commonhashweight",   required_argument,  0, 'c'},
-        {"uniquehashweight",   required_argument,  0, 'u'},
+        {"max_seeds",          required_argument,  0, 'S'},
+        {"max_matches",        required_argument,  0, 'M'},
+        //{"commonhashweight",   required_argument,  0, 'c'},
+        //{"uniquehashweight",   required_argument,  0, 'u'},
         {"hom_thres",          required_argument,  0, 't'},
         {"decent",             required_argument,  0, 'd'},
         {"intercept",          required_argument,  0, 'i'},
@@ -239,6 +239,20 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params) {
 				}
 
 				params->k = atoi(optarg);
+				break;
+			case 'S':
+				if(atoi(optarg) <= 0) {
+					cerr << "ERROR: The number of seeds should be positive." << endl;
+					return false;
+				}
+				params->max_seeds = atoi(optarg);
+				break;
+			case 'M':
+				if(atoi(optarg) <= 0) {
+					cerr << "ERROR: The number of seed matches should be positive." << endl;
+					return false;
+				}
+				params->max_matches = atoi(optarg);
 				break;
 			case 'e':
 				//Elastic kmers
