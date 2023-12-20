@@ -3,12 +3,14 @@
 
 #ref=chm13.genome.fa
 #reads=nearperfect-chm13.10X.24kb
-ref=t2tChrY.fa
-reads=out/reads-ChrY
+#ref=t2tChrY.fa
+#reads=out/reads-ChrY
+ref=chm13.fa
+reads=reads-chm13
 
 pbsim \
        $ref \
-       --model_qc  model_qc_clr \
+       --model_qc model_qc_clr \
        --accuracy-mean 0.99\
        --accuracy-sd 0\
        --depth 1\
@@ -21,3 +23,6 @@ samtools faidx $ref
 #paftools.js mason2fq mason_ali.sam > reads_paf.fa
 paftools.js pbsim2fq $ref.fai "$reads"_*.maf > $reads.fa
 rm -f "$reads"_*.maf "$reads"_*.ref "$reads"_*.fastq
+
+# filter only reads that are aligned on the positive strain
+awk '/^>/ {printit = /+$/} printit' $reads.fa >$reads-positive.fa

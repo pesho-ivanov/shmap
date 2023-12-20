@@ -11,13 +11,23 @@ MAPQUIK_BIN = mapquik
 ESKEMAP_BIN = eskemap
 EDLIB_BIN = ~/libs/edlib/build/bin/edlib-aligner
 
-REF = newevals/t2tChrY.fa
-READS = newevals/reads-ChrY-positive.fa
+REF = newevals/chm13.fa
+READS = newevals/reads-chm13-positive.fa
+#REF = newevals/t2tChrY.fa
+#READS = newevals/reads-ChrY-positive.fa
+
+MAX_SEEDS = 10000
+MAX_MATCHES = 100 300 1000 3000 10000 30000 100000
+#10000000
 
 all: sweep
 
 $(SWEEP_BIN): $(SRCS)
 	$(CC) $(CXX_STANDARD) $(CFLAGS) $< -o $@ $(LIBS)
+
+gen_reads:
+	cd newevals; \
+	./simulate_reads.sh
 
 eval_abe: sweep
 	mkdir -p ../out
@@ -43,25 +53,32 @@ eval_multiple_alignments: sweep
 debug: sweep
 	$(SWEEP_BIN) -s $(REF) -p simulations/reads/1.fasta $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z out/sweep-1.params >out/sweep-1.out 2>out/sweep-1.cerr
 
-run_sweep: sweep
-	time $(SWEEP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 25 -z -S 100 -M 1000 newevals/out/sweep.params >newevals/out/sweep.paf 2>newevals/out/sweep.log
-	paftools.js mapeval newevals/out/sweep.paf | tee newevals/out/sweep.eval
+eval_sweep_max_seeds: sweep
+	@DIR=newevals/eval_sweep-K22; \
+	mkdir -p $${DIR}; \
+	for maxseeds in $(MAX_SEEDS); do \
+		for maxmatches in $(MAX_MATCHES); do \
+			f=$${DIR}/"sweep-S$${maxseeds}-M$${maxmatches}"; \
+			echo "Processing $${f}"; \
+			time $(SWEEP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 22 -z -S $${maxseeds} -M $${maxmatches} $${f}.params >$${f}.paf 2>$${f}.log; \
+			paftools.js mapeval $${f}.paf | tee $${f}.eval; \
+		done \
+    done
 
-sweep_max_seeds_eval:
-	time $(SWEEP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 15 -z -S 100 -M 1000 newevals/out/sweep.params >newevals/out/sweep.paf 2>newevals/out/sweep.log
+run_sweep: sweep
+	time $(SWEEP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 22 -z -S 1000 -M 10000 newevals/out/sweep.params >newevals/out/sweep.paf 2>newevals/out/sweep.log
 	paftools.js mapeval newevals/out/sweep.paf | tee newevals/out/sweep.eval
 
 run_minimap:
-	$(MINIMAP_BIN) -x map-hifi -t 1 $(REF) $(READS) >out/minimap-Y.paf
+	time $(MINIMAP_BIN) -x map-hifi -t 1 $(REF) $(READS) >out/minimap-Y.paf
+	paftools.js mapeval out/minimap-Y.paf | tee out/minimap-Y.eval
 
 run_mapquik:
-	$(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p out/mapquik-Y
+	time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p out/mapquik-Y
+	paftools.js mapeval out/mapquik-Y.paf | tee out/mapquik-Y.eval
 
 run_eskemap:
 	time $(ESKEMAP_BIN) -p $(READS) -s $(REF) -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -N >out/eskemap-Y.out
-
-#run_edlib:
-#	time $(EDLIB_BIN) $(READS) $(REF) >out/edlib-Y.out
 
 run: run_sweep run_minimap run_mapquik
 
