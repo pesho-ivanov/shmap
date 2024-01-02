@@ -13,7 +13,7 @@ pbsim \
        --model_qc model_qc_clr \
        --accuracy-mean 0.99\
        --accuracy-sd 0\
-       --depth 1\
+       --depth 0.1\
        --prefix $reads\
        --length-mean 10000 #hifi
 

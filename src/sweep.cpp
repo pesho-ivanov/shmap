@@ -10,7 +10,8 @@
 const float EPS = 1e-7;
 unordered_map<uint64_t, char> bLstmers;
 
-clock_t sorting_time;
+clock_t sorting_time = 0;
+clock_t total_match_kmers_time = 0;
 
 struct Match {
 	uint32_t kmer_ord;
@@ -266,7 +267,10 @@ class Sweep {
 
 		//cerr << "Mapping " << p.size() << " kmers of length " << Plen_nucl << endl;
 
+		clock_t start_match_kmers = clock();
 		match_kmers(p, &diff_hist, &L, &L2);
+		total_match_kmers_time += clock() - start_match_kmers;
+
 
 		// Increase the left point end of the window [l,r) one by one.
 		// O(matches)
@@ -498,6 +502,7 @@ int main(int argc, char **argv) {
 	total_sketching_time /= CLOCKS_PER_SEC;
 	total_mapping_time /= CLOCKS_PER_SEC;
 	sorting_time /= CLOCKS_PER_SEC;
+	total_match_kmers_time /= CLOCKS_PER_SEC;
 
 	// TODO: report average Jaccard similarity
 	cerr << "Total reads:          " << total_reads << endl;
@@ -508,9 +513,10 @@ int main(int argc, char **argv) {
 	cerr << endl;
 	cerr << "Total time:           " << total_time << endl;
 	cerr << "Average time per read:" << total_time / total_reads << endl;
-	cerr << "Total sketching time: " << total_sketching_time << " (" << 100*total_sketching_time / total_time << "\% of total)" << endl;
-	cerr << "Total   mapping time: " << total_mapping_time << " (" << 100*total_mapping_time / total_time << "\% of total)" << endl;
+	cerr << "Total read sketching: " << total_sketching_time << " (" << 100*total_sketching_time / total_time << "\% of total)" << endl;
+	cerr << "Total mapping:        " << total_mapping_time << " (" << 100*total_mapping_time / total_time << "\% of total)" << endl;
 	cerr << "        Sorting time: " << sorting_time << " (" << 100*sorting_time / total_time << "\% of total)" << endl;
+	cerr << "      Matching kmers: " << total_match_kmers_time << " (" << 100*total_match_kmers_time / total_time << "\% of total)" << endl;
 
 	return 0;
 }
