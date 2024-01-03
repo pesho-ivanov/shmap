@@ -10,8 +10,7 @@
 const float EPS = 1e-7;
 unordered_map<uint64_t, char> bLstmers;
 
-clock_t sorting_time = 0;
-clock_t total_match_kmers_time = 0;
+double total_sorting_time(0.0), total_sweep_time(0.0), total_match_kmers_time(0.0), total_map_postproc_time(0.0);
 
 struct Match {
 	uint32_t kmer_ord;
@@ -184,7 +183,7 @@ class Sweep {
 		clock_t _ = clock();
 		//Sort L by ascending positions in reference
 		sort(L->begin(), L->end());
-		sorting_time += clock() - _;
+		total_sorting_time += clock() - _;
 
 		// Add elastic kmers
 		//if (params.elastic == elastic_t::consecutive) {
@@ -275,6 +274,7 @@ class Sweep {
 		match_kmers(p, &diff_hist, &L, &L2);
 		total_match_kmers_time += clock() - start_match_kmers;
 
+		clock_t start_sweep = clock();
 		// Increase the left point end of the window [l,r) one by one.
 		// O(matches)
 		int i = 0, j = 0;
@@ -332,6 +332,7 @@ class Sweep {
 		if (params.onlybest) { // && best.J > params.tThres)
 			mappings.push_back(best);
 		}
+		total_sweep_time += clock() - start_sweep;
 
 		return mappings;
 	}
@@ -424,9 +425,9 @@ void mappings2paf(const params_t &params, const vector<Mapping>& res, const uint
 			<< T_sz << "\t"  // target sequence length
 			<< m.T_l << "\t"  // target start on original strand (0-based)
 			<< m.T_r << "\t"  // target start on original strand (0-based)
-			<< -1 << "\t"  // Number of residue matches
-			<< -1 << "\t"  // Alignment block length
-			<< 255 << "\t"  // Mapping quality (0-255; 255 for missing)
+			<< P_sz << "\t"  // TODO: fix; Number of residue matches (number of nucleotide matches)
+			<< P_sz << "\t"  // TODO: fix; Alignment block length: total number of sequence matches, mismatches, insertions and deletions in the alignment
+			<< 60 << "\t"  // Mapping quality (0-255; 255 for missing)
 		// ----- end of required PAF fields -----
 			<< "k:i:" << m.k << "\t"
 			//<< "P:i:" << m.P_sz << "\t"  // redundant
@@ -469,6 +470,8 @@ int main(int argc, char **argv) {
 
 	// Load pattern sequences in batches
 	while(true) {
+		clock_t start_mappings = clock();
+
 		cerr << "Sketching a batch of reads..." << endl;
 		clock_t start_sketching = clock();
 		if (!lMiniPttnSks(reader.fStr, params.k, reader.tidx->w, bLstmers, reader.pSks) && reader.pSks.empty())
@@ -476,7 +479,6 @@ int main(int argc, char **argv) {
 		total_sketching_time += clock() - start_sketching;
 
 		cerr << "Aligning a batch of reads..." << endl;
-		clock_t start_mapping = clock();
 		// Iterate over pattern sketches
 		for(auto p = reader.pSks.begin(); p != reader.pSks.end(); ++p) {
 			auto seqID = get<0>(*p);
@@ -485,6 +487,7 @@ int main(int argc, char **argv) {
 			clock_t begin_map_time = clock();
 
             auto mappings = sweep.map(sks, P_sz);
+			clock_t start_map_postproc_time = clock();
 			auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(params, mappings, P_sz);
 			normalize_mappings(params, &reasonable_mappings, sks.size(), seqID, reader.T_sz, reader.text);
 
@@ -496,21 +499,28 @@ int main(int argc, char **argv) {
 				total_matches += m.matches;
 			}
 			mappings2paf(params, reasonable_mappings, P_sz, sks.size(), seqID, reader.T_sz, reader.tidx->seq->name, reader.text);
+			total_map_postproc_time += clock() - start_map_postproc_time;
 
 			// stats
 			++total_reads;
-			if (mappings.empty()) ++unmapped_reads;
+			if (reasonable_mappings.empty()) ++unmapped_reads;
 		}
 		reader.pSks.clear();
-		total_mapping_time += clock() - start_mapping;
+		total_mapping_time += clock() - start_mappings;
 	}
 
+	total_time = clock() - total_start;
+
+	total_time /= CLOCKS_PER_SEC;
 	indexing_time /= CLOCKS_PER_SEC;
-	total_time = double(clock() - total_start) / CLOCKS_PER_SEC;
 	total_sketching_time /= CLOCKS_PER_SEC;
 	total_mapping_time /= CLOCKS_PER_SEC;
-	sorting_time /= CLOCKS_PER_SEC;
+	total_sorting_time /= CLOCKS_PER_SEC;
+	total_sweep_time /= CLOCKS_PER_SEC;
 	total_match_kmers_time /= CLOCKS_PER_SEC;
+	total_map_postproc_time /= CLOCKS_PER_SEC;
+
+	cerr << fixed << setprecision(1);
 
 	// TODO: report average Jaccard similarity
 	cerr << "Total reads:          " << total_reads << endl;
@@ -520,12 +530,14 @@ int main(int argc, char **argv) {
 	cerr << "Unmapped reads:       " << unmapped_reads << " (" << 100.0 * unmapped_reads / total_reads << "%)" << endl;
 	cerr << "Average J:            " << total_J / total_mappings << endl;
 	cerr << endl;
-	cerr << "Total time:           " << total_time << " sec (" << total_time / total_reads << " per read)" << endl;
-	cerr << "   indexing:          " << indexing_time << " (" << 100.0*indexing_time/total_time << "\% of total)" << endl;
-	cerr << "   read sketching:    " << total_sketching_time << " (" << 100.0*total_sketching_time / total_time << "\% of total)" << endl;
-	cerr << "   mapping:           " << total_mapping_time << " (" << 100.0*total_mapping_time / total_time << "\% of total)" << endl;
-	cerr << "      matching kmers: " << total_match_kmers_time << " (" << 100.0*total_match_kmers_time / total_time << "\% of total)" << endl;
-	cerr << "      sorting:        " << sorting_time << " (" << 100.0*sorting_time / total_time << "\% of total)" << endl;
+	cerr << "Total time [sec]:     " << setw(4) << right << total_time << " (" << total_time / total_reads << " per read)" << endl;
+	cerr << "   indexing:          " << setw(4) << right << indexing_time           << " (" << setw(4) << right << 100.0*indexing_time/total_time << "\% of total)" << endl;
+	cerr << "   mapping:           " << setw(4) << right << total_mapping_time      << " (" << setw(4) << right << 100.0*total_mapping_time / total_time << "\% of total)" << endl;
+	cerr << "      read sketching: " << setw(4) << right << total_sketching_time    << " (" << setw(4) << right << 100.0*total_sketching_time / total_mapping_time << "\% of mapping)" << endl;
+	cerr << "      match kmers:    " << setw(4) << right << total_match_kmers_time  << " (" << setw(4) << right << 100.0*total_match_kmers_time / total_mapping_time << "\%)" << endl;
+	cerr << "      sort matches:   " << setw(4) << right << total_sorting_time      << " (" << setw(4) << right << 100.0*total_sorting_time / total_mapping_time << "\%)" << endl;
+	cerr << "      sweep:          " << setw(4) << right << total_sweep_time        << " (" << setw(4) << right << 100.0*total_sweep_time / total_mapping_time << "\%)" << endl;
+	cerr << "      post proc:      " << setw(4) << right << total_map_postproc_time << " (" << setw(4) << right << 100.0*total_map_postproc_time / total_mapping_time << "\%)" << endl;
 
 	return 0;
 }
