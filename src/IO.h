@@ -147,16 +147,15 @@ struct reader_t {
 
 	mm_idxopt_t iopt; 							//An index option struct
 	mm_mapopt_t mopt; 							//A mapping options struct
-	mm_idx_reader_t *r; 						//An index reader
 	const mm_idx_t *tidx; 						//A pointer to the text index
-	const mm_idx_t *pidx; 						//A pointer to the pattern index
+	//const mm_idx_t *pidx; 						//A pointer to the pattern index
 	vector<tuple<string, uint32_t, Sketch>> pSks; //A vector of pattern sketches
 
 	uint32_t T_sz;
 	string text;
 
 	reader_t() {}
-	bool init(int argc, char **argv);
+	bool init_and_index(int argc, char **argv);
 };
 
 //This function prints usage infos
@@ -475,9 +474,10 @@ const unordered_map<uint64_t, char> readBlstKmers(const string& fname) {
 	return numbers;
 }
 	
-bool reader_t::init(int argc, char **argv) {
+bool reader_t::init_and_index(int argc, char **argv) {
 	//A hash table to store black listed k-mers
 	// unordered_map<uint64_t, char> bLstmers;
+	mm_idx_reader_t *r; 						//An index reader
 
 	cerr << "Reading index " << params.tFile << "..." << endl;
 
@@ -516,25 +516,25 @@ bool reader_t::init(int argc, char **argv) {
 	}
 
 	//Open index reader to read pattern
-	r = mm_idx_reader_open(params.pFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);
+	//r = mm_idx_reader_open(params.pFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);
 
-	//Check if index could be opened successfully
-	if(r == NULL) {
-		cerr << "ERROR: Pattern sequence file could not be read" << endl;
-		return 1;
-	}
+	////Check if index could be opened successfully
+	//if(r == NULL) {
+	//	cerr << "ERROR: Pattern sequence file could not be read" << endl;
+	//	return 1;
+	//}
 
-	//Construct index of reference
-	if((pidx = mm_idx_reader_read(r, 1)) == 0) {//TODO: Make use of multithreading here!
-		cerr << "ERROR: Pattern index cannot be read" << endl;
-		return 1;
-	}
+	////Construct index of reference
+	//if((pidx = mm_idx_reader_read(r, 1)) == 0) {//TODO: Make use of multithreading here!
+	//	cerr << "ERROR: Pattern index cannot be read" << endl;
+	//	return 1;
+	//}
 
-	//For simplicity we assume that an index always consists of only one part
-	if(mm_idx_reader_read(r, 1) != 0) {
-		cerr << "ERROR: Pattern index consists of several parts! We cannot handle this yet" << endl;
-		return 1; 
-	}
+	////For simplicity we assume that an index always consists of only one part
+	//if(mm_idx_reader_read(r, 1) != 0) {
+	//	cerr << "ERROR: Pattern index consists of several parts! We cannot handle this yet" << endl;
+	//	return 1; 
+	//}
 
 	T_sz = tidx->seq->len;  //The length of the text
 	fStr.open(params.pFile);  //Open stream to read in patterns

@@ -85,8 +85,12 @@ class Sweep {
 	}
 
 	// return if the kmer has not been seen before
-	bool add2hist(const uint64_t kmer_hash,
-			vector<int32_t> *hist, unordered_map<uint64_t, uint32_t> *hash2ord, vector<uint64_t> *ord2hash, uint32_t *kmer_ord) {
+	inline bool add2hist(
+			const uint64_t kmer_hash,
+			vector<int32_t> *hist,
+			unordered_map<uint64_t, uint32_t> *hash2ord,
+			vector<uint64_t> *ord2hash,
+			uint32_t *kmer_ord) {
 		auto ord_it = hash2ord->find(kmer_hash);
 		if (ord_it != hash2ord->end()) {
 			*kmer_ord = ord_it->second;
@@ -95,9 +99,9 @@ class Sweep {
 		} else {
 			*kmer_ord = hist->size();
 			hash2ord->insert({kmer_hash, *kmer_ord});  //(*hash2ord)[kmer_hash] = kmer_ord;
-			ord2hash->push_back(kmer_hash);
+			//ord2hash->push_back(kmer_hash);
 			hist->push_back(1);
-			assert(hist->size() == ord2hash->size());
+			//assert(hist->size() == ord2hash->size());
 			return true;
 		}
 	}
@@ -133,19 +137,19 @@ class Sweep {
 
 		uint64_t kmer_hash, prev_kmer_hash = 0;
 		for(auto p_it = p.begin(); p_it != p.end(); ++p_it, prev_kmer_hash = kmer_hash) {
+			// TODO: limit the number of kmers in the pattern p
 			auto kmer_pos = p_it->first;
 			kmer_hash = p_it->second;
 			uint32_t kmer_ord;
 
 			// Add xor'ed consecuent pattern kmers to p_hist 
-			if (p_it != p.begin()) {
-				auto xor_hash = prev_kmer_hash ^ kmer_hash;
-				(void)add2hist(xor_hash, p_hist, &hash2ord, &ord2hash, &kmer_ord);
-			}
+			//if (p_it != p.begin()) {
+			//	auto xor_hash = prev_kmer_hash ^ kmer_hash;
+			//	(void)add2hist(xor_hash, p_hist, &hash2ord, &ord2hash, &kmer_ord);
+			//}
 
 			// Add pattern kmers from the pattern to p_hist 
 			if (add2hist(kmer_hash, p_hist, &hash2ord, &ord2hash, &kmer_ord)) {
-				// Add kmer matches to L
 				int nHits;
 				auto *idx_p = mm_idx_get(tidx, kmer_hash, &nHits);
 				if (nHits > 0)
@@ -156,7 +160,6 @@ class Sweep {
 		//Sort by number of hits and get MAX_SEEDS of kmers with the lowest number of hits.
 		sort(match_lists.begin(), match_lists.end());
 		int total_hits = 0;
-		//const int MAX_SEEDS = 1000, MAX_TOTAL_HITS = 100000;
 		for (int seed=0; seed<(int)match_lists.size(); seed++) {
 			if (seed > params.max_seeds) {
 				++seeds_limit_reached;
@@ -165,6 +168,7 @@ class Sweep {
 			auto &res = match_lists[seed];
 			//cerr << "seed=" << seed << ", nHits=" << res.nHits << endl;
 			for (int i = 0; i < res.nHits; ++i, ++res.idx_p) {					// Iterate over all occurrences
+				// Add kmer matches to L
 				Match m;
 				m.P_l = res.kmer_pos;
 				m.kmer_ord = res.kmer_ord;
@@ -183,23 +187,23 @@ class Sweep {
 		sorting_time += clock() - _;
 
 		// Add elastic kmers
-		if (params.elastic == elastic_t::consecutive) {
-			if (L->size() == 0)
-				return;
+		//if (params.elastic == elastic_t::consecutive) {
+		//	if (L->size() == 0)
+		//		return;
 
-			// Add xor'ed consecuent text kmers to L2
-			L2->reserve(L->size());
-			L2->push_back(0);
-			for (int i=1; i<L->size(); i++) {
-				auto xor_h = ord2hash[ (*L)[i-1].kmer_ord ] ^ ord2hash[ (*L)[i].kmer_ord ];
-				auto it = hash2ord.find(xor_h); 
-				L2->push_back(it != hash2ord.end() ? it->second : p_hist->size());
-			}
+		//	// Add xor'ed consecuent text kmers to L2
+		//	L2->reserve(L->size());
+		//	L2->push_back(0);
+		//	for (int i=1; i<L->size(); i++) {
+		//		auto xor_h = ord2hash[ (*L)[i-1].kmer_ord ] ^ ord2hash[ (*L)[i].kmer_ord ];
+		//		auto it = hash2ord.find(xor_h); 
+		//		L2->push_back(it != hash2ord.end() ? it->second : p_hist->size());
+		//	}
 
-			if (L->size() != L2->size())
-				cerr << L->size() << " != " << L2->size() << endl;
-			assert(L->size() == L2->size());
-		}
+		//	if (L->size() != L2->size())
+		//		cerr << L->size() << " != " << L2->size() << endl;
+		//	assert(L->size() == L2->size());
+		//}
 	}
 
 	// Returns the Jaccard score of the window [l,r)
@@ -271,7 +275,6 @@ class Sweep {
 		match_kmers(p, &diff_hist, &L, &L2);
 		total_match_kmers_time += clock() - start_match_kmers;
 
-
 		// Increase the left point end of the window [l,r) one by one.
 		// O(matches)
 		int i = 0, j = 0;
@@ -284,11 +287,11 @@ class Sweep {
 					++xmin;
 				assert (l->T_r <= r->T_r);
 
-				if (params.elastic == elastic_t::consecutive) {
-					auto pair_ord = L2[r-L.begin()];
-					if (pair_ord<diff_hist.size() && --diff_hist[pair_ord] >= 0)
-						++xmin;
-				}
+				//if (params.elastic == elastic_t::consecutive) {
+				//	auto pair_ord = L2[r-L.begin()];
+				//	if (pair_ord<diff_hist.size() && --diff_hist[pair_ord] >= 0)
+				//		++xmin;
+				//}
 			}
 
 			auto curr_J = J(p.size(), l, r, xmin);
@@ -316,11 +319,11 @@ class Sweep {
 			if (++diff_hist[l->kmer_ord] > 0)
 				--xmin;
 
-			if (params.elastic == elastic_t::consecutive) {
-				auto pair_ord = L2[l-L.begin()];
-				if (pair_ord<diff_hist.size() && ++diff_hist[pair_ord] > 0)
-					--xmin;
-			}
+			//if (params.elastic == elastic_t::consecutive) {
+			//	auto pair_ord = L2[l-L.begin()];
+			//	if (pair_ord<diff_hist.size() && ++diff_hist[pair_ord] > 0)
+			//		--xmin;
+			//}
 
 			assert(xmin >= 0);
 		}
@@ -438,16 +441,19 @@ void mappings2paf(const params_t &params, const vector<Mapping>& res, const uint
 }
 
 int main(int argc, char **argv) {
-	double total_sketching_time=0, total_mapping_time=0, total_time=0;
-	clock_t total_start = clock();
-	int total_reads = 0, unmapped_reads = 0;
-	double total_J = 0.0;
-	int total_mappings = 0;
+	double indexing_time(0.0), total_sketching_time(0.0), total_mapping_time(0.0), total_time(0.0);
+	int total_reads(0), unmapped_reads(0);
+	double total_J(0.0);
+	int total_matches(0), total_mappings(0);
 
+	clock_t total_start = clock();
+
+	clock_t start_indexing = clock();
 	reader_t reader;
-	auto res = reader.init(argc, argv);
+	auto res = reader.init_and_index(argc, argv);
 	const params_t &params = reader.params;
 	assert(res == 0);
+	indexing_time = clock() - start_indexing;
 
 	Sweep sweep(reader.tidx, params);
 
@@ -487,6 +493,7 @@ int main(int argc, char **argv) {
 				m.map_time = all_map_time / mappings.size();
 				total_J += m.J;
 				total_mappings ++;
+				total_matches += m.matches;
 			}
 			mappings2paf(params, reasonable_mappings, P_sz, sks.size(), seqID, reader.T_sz, reader.tidx->seq->name, reader.text);
 
@@ -498,6 +505,7 @@ int main(int argc, char **argv) {
 		total_mapping_time += clock() - start_mapping;
 	}
 
+	indexing_time /= CLOCKS_PER_SEC;
 	total_time = double(clock() - total_start) / CLOCKS_PER_SEC;
 	total_sketching_time /= CLOCKS_PER_SEC;
 	total_mapping_time /= CLOCKS_PER_SEC;
@@ -506,17 +514,18 @@ int main(int argc, char **argv) {
 
 	// TODO: report average Jaccard similarity
 	cerr << "Total reads:          " << total_reads << endl;
+	cerr << "Kmer matches:         " << total_matches << " (" << total_matches / total_reads << " per read)" << endl;
 	cerr << "Seed limit reached:   " << sweep.seeds_limit_reached << " (" << 100.0 * sweep.seeds_limit_reached / total_reads << ")" << endl;
 	cerr << "Matches limit reached:" << sweep.matches_limit_reached << " (" << 100.0 * sweep.matches_limit_reached / total_reads << ")" << endl;
 	cerr << "Unmapped reads:       " << unmapped_reads << " (" << 100.0 * unmapped_reads / total_reads << "%)" << endl;
 	cerr << "Average J:            " << total_J / total_mappings << endl;
 	cerr << endl;
-	cerr << "Total time:           " << total_time << endl;
-	cerr << "Average time per read:" << total_time / total_reads << endl;
-	cerr << "Total read sketching: " << total_sketching_time << " (" << 100*total_sketching_time / total_time << "\% of total)" << endl;
-	cerr << "Total mapping:        " << total_mapping_time << " (" << 100*total_mapping_time / total_time << "\% of total)" << endl;
-	cerr << "        Sorting time: " << sorting_time << " (" << 100*sorting_time / total_time << "\% of total)" << endl;
-	cerr << "      Matching kmers: " << total_match_kmers_time << " (" << 100*total_match_kmers_time / total_time << "\% of total)" << endl;
+	cerr << "Total time:           " << total_time << " sec (" << total_time / total_reads << " per read)" << endl;
+	cerr << "   indexing:          " << indexing_time << " (" << 100.0*indexing_time/total_time << "\% of total)" << endl;
+	cerr << "   read sketching:    " << total_sketching_time << " (" << 100.0*total_sketching_time / total_time << "\% of total)" << endl;
+	cerr << "   mapping:           " << total_mapping_time << " (" << 100.0*total_mapping_time / total_time << "\% of total)" << endl;
+	cerr << "      matching kmers: " << total_match_kmers_time << " (" << 100.0*total_match_kmers_time / total_time << "\% of total)" << endl;
+	cerr << "      sorting:        " << sorting_time << " (" << 100.0*sorting_time / total_time << "\% of total)" << endl;
 
 	return 0;
 }

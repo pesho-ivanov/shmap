@@ -76,14 +76,14 @@ eval_sweep_max_seeds: sweep
 		for maxmatches in $(MAX_MATCHES); do \
 			f=$${DIR}/"sweep-S$${maxseeds}-M$${maxmatches}"; \
 			echo "Processing $${f}"; \
-			time $(SWEEP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 22 -z -S $${maxseeds} -M $${maxmatches} $${f}.params >$${f}.paf 2>$${f}.log; \
+			time $(SWEEP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 22 -z sweep.params -S $${maxseeds} -M $${maxmatches} $${f}.params >$${f}.paf 2>$${f}.log; \
 			paftools.js mapeval $${f}.paf | tee $${f}.eval; \
 		done \
     done
 
 run_sweep: sweep
 	mkdir -p $(OUTDIR)
-	time -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 20 -z -S 1000 -M 1000000 $(OUTDIR)/sweep.params >$(OUTDIR)/sweep.paf 2>$(OUTDIR)/sweep.log
+	time -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 20 -z $(OUTDIR)/sweep.params -S 300 -M 10000 $(OUTDIR)/sweep.params >$(OUTDIR)/sweep.paf 2>$(OUTDIR)/sweep.log
 	paftools.js mapeval $(OUTDIR)/sweep.paf | tee $(OUTDIR)/sweep.eval
 
 run_minimap:
