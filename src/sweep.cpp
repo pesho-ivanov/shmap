@@ -446,15 +446,15 @@ int main(int argc, char **argv) {
 	double indexing_time(0.0), total_sketching_time(0.0), total_mapping_time(0.0), total_time(0.0);
 	int total_reads(0), unmapped_reads(0);
 	double total_J(0.0);
-	int total_matches(0), total_mappings(0);
+	int total_matches(0), total_mappings(0), total_sketched_kmers(0);
 
 	clock_t total_start = clock();
 
 	clock_t start_indexing = clock();
 	reader_t reader;
-	auto res = reader.init_and_index(argc, argv);
+	if (reader.init_and_index(argc, argv))
+		return 1;
 	const params_t &params = reader.params;
-	assert(res == 0);
 	indexing_time = clock() - start_indexing;
 
 	Sweep sweep(reader.tidx, params);
@@ -497,6 +497,7 @@ int main(int argc, char **argv) {
 				m.map_time = all_map_time / mappings.size();
 				total_J += m.J;
 				total_mappings ++;
+				total_sketched_kmers += m.p_sz;
 				total_matches += m.matches;
 			}
 			// stats
@@ -528,17 +529,20 @@ int main(int argc, char **argv) {
 
 	// TODO: report average Jaccard similarity
 	cerr << "Params:" << endl;
+	cerr << " | reference file =  " << params.tFile << endl;
+	cerr << " | query file =      " << params.pFile << endl;
 	cerr << " | k =               " << params.k << endl;
 	cerr << " | w =               " << params.w << endl;
-	cerr << " | blacklist file =  " << params.bLstFl << endl;
-	cerr << " | hFrac =           " << params.hFrac << endl;
+	cerr << " | blacklist file =  " << (params.bLstFl.size() ? params.bLstFl : "-") << endl;
+	//cerr << " | hFrac =           " << params.hFrac << endl;
 	cerr << " | max_seeds (S) =   " << params.max_seeds << endl;
 	cerr << " | max_matches (M) = " << params.max_matches << endl;
 	cerr << " | onlybest =        " << params.onlybest << endl;
 	cerr << " | tThres =          " << params.tThres << endl;
 	cerr << "Stats:" << endl;
 	cerr << " | Total reads:           " << total_reads << endl;
-	cerr << " | Kmer matches:          " << total_matches << " (" << total_matches / total_reads << " per read)" << endl;
+	cerr << " | Sketched read kmers:   " << total_sketched_kmers << " (" << 1.0*total_sketched_kmers / total_reads << " per read)" << endl;
+	cerr << " | Kmer matches:          " << total_matches << " (" << 1.0*total_matches / total_reads << " per read)" << endl;
 	cerr << " | Seed limit reached:    " << sweep.seeds_limit_reached << " (" << 100.0 * sweep.seeds_limit_reached / total_reads << ")" << endl;
 	cerr << " | Matches limit reached: " << sweep.matches_limit_reached << " (" << 100.0 * sweep.matches_limit_reached / total_reads << ")" << endl;
 	cerr << " | Unmapped reads:        " << unmapped_reads << " (" << 100.0 * unmapped_reads / total_reads << "%)" << endl;

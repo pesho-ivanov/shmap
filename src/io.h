@@ -10,7 +10,7 @@
 #define DEFAULT_WEIGHT 1
 using Thomology = tuple<uint32_t, uint32_t, int32_t>;
 
-#define T_HOM_OPTIONS "p:s:k:w:e:a:r:b:S:M:t:d:i:z:nxoh"
+#define T_HOM_OPTIONS "p:s:k:w:e:a:b:S:M:t:d:i:z:nxoh"
 
 //#define MIN_PARAM_NB 6
 #define MAX_RATIO 1.0
@@ -82,7 +82,7 @@ struct params_t {
 	uint32_t w;  							//The window size
 	elastic_t elastic;
 	alignment_edges_t alignment_edges;
-	double hFrac;  					//The FracMinHash ratio
+	//double hFrac;  					//The FracMinHash ratio
 	uint32_t max_seeds;  							//Maximum seeds in a sketch
 	uint32_t max_matches;  							//Maximum seed matches in a sketch
 	float tThres;  							//The t-homology threshold
@@ -100,7 +100,7 @@ struct params_t {
 		w = W; 							//The window size
 		elastic = elastic_t::off;
 		alignment_edges = alignment_edges_t::fine;
-		hFrac = HASH_RATIO;
+		//hFrac = HASH_RATIO;
 		max_seeds = 10000;
 		max_matches = 1000000;
 		tThres = 0.9; 							//The t-homology threshold
@@ -118,7 +118,7 @@ struct params_t {
 		m.push_back({"w", std::to_string(w)});
 		m.push_back({"elastic", getElasticDescription(elastic)});
 		m.push_back({"alignment_edges", getAlignmentEdgesDescription(alignment_edges)});
-		m.push_back({"hFrac", std::to_string(hFrac)});
+		//m.push_back({"hFrac", std::to_string(hFrac)});
 		m.push_back({"tThres", std::to_string(tThres)});
 		m.push_back({"dec", std::to_string(dec)});
 		m.push_back({"inter", std::to_string(inter)});
@@ -171,7 +171,7 @@ inline void dsHlp() {
 	cerr << "   -w   --windowsize        Window size for minimizer sketching approach (default " << W << ")" << endl;
 	cerr << "   -e   --elastic           Elastic pairs of kmers {off, consecutive, random} [off]" << endl;
 	cerr << "   -a   --alignment_edges   Alignment interval {sketch_edges, extend_equally, fine} [fine]" << endl;
-	cerr << "   -r   --hashratio         FracMin hash ratio to be used for sketches (default " << HASH_RATIO << ")" << endl;
+	//cerr << "   -r   --hashratio         FracMin hash ratio to be used for sketches (default " << HASH_RATIO << ")" << endl;
 	cerr << "   -b   --blacklist         File containing hashes to ignore for sketch calculation" << endl;
 	cerr << "   -S   --max_seeds         Max seeds in a sketch" << endl;
 	cerr << "   -M   --max_matches       Max seed matches in a sketch" << endl;
@@ -187,7 +187,7 @@ inline void dsHlp() {
 }
 
 //This function parses the program parameters. Returns false if given arguments are not valid
-const bool prsArgs(int& nArgs, char** argList, params_t *params) {
+bool prsArgs(int& nArgs, char** argList, params_t *params) {
 	int option_index = 0, a;
 
 	static struct option long_options[] = {
@@ -278,16 +278,16 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params) {
 
 				params->w = atoi(optarg);
 				break;
-			case 'r':
-				//Check if given value is reasonable to represent a ratio
-				if(atof(optarg) <= 0 || atof(optarg) > MAX_RATIO) {
-					cerr << "ERROR: Given hash ratio not applicable" << endl;
-
-					return false;
-				}
-
-				params->hFrac = atof(optarg);
-				break;
+//			case 'r':
+//				//Check if given value is reasonable to represent a ratio
+//				if(atof(optarg) <= 0 || atof(optarg) > MAX_RATIO) {
+//					cerr << "ERROR: Given hash ratio not applicable" << endl;
+//
+//					return false;
+//				}
+//
+//				params->hFrac = atof(optarg);
+//				break;
 			case 'b':
 				//Save blacklist file name
 				params->bLstFl = optarg;
@@ -348,7 +348,7 @@ const bool prsArgs(int& nArgs, char** argList, params_t *params) {
 //		tor to store the sketch would have to be elongated several times which might be time consuming. On the other hand, it might
 //		also be time consuming to handle the complete sequence in memory first. Eventually, it will depend on a try to find out
 //		what is the better alternative. Could also be that it does not matter at all!
-const bool readFASTA(const string& filePath, string& seq) {
+bool readFASTA(const string& filePath, string& seq) {
 	bool headerRead = false, lnBrkDiscvd = false;
 	char c;
 
@@ -390,7 +390,7 @@ const bool readFASTA(const string& filePath, string& seq) {
 
 //This function reads in batches of FASTA sequence entries from file and transforms them into minimap sketches. Returns false if end
 // of file was reached.
-const bool lMiniPttnSks(ifstream& fStr, const uint32_t& k, const uint32_t& w, const unordered_map<uint64_t, char>& blmers, 
+bool lMiniPttnSks(ifstream& fStr, const uint32_t& k, const uint32_t& w, const unordered_map<uint64_t, char>& blmers, 
 	vector<tuple<string, uint32_t, Sketch>>& pSks) {
 	bool headerRead, idRead = false, lnBrkDiscvd = false;
 	char c;

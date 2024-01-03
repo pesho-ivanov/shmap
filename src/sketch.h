@@ -21,7 +21,7 @@
 //The hash value threshold
 #define MAX_HASH 26214
 //The FracMinHash ratio
-#define HASH_RATIO 0.1
+//#define HASH_RATIO 0.1
 //Size of the considered alphabet
 #define ALPHABET_SIZE 4
 //Number of times we expect p to occur in t

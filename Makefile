@@ -16,11 +16,16 @@ MERYL_BIN = ~/libs/Winnowmap/bin/meryl
 WINNOWMAP_BIN = ~/libs/Winnowmap/bin/winnowmap
 EDLIB_BIN = ~/libs/edlib/build/bin/edlib-aligner
 
-DIR = newevals
-REFNAME = chm13
+K ?= 19
+W ?= 20
+S ?= 200
+M ?= 2000
+T ?= 0.0
+REFNAME ?= chm13
 ACCURACY = 0.99
 DEPTH = 0.01
 MEANLEN = 10000  # hifi
+DIR = newevals
 REF = $(DIR)/$(REFNAME).fa
 READS_PREFIX = reads-$(REFNAME)
 READS = $(DIR)/$(READS_PREFIX).fa
@@ -36,6 +41,7 @@ $(SWEEP_BIN): $(SRCS)
 	$(CC) $(CXX_STANDARD) $(CFLAGS) $< -o $@ $(LIBS)
 
 gen_reads:
+ifeq ($(wildcard $(READS)),)
 	pbsim \
 		   $(REF) \
 		   --model_qc $(DIR)/model_qc_clr \
@@ -49,8 +55,9 @@ gen_reads:
 	paftools.js pbsim2fq $(REF).fai "$(READS_PREFIX)"_*.maf >$(READS)_
 	rm -f "$(READS_PREFIX)"_*.maf "$(READS_PREFIX)"_*.ref "$(READS_PREFIX)"_*.fastq
 	awk '/^>/ {printit = /+$$/} printit' $(READS)_ >$(READS)
+endif
 
-eval_abe: sweep
+eval_abe: sweep gen_reads
 	mkdir -p ../out
 #	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 >out/sweep.out
 
@@ -64,17 +71,17 @@ eval_abe: sweep
 	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -z $(DIR)/out/sweep-e.params >out/sweep-e.out
 	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -a extend_equally -z $(DIR)/out/sweep-e-a.params >out/sweep-e-a.out
 
-eval_multiple_alignments: sweep
+eval_multiple_alignments: sweep gen_reads
 #	time $(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -a fine 		     -z $(DIR)/out/sweep.params >out/sweep.out
 	time $(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -a fine -x		     -z $(DIR)/out/sweep-x.params >out/sweep-x.out
 #	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -x -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a-x.out
 #	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out 2>out/sweep-b-a.cerr
 #	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -o -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a-o.out 2>out/sweep-b-a-o.cerr
 
-debug: sweep
+debug: sweep gen_reads
 	$(SWEEP_BIN) -s $(REF) -p simulations/reads/1.fasta $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-1.params >out/sweep-1.out 2>out/sweep-1.cerr
 
-eval_sweep_max_seeds: sweep
+eval_sweep_max_seeds: sweep gen_reads
 	@DIR=newevals/eval_sweep-K22; \
 	mkdir -p $${DIR}; \
 	for maxseeds in $(MAX_SEEDS); do \
@@ -86,12 +93,12 @@ eval_sweep_max_seeds: sweep
 		done \
     done
 
-sweep: sweep
+eval_sweep: sweep gen_reads
 	mkdir -p $(OUTDIR)
-	$(TIME_CMD) -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 20 -z $(OUTDIR)/sweep.params -S 300 -M 10000 2> >(tee $(OUTDIR)/sweep.log) >$(OUTDIR)/sweep.paf 
+	$(TIME_CMD) -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep.params -x -t $(T) -k $(K) -w $(W) -S $(S) -M $(M) 2> >(tee $(OUTDIR)/sweep.log) >$(OUTDIR)/sweep.paf 
 	paftools.js mapeval $(OUTDIR)/sweep.paf | tee $(OUTDIR)/sweep.eval
 
-winnowmap:
+eval_winnowmap: gen_reads
 	mkdir -p $(OUTDIR)
 	if [ ! -f winnowmap_repetitive_k15.txt ]; then \
 		$(MERYL_BIN) count k=15 output merylDB $(REF); \
@@ -100,21 +107,21 @@ winnowmap:
 	$(TIME_CMD) -o $(OUTDIR)/winnowmap.time $(WINNOWMAP_BIN) -W winnowmap_repetitive_k15.txt -x map-pb -t 1 $(REF) $(READS) 2> >(tee $(OUTDIR)/winnowmap.log) >$(OUTDIR)/winnowmap.paf 
 	paftools.js mapeval $(OUTDIR)/winnowmap.paf | tee $(OUTDIR)/winnowmap.eval
 
-minimap:
+eval_minimap: gen_reads
 	mkdir -p $(OUTDIR)
 	$(TIME_CMD) -o $(OUTDIR)/minimap.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(READS) 2> >(tee $(OUTDIR)/minimap.log) >$(OUTDIR)/minimap.paf 
 	paftools.js mapeval $(OUTDIR)/minimap.paf | tee $(OUTDIR)/minimap.eval
 
-mapquik:
+eval_mapquik: gen_reads
 	mkdir -p $(OUTDIR)
 	$(TIME_CMD) -o $(OUTDIR)/mapquik.time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(OUTDIR)/mapquik | tee $(OUTDIR)/mapquik.log
 	paftools.js mapeval $(OUTDIR)/mapquik.paf | tee $(OUTDIR)/mapquik.eval
 
-eskemap:
+eval_eskemap: gen_reads
 	mkdir -p $(OUTDIR)
 	$(TIME_CMD) -o $(OUTDIR)/eskemap.time $(ESKEMAP_BIN) -p $(READS) -s $(REF) -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -N >$(OUTDIR)/eskemap.out 2>$(OUTDIR)/eskemap.log
 
-run: sweep minimap mapquik winnowmap
+eval: eval_sweep eval_minimap eval_mapquik eval_winnowmap
 
 clean:
 	rm -f sweep
