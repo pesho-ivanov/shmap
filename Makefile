@@ -1,12 +1,13 @@
+SHELL := /bin/bash
 CC = g++
 CXX_STANDARD = -std=c++2a
 CFLAGS = -g -O3 -march=native -lm -lpthread -Wall -Wextra -Wno-unused-parameter  -Wno-unused-result 
 LIBS = minimap2/libminimap2.a -lz
 DEPFLAGS = -MMD -MP
 
-TIME_CMD = time -f "%U\t%M"
+TIME_CMD = /usr/bin/time -f "%U\t%M"
 
-SRCS = src/sweep.cpp src/IO.h src/Sketch.h
+SRCS = src/sweep.cpp src/io.h src/sketch.h
 SWEEP_BIN = ./sweep
 MINIMAP_BIN = minimap2
 MAPQUIK_BIN = mapquik
@@ -85,33 +86,35 @@ eval_sweep_max_seeds: sweep
 		done \
     done
 
-run_sweep: sweep
+sweep: sweep
 	mkdir -p $(OUTDIR)
-	$(TIME_CMD) -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 20 -z $(OUTDIR)/sweep.params -S 300 -M 10000 >$(OUTDIR)/sweep.paf 2> >(tee $(OUTDIR)/sweep.log)
+	$(TIME_CMD) -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 20 -z $(OUTDIR)/sweep.params -S 300 -M 10000 2> >(tee $(OUTDIR)/sweep.log) >$(OUTDIR)/sweep.paf 
 	paftools.js mapeval $(OUTDIR)/sweep.paf | tee $(OUTDIR)/sweep.eval
 
-run_winnowmap:
+winnowmap:
 	mkdir -p $(OUTDIR)
-	$(MERYL_BIN) count k=15 output merylDB $(REF)
-	$(MERYL_BIN) print greater-than distinct=0.9998 merylDB > winnowmap_repetitive_k15.txt
-	$(TIME_CMD) -o $(OUTDIR)/winnowmap.time $(WINNOWMAP_BIN) -W winnowmap_repetitive_k15.txt -ax map-pb $(REF) $(READS) >$(OUTDIR)/winnowmap.sam 2> >(tee $(OUTDIR)/winnowmap.log)
-	paftools.js mapeval $(OUTDIR)/winnowmap.sam | tee $(OUTDIR)/winnowmap.eval
+	if [ ! -f winnowmap_repetitive_k15.txt ]; then \
+		$(MERYL_BIN) count k=15 output merylDB $(REF); \
+		$(MERYL_BIN) print greater-than distinct=0.9998 merylDB > winnowmap_repetitive_k15.txt; \
+	fi
+	$(TIME_CMD) -o $(OUTDIR)/winnowmap.time $(WINNOWMAP_BIN) -W winnowmap_repetitive_k15.txt -x map-pb -t 1 $(REF) $(READS) 2> >(tee $(OUTDIR)/winnowmap.log) >$(OUTDIR)/winnowmap.paf 
+	paftools.js mapeval $(OUTDIR)/winnowmap.paf | tee $(OUTDIR)/winnowmap.eval
 
-run_minimap:
+minimap:
 	mkdir -p $(OUTDIR)
-	$(TIME_CMD) -o $(OUTDIR)/minimap.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(READS) >$(OUTDIR)/minimap.paf 2> >(tee $(OUTDIR)/minimap.log)
+	$(TIME_CMD) -o $(OUTDIR)/minimap.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(READS) 2> >(tee $(OUTDIR)/minimap.log) >$(OUTDIR)/minimap.paf 
 	paftools.js mapeval $(OUTDIR)/minimap.paf | tee $(OUTDIR)/minimap.eval
 
-run_mapquik:
+mapquik:
 	mkdir -p $(OUTDIR)
 	$(TIME_CMD) -o $(OUTDIR)/mapquik.time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(OUTDIR)/mapquik | tee $(OUTDIR)/mapquik.log
 	paftools.js mapeval $(OUTDIR)/mapquik.paf | tee $(OUTDIR)/mapquik.eval
 
-run_eskemap:
+eskemap:
 	mkdir -p $(OUTDIR)
 	$(TIME_CMD) -o $(OUTDIR)/eskemap.time $(ESKEMAP_BIN) -p $(READS) -s $(REF) -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -N >$(OUTDIR)/eskemap.out 2>$(OUTDIR)/eskemap.log
 
-run: run_sweep run_minimap run_mapquik
+run: sweep minimap mapquik winnowmap
 
 clean:
 	rm -f sweep

@@ -4,8 +4,8 @@
 #include <deque>
 #include <set>
 
-#include "Sketch.h"
-#include "IO.h"
+#include "sketch.h"
+#include "io.h"
 
 const float EPS = 1e-7;
 unordered_map<uint64_t, char> bLstmers;
@@ -416,26 +416,27 @@ void mappings2paf(const params_t &params, const vector<Mapping>& res, const uint
 	for(auto m: res) {
 		//m.print();
 		// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
-		cout << seqID << "\t"  // Query sequence name
-			<< P_sz << "\t"   // query sequence length
-			<< 0 << "\t"   // query start (0-based; closed)
-			<< P_sz << "\t"   // query end (0-based; open)
-			<< "+" << "\t"   // m.get_strand() //strand; TODO
-			<< T_name << "\t"   // reference name
-			<< T_sz << "\t"  // target sequence length
-			<< m.T_l << "\t"  // target start on original strand (0-based)
-			<< m.T_r << "\t"  // target start on original strand (0-based)
-			<< P_sz << "\t"  // TODO: fix; Number of residue matches (number of nucleotide matches)
-			<< P_sz << "\t"  // TODO: fix; Alignment block length: total number of sequence matches, mismatches, insertions and deletions in the alignment
-			<< 60 << "\t"  // Mapping quality (0-255; 255 for missing)
+		cout << seqID  			// Query sequence name
+			<< "\t" << P_sz     // query sequence length
+			<< "\t" << 0   // query start (0-based; closed)
+			<< "\t" << P_sz  // query end (0-based; open)
+			<< "\t" << "+"   // m.get_strand() //strand; TODO
+			<< "\t" << T_name    // reference name
+			<< "\t" << T_sz  // target sequence length
+			<< "\t" << m.T_l  // target start on original strand (0-based)
+			<< "\t" << m.T_r  // target start on original strand (0-based)
+			<< "\t" << P_sz  // TODO: fix; Number of residue matches (number of nucleotide matches)
+			<< "\t" << P_sz  // TODO: fix; Alignment block length: total number of sequence matches, mismatches, insertions and deletions in the alignment
+			<< "\t" << 60  // Mapping quality (0-255; 255 for missing)
 		// ----- end of required PAF fields -----
-			<< "k:i:" << m.k << "\t"
-			//<< "P:i:" << m.P_sz << "\t"  // redundant
-			<< "p:i:" << m.p_sz << "\t"
-			<< "M:i:" << m.matches << "\t" // matches of `p` in `s` [kmers]
-			<< "I:i:" << m.xmin << "\t"  // intersection of `p` and `s` [kmers]
-			<< "J:f:" << m.J << "\t"  // Jaccard similarity [0; 1]
-			<< "t:f:" << m.map_time << endl;
+			<< "\t" << "k:i:" << m.k
+			//<< "\t" << "P:i:" << m.P_sz  // redundant
+			<< "\t" << "p:i:" << m.p_sz 
+			<< "\t" << "M:i:" << m.matches // matches of `p` in `s` [kmers]
+			<< "\t" << "I:i:" << m.xmin  // intersection of `p` and `s` [kmers]
+			<< "\t" << "J:f:" << m.J   // Jaccard similarity [0; 1]
+			<< "\t" << "t:f:" << m.map_time
+			<< endl;
         if (!text.empty())
             cerr << "   text: " << text.substr(m.T_l, m.T_r-m.T_l+1) << endl;
 	}
@@ -498,12 +499,15 @@ int main(int argc, char **argv) {
 				total_mappings ++;
 				total_matches += m.matches;
 			}
-			mappings2paf(params, reasonable_mappings, P_sz, sks.size(), seqID, reader.T_sz, reader.tidx->seq->name, reader.text);
-			total_map_postproc_time += clock() - start_map_postproc_time;
-
 			// stats
 			++total_reads;
-			if (reasonable_mappings.empty()) ++unmapped_reads;
+			if (!reasonable_mappings.empty())
+				mappings2paf(params, reasonable_mappings, P_sz, sks.size(), seqID, reader.T_sz, reader.tidx->seq->name, reader.text);
+			else
+				++unmapped_reads;
+
+			total_map_postproc_time += clock() - start_map_postproc_time;
+
 		}
 		reader.pSks.clear();
 		total_mapping_time += clock() - start_mappings;
@@ -523,21 +527,30 @@ int main(int argc, char **argv) {
 	cerr << fixed << setprecision(1);
 
 	// TODO: report average Jaccard similarity
-	cerr << "Total reads:          " << total_reads << endl;
-	cerr << "Kmer matches:         " << total_matches << " (" << total_matches / total_reads << " per read)" << endl;
-	cerr << "Seed limit reached:   " << sweep.seeds_limit_reached << " (" << 100.0 * sweep.seeds_limit_reached / total_reads << ")" << endl;
-	cerr << "Matches limit reached:" << sweep.matches_limit_reached << " (" << 100.0 * sweep.matches_limit_reached / total_reads << ")" << endl;
-	cerr << "Unmapped reads:       " << unmapped_reads << " (" << 100.0 * unmapped_reads / total_reads << "%)" << endl;
-	cerr << "Average J:            " << total_J / total_mappings << endl;
-	cerr << endl;
+	cerr << "Params:" << endl;
+	cerr << " | k =               " << params.k << endl;
+	cerr << " | w =               " << params.w << endl;
+	cerr << " | blacklist file =  " << params.bLstFl << endl;
+	cerr << " | hFrac =           " << params.hFrac << endl;
+	cerr << " | max_seeds (S) =   " << params.max_seeds << endl;
+	cerr << " | max_matches (M) = " << params.max_matches << endl;
+	cerr << " | onlybest =        " << params.onlybest << endl;
+	cerr << " | tThres =          " << params.tThres << endl;
+	cerr << "Stats:" << endl;
+	cerr << " | Total reads:           " << total_reads << endl;
+	cerr << " | Kmer matches:          " << total_matches << " (" << total_matches / total_reads << " per read)" << endl;
+	cerr << " | Seed limit reached:    " << sweep.seeds_limit_reached << " (" << 100.0 * sweep.seeds_limit_reached / total_reads << ")" << endl;
+	cerr << " | Matches limit reached: " << sweep.matches_limit_reached << " (" << 100.0 * sweep.matches_limit_reached / total_reads << ")" << endl;
+	cerr << " | Unmapped reads:        " << unmapped_reads << " (" << 100.0 * unmapped_reads / total_reads << "%)" << endl;
+	cerr << " | Average J:             " << total_J / total_mappings << endl;
 	cerr << "Total time [sec]:     " << setw(4) << right << total_time << " (" << total_time / total_reads << " per read)" << endl;
-	cerr << "   indexing:          " << setw(4) << right << indexing_time           << " (" << setw(4) << right << 100.0*indexing_time/total_time << "\% of total)" << endl;
-	cerr << "   mapping:           " << setw(4) << right << total_mapping_time      << " (" << setw(4) << right << 100.0*total_mapping_time / total_time << "\% of total)" << endl;
-	cerr << "      read sketching: " << setw(4) << right << total_sketching_time    << " (" << setw(4) << right << 100.0*total_sketching_time / total_mapping_time << "\% of mapping)" << endl;
-	cerr << "      match kmers:    " << setw(4) << right << total_match_kmers_time  << " (" << setw(4) << right << 100.0*total_match_kmers_time / total_mapping_time << "\%)" << endl;
-	cerr << "      sort matches:   " << setw(4) << right << total_sorting_time      << " (" << setw(4) << right << 100.0*total_sorting_time / total_mapping_time << "\%)" << endl;
-	cerr << "      sweep:          " << setw(4) << right << total_sweep_time        << " (" << setw(4) << right << 100.0*total_sweep_time / total_mapping_time << "\%)" << endl;
-	cerr << "      post proc:      " << setw(4) << right << total_map_postproc_time << " (" << setw(4) << right << 100.0*total_map_postproc_time / total_mapping_time << "\%)" << endl;
+	cerr << " | Indexing:          " << setw(4) << right << indexing_time           << " (" << setw(4) << right << 100.0*indexing_time/total_time << "\% of total)" << endl;
+	cerr << " | Mapping:           " << setw(4) << right << total_mapping_time      << " (" << setw(4) << right << 100.0*total_mapping_time / total_time << "\% of total)" << endl;
+	cerr << " |  | read sketching: " << setw(4) << right << total_sketching_time    << " (" << setw(4) << right << 100.0*total_sketching_time / total_mapping_time << "\% of mapping)" << endl;
+	cerr << " |  | match kmers:    " << setw(4) << right << total_match_kmers_time  << " (" << setw(4) << right << 100.0*total_match_kmers_time / total_mapping_time << "\%)" << endl;
+	cerr << " |  | sort matches:   " << setw(4) << right << total_sorting_time      << " (" << setw(4) << right << 100.0*total_sorting_time / total_mapping_time << "\%)" << endl;
+	cerr << " |  | sweep:          " << setw(4) << right << total_sweep_time        << " (" << setw(4) << right << 100.0*total_sweep_time / total_mapping_time << "\%)" << endl;
+	cerr << " |  | post proc:      " << setw(4) << right << total_map_postproc_time << " (" << setw(4) << right << 100.0*total_map_postproc_time / total_mapping_time << "\%)" << endl;
 
 	return 0;
 }
