@@ -115,6 +115,26 @@ uint64_t calcKmerNb(const string& kmer) {
 	return kmerNb;
 }
 
+Sketch convertToSketch(mm128_v* mm128Vector) {
+    Sketch sketch;
+
+//	info.x = hash64(kmer[z], mask) << 8 | kmer_span;
+//	// info.y = (uint64_t)rid<<32 | (uint32_t)hcnt<<1 | z;
+//	info.y = (uint64_t)rid<<32 | (uint32_t)i<<1 | z;
+
+    // Iterate over the elements of the mm128_v vector
+    for (size_t i = 0; i < mm128Vector->n; ++i) {
+        mm128_t mm128 = mm128Vector->a[i];
+
+        // Extract the necessary information from mm128 and add it to the Sketch
+        uint64_t hash = mm128.x >> 8;
+        int32_t offset = mm128.y >> 32; //) & ((1<<31) - 1);
+        sketch.emplace_back(offset, hash);
+    }
+
+    return sketch;
+}
+
 //This function builds a minimap2 sketch of a sequence by querying from a prebuilt minimap index; this function is influenced by the
 // code of "The minimizer Jaccard estimator is biased and inconsistent." from Belbasi et al. (function 
 //"winnowed_minimizers_linear(perm,windowSize)" in file "winnowed_minimizers.py").

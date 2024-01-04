@@ -543,8 +543,8 @@ int main(int argc, char **argv) {
 	cerr << " | Total reads:           " << total_reads << endl;
 	cerr << " | Sketched read kmers:   " << total_sketched_kmers << " (" << 1.0*total_sketched_kmers / total_reads << " per read)" << endl;
 	cerr << " | Kmer matches:          " << total_matches << " (" << 1.0*total_matches / total_reads << " per read)" << endl;
-	cerr << " | Seed limit reached:    " << sweep.seeds_limit_reached << " (" << 100.0 * sweep.seeds_limit_reached / total_reads << ")" << endl;
-	cerr << " | Matches limit reached: " << sweep.matches_limit_reached << " (" << 100.0 * sweep.matches_limit_reached / total_reads << ")" << endl;
+	cerr << " | Seed limit reached:    " << sweep.seeds_limit_reached << " (" << 100.0 * sweep.seeds_limit_reached / total_reads << "%)" << endl;
+	cerr << " | Matches limit reached: " << sweep.matches_limit_reached << " (" << 100.0 * sweep.matches_limit_reached / total_reads << "%)" << endl;
 	cerr << " | Unmapped reads:        " << unmapped_reads << " (" << 100.0 * unmapped_reads / total_reads << "%)" << endl;
 	cerr << " | Average J:             " << total_J / total_mappings << endl;
 	cerr << "Total time [sec]:     " << setw(4) << right << total_time << " (" << total_time / total_reads << " per read)" << endl;

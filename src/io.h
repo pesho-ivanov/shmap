@@ -408,7 +408,25 @@ bool lMiniPttnSks(ifstream& fStr, const uint32_t& k, const uint32_t& w, const un
 		//file
 		if(c == '>' && headerRead && lnBrkDiscvd) {
 			//Add sequence's sketch, length and id to result vector
-			pSks.push_back(make_tuple(seqID, seq.length(), buildMiniSketch(seq, k, w, blmers)));//TODO: This function still needs to be tested!
+			//auto sketch = buildMiniSketch(seq, k, w, blmers);
+			mm128_v a = {0,0,0};
+			mm_sketch(0, seq.c_str(), seq.size(), w, k, 0, 0, &a);
+			auto sketch2 = convertToSketch(&a);
+			//if (sketch.size() != sketch2.size()) {
+			//	cerr << "ERROR: sketch size mismatch" << endl;
+			//	cerr << "sketch:  " << sketch.size() << endl;
+			//	cerr << "sketch2: " << sketch2.size() << endl;
+			//	//exit(1);
+			//}
+			//for (size_t i = 1; i < sketch.size(); ++i) {
+			//	if (sketch[i] != sketch2[i]) {
+			//		cerr << "ERROR: sketch mismatch" << endl;
+			//		cerr << "sketch:  " << sketch[i].first << ", " << sketch[i].second << endl;
+			//		cerr << "sketch2: " << sketch2[i].first << ", " << sketch2[i].second << endl;
+			//		//exit(1);
+			//	}
+			//}	
+			pSks.push_back(make_tuple(seqID, seq.length(), sketch2));//TODO: This function still needs to be tested!
             //cout << "pattern: " << seq << endl;
 			//Clear sequence id
 			seqID.clear();
