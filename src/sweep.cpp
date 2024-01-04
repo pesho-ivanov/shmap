@@ -479,7 +479,7 @@ int main(int argc, char **argv) {
 			break;
 		total_sketching_time += clock() - start_sketching;
 
-		cerr << "Aligning a batch of reads..." << endl;
+		cerr << "Mapping a batch of reads..." << endl;
 		// Iterate over pattern sketches
 		for(auto p = reader.pSks.begin(); p != reader.pSks.end(); ++p) {
 			auto seqID = get<0>(*p);
@@ -547,7 +547,7 @@ int main(int argc, char **argv) {
 	cerr << " | Matches limit reached: " << sweep.matches_limit_reached << " (" << 100.0 * sweep.matches_limit_reached / total_reads << "%)" << endl;
 	cerr << " | Unmapped reads:        " << unmapped_reads << " (" << 100.0 * unmapped_reads / total_reads << "%)" << endl;
 	cerr << " | Average J:             " << total_J / total_mappings << endl;
-	cerr << "Total time [sec]:     " << setw(4) << right << total_time << " (" << total_time / total_reads << " per read)" << endl;
+	cerr << "Total time [sec]:     " << setw(4) << right << total_time 				<< " (" << setw(6) << right << total_time / total_reads << " per read)" << endl;
 	cerr << " | Indexing:          " << setw(4) << right << indexing_time           << " (" << setw(4) << right << 100.0*indexing_time/total_time << "\% of total)" << endl;
 	cerr << " | Mapping:           " << setw(4) << right << total_mapping_time      << " (" << setw(4) << right << 100.0*total_mapping_time / total_time << "\% of total)" << endl;
 	cerr << " |  | read sketching: " << setw(4) << right << total_sketching_time    << " (" << setw(4) << right << 100.0*total_sketching_time / total_mapping_time << "\% of mapping)" << endl;

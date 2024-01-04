@@ -16,12 +16,12 @@ MERYL_BIN = ~/libs/Winnowmap/bin/meryl
 WINNOWMAP_BIN = ~/libs/Winnowmap/bin/winnowmap
 EDLIB_BIN = ~/libs/edlib/build/bin/edlib-aligner
 
-K ?= 19
+K ?= 22
 W ?= 20
 S ?= 200
 M ?= 2000
 T ?= 0.0
-REFNAME ?= chm13
+REFNAME ?= chm13-1B
 ACCURACY = 0.99
 DEPTH = 1
 MEANLEN = 10000  # hifi
@@ -97,6 +97,7 @@ eval_sweep_max_seeds: sweep gen_reads
 eval_sweep: sweep gen_reads
 	mkdir -p $(OUTDIR)
 	$(TIME_CMD) -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep.params -x -t $(T) -k $(K) -w $(W) -S $(S) -M $(M) 2> >(tee $(OUTDIR)/sweep.log) >$(OUTDIR)/sweep.paf 
+	#$(TIME_CMD) -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep.params -b blacklist_chm13-1Bk15w10n100.txt -x -t $(T) -k $(K) -w $(W) -S $(S) -M $(M) 2> >(tee $(OUTDIR)/sweep.log) >$(OUTDIR)/sweep.paf 
 	paftools.js mapeval $(OUTDIR)/sweep.paf | tee $(OUTDIR)/sweep.eval
 
 eval_winnowmap: gen_reads
