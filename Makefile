@@ -16,15 +16,17 @@ MERYL_BIN = ~/libs/Winnowmap/bin/meryl
 WINNOWMAP_BIN = ~/libs/Winnowmap/bin/winnowmap
 EDLIB_BIN = ~/libs/edlib/build/bin/edlib-aligner
 
+REFNAME ?= chm13-1B
+ACCURACY ?= 0.99
+DEPTH ?= 1
+MEANLEN ?= 10000  # hifi
+
 K ?= 22
 W ?= 20
 S ?= 200
 M ?= 2000
 T ?= 0.0
-REFNAME ?= chm13-1B
-ACCURACY = 0.99
-DEPTH = 1
-MEANLEN = 10000  # hifi
+
 DIR = newevals
 REF = $(DIR)/$(REFNAME).fa
 READS_PARAMS = $(REFNAME)-a$(ACCURACY)-d$(DEPTH)
@@ -102,11 +104,11 @@ eval_sweep: sweep gen_reads
 
 eval_winnowmap: gen_reads
 	mkdir -p $(OUTDIR)
-	if [ ! -f winnowmap_repetitive_k15.txt ]; then \
+	if [ ! -f winnowmap_$(REF)_repetitive_k15.txt ]; then \
 		$(MERYL_BIN) count k=15 output merylDB $(REF); \
-		$(MERYL_BIN) print greater-than distinct=0.9998 merylDB > winnowmap_repetitive_k15.txt; \
+		$(MERYL_BIN) print greater-than distinct=0.9998 merylDB > winnowmap_$(REF)_repetitive_k15.txt; \
 	fi
-	$(TIME_CMD) -o $(OUTDIR)/winnowmap.time $(WINNOWMAP_BIN) -W winnowmap_repetitive_k15.txt -x map-pb -t 1 $(REF) $(READS) 2> >(tee $(OUTDIR)/winnowmap.log) >$(OUTDIR)/winnowmap.paf 
+	$(TIME_CMD) -o $(OUTDIR)/winnowmap.time $(WINNOWMAP_BIN) -W winnowmap_$(REF)_repetitive_k15.txt -x map-pb -t 1 $(REF) $(READS) 2> >(tee $(OUTDIR)/winnowmap.log) >$(OUTDIR)/winnowmap.paf 
 	paftools.js mapeval $(OUTDIR)/winnowmap.paf | tee $(OUTDIR)/winnowmap.eval
 
 eval_minimap: gen_reads
