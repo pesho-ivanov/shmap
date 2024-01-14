@@ -1,8 +1,10 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
+#include <chrono>
 #include <iostream>
 #include <string>
+#include <unordered_map>
 
 using std::string;
 
@@ -23,6 +25,77 @@ const double EPS = 1e-7;
 #define CMPL_BASE_C 'G'
 #define CMPL_BASE_G 'C'
 #define CMPL_BASE_T 'A'
+
+class Timer {
+private:
+    std::chrono::time_point<std::chrono::high_resolution_clock> start_time_point_, end_time_point_;
+    double accumulated_time_;
+    bool running_;
+
+public:
+    Timer() : accumulated_time_(0.0), running_(false) {}
+
+    void start() {
+        if (!running_) {
+            start_time_point_ = std::chrono::high_resolution_clock::now();
+            running_ = true;
+        }
+    }
+
+    void stop() {
+		assert(running_);
+        if (running_) {
+            end_time_point_ = std::chrono::high_resolution_clock::now();
+            accumulated_time_ += std::chrono::duration<double>(end_time_point_ - start_time_point_).count();
+            running_ = false;
+        }
+    }
+
+    double get_secs() const {
+		assert(!running_);
+		return accumulated_time_;
+    }
+};
+
+class Timers {
+private:
+    std::unordered_map<std::string, Timer> timers_;
+
+public:
+    void start(const std::string& name) {
+        timers_[name].start();
+    }
+
+    void stop(const std::string& name) {
+        auto it = timers_.find(name);
+        if (it != timers_.end()) {
+            it->second.stop();
+        }
+    }
+
+    double get_secs(const std::string& name) const {
+        auto it = timers_.find(name);
+		assert(it != timers_.end());
+        if (it != timers_.end()) {
+            return it->second.get_secs();
+        }
+        return 0.0;
+    }
+
+    double get_perc(const std::string& name, const std::string& total) const {
+        auto it = timers_.find(name);
+		assert(it != timers_.end());
+        auto it_total = timers_.find(total);
+		assert(it_total != timers_.end());
+        if (it != timers_.end()) {
+			if (it_total != timers_.end()) {
+				assert(it->second.get_secs() <= it_total->second.get_secs());
+				return it->second.get_secs() / it_total->second.get_secs() * 100.0;
+			}
+        }
+        return 0.0;
+    }
+};
 
 struct Match {
 	kmer_num_t kmer_ord;
