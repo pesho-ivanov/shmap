@@ -4,19 +4,44 @@
 #include <getopt.h>
 #include <fstream>
 #include <map>
+#include <string>
+#include <tuple>
+
+#include "utils.h"
+
+using std::cerr;
+using std::cout;
+using std::vector;
+using std::string;
+using std::pair;
+using std::endl;
+using std::ifstream;
+using std::unordered_map;
 
 #define INDEX_DEFAULT_DUMP_FILE "indexDump.idx"
-//#define T 0.9
 #define DEFAULT_WEIGHT 1
-using Thomology = tuple<uint32_t, uint32_t, int32_t>;
 
-#define T_HOM_OPTIONS "p:s:k:w:e:a:b:S:M:t:d:i:z:nxoh"
+#define T_HOM_OPTIONS "p:s:k:w:r:e:a:b:S:M:t:z:nxoh"
 
 //#define MIN_PARAM_NB 6
-#define MAX_RATIO 1.0
+//#define MAX_RATIO 1.0
 //#define NORM_FLAG_DEFAULT false
 #define PATTERN_BATCH_SIZE 250000
 #define STRING_BUFFER_SIZE_DEFAULT 50
+#define HASH_RATIO 0.1
+
+//The k-mer size
+#define K 9
+//The window size
+#define W 10
+//The hash value threshold
+#define MAX_HASH 26214
+//The FracMinHash ratio
+//#define HASH_RATIO 0.1
+//Size of the considered alphabet
+#define ALPHABET_SIZE 4
+//Number of times we expect p to occur in t
+#define P_MULTIPLICITY 2
 
 enum class elastic_t {
     wrong = -1,
@@ -32,7 +57,7 @@ elastic_t str2elastic(string t) {
 	return elastic_t::wrong;
 }
 
-std::string getElasticDescription(elastic_t e) {
+string getElasticDescription(elastic_t e) {
     switch (e) {
         case elastic_t::off:
             return "off";
@@ -59,7 +84,7 @@ alignment_edges_t str2alignment_edges(string t) {
 	return alignment_edges_t::wrong;
 }
 
-std::string getAlignmentEdgesDescription(alignment_edges_t ae) {
+string getAlignmentEdgesDescription(alignment_edges_t ae) {
     switch (ae) {
         case alignment_edges_t::sketch_edges:
             //return "Use the beginning of the first matched sketch and the end of the last matched sketch.";
@@ -78,16 +103,14 @@ struct params_t {
 	bool normalize; 		//Flag to save that scores are to be normalized
 	bool onlybest;          // Output up to one (best) mapping (if above the threshold)
 	bool overlaps;          // Permit overlapping mappings 
-	uint32_t k;  						//The k-mer length
-	uint32_t w;  							//The window size
+	int k;  						//The k-mer length
+	int w;  							//The window size
 	elastic_t elastic;
 	alignment_edges_t alignment_edges;
-	//double hFrac;  					//The FracMinHash ratio
-	uint32_t max_seeds;  							//Maximum seeds in a sketch
-	uint32_t max_matches;  							//Maximum seed matches in a sketch
-	float tThres;  							//The t-homology threshold
-	float dec; 								//Intercept and decent to interpolate thresholds
-	float inter; 
+	double hFrac;  					//The FracMinHash ratio
+	int max_seeds;  							//Maximum seeds in a sketch
+	int max_matches;  							//Maximum seed matches in a sketch
+	double tThres;  							//The t-homology threshold
 	string pFile, tFile;
 	string paramsFile;
 	string bLstFl; // = "highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
@@ -100,12 +123,10 @@ struct params_t {
 		w = W; 							//The window size
 		elastic = elastic_t::off;
 		alignment_edges = alignment_edges_t::fine;
-		//hFrac = HASH_RATIO;
+		hFrac = HASH_RATIO;
 		max_seeds = 10000;
 		max_matches = 1000000;
 		tThres = 0.9; 							//The t-homology threshold
-		dec = 0; 								//Intercept and decent to interpolate thresholds
-		inter = 0;
 		bLstFl = ""; //"highAbundKmersMiniK15w10Lrgr100BtStrnds.txt";  //Input file names
 	}
 
@@ -116,12 +137,10 @@ struct params_t {
 		m.push_back({"overlaps", std::to_string(overlaps)});
 		m.push_back({"k", std::to_string(k)});
 		m.push_back({"w", std::to_string(w)});
+		m.push_back({"hFrac", std::to_string(hFrac)});
 		m.push_back({"elastic", getElasticDescription(elastic)});
 		m.push_back({"alignment_edges", getAlignmentEdgesDescription(alignment_edges)});
-		//m.push_back({"hFrac", std::to_string(hFrac)});
 		m.push_back({"tThres", std::to_string(tThres)});
-		m.push_back({"dec", std::to_string(dec)});
-		m.push_back({"inter", std::to_string(inter)});
 		m.push_back({"pFile", pFile});
 		m.push_back({"tFile", tFile});
 		m.push_back({"paramsFile", paramsFile});
@@ -141,23 +160,6 @@ struct params_t {
 	}
 };
 
-struct reader_t {
-	params_t params;
-	ifstream fStr; 								//A file stream
-
-	mm_idxopt_t iopt; 							//An index option struct
-	mm_mapopt_t mopt; 							//A mapping options struct
-	const mm_idx_t *tidx; 						//A pointer to the text index
-	//const mm_idx_t *pidx; 						//A pointer to the pattern index
-	vector<tuple<string, uint32_t, Sketch>> pSks; //A vector of pattern sketches
-
-	uint32_t T_sz;
-	string text;
-
-	reader_t() {}
-	bool init_and_index(int argc, char **argv);
-};
-
 //This function prints usage infos
 inline void dsHlp() {
 	cerr << "sweep [-hn] [-p PATTERN_FILE] [-s TEXT_FILE] [-k KMER_LEN] [-r HASH_RATIO] [-b BLACKLIST] [-c COM_HASH_WGHT] [-u UNI\
@@ -171,7 +173,7 @@ inline void dsHlp() {
 	cerr << "   -w   --windowsize        Window size for minimizer sketching approach (default " << W << ")" << endl;
 	cerr << "   -e   --elastic           Elastic pairs of kmers {off, consecutive, random} [off]" << endl;
 	cerr << "   -a   --alignment_edges   Alignment interval {sketch_edges, extend_equally, fine} [fine]" << endl;
-	//cerr << "   -r   --hashratio         FracMin hash ratio to be used for sketches (default " << HASH_RATIO << ")" << endl;
+	//cerr << "   -c   --hashratio         FracMin hash ratio to be used for sketches (default " << HASH_RATIO << ")" << endl;
 	cerr << "   -b   --blacklist         File containing hashes to ignore for sketch calculation" << endl;
 	cerr << "   -S   --max_seeds         Max seeds in a sketch" << endl;
 	cerr << "   -M   --max_matches       Max seed matches in a sketch" << endl;
@@ -195,6 +197,7 @@ bool prsArgs(int& nArgs, char** argList, params_t *params) {
         {"text",               required_argument,  0, 's'},
         {"ksize",              required_argument,  0, 'k'},
         {"windowsize",         required_argument,  0, 'w'},
+        {"hashratio",          required_argument,  0, 'r'},
         {"elastic",            required_argument,  0, 'e'},
         {"alignment_edges",    required_argument,  0, 'a'},
         {"hashratio",          required_argument,  0, 'r'},
@@ -236,7 +239,6 @@ bool prsArgs(int& nArgs, char** argList, params_t *params) {
 					cerr << "ERROR: K-mer length not applicable" << endl;
 					return false;
 				}
-
 				params->k = atoi(optarg);
 				break;
 			case 'S':
@@ -275,19 +277,16 @@ bool prsArgs(int& nArgs, char** argList, params_t *params) {
 					cerr << "ERROR: Window size not applicable" << endl;
 					return false;
 				}
-
 				params->w = atoi(optarg);
 				break;
-//			case 'r':
-//				//Check if given value is reasonable to represent a ratio
-//				if(atof(optarg) <= 0 || atof(optarg) > MAX_RATIO) {
-//					cerr << "ERROR: Given hash ratio not applicable" << endl;
-//
-//					return false;
-//				}
-//
-//				params->hFrac = atof(optarg);
-//				break;
+			case 'r':
+				//Check if given value is reasonable to represent a ratio
+				if(atof(optarg) <= 0 || atof(optarg) > 1.0) {
+					cerr << "ERROR: Given hash ratio " << optarg << " not applicable" << endl;
+					return false;
+				}
+				params->hFrac = atof(optarg);
+				break;
 			case 'b':
 				//Save blacklist file name
 				params->bLstFl = optarg;
@@ -314,12 +313,6 @@ bool prsArgs(int& nArgs, char** argList, params_t *params) {
 			//	break;
 			case 't':
 				params->tThres = atof(optarg);
-				break;
-			case 'd':
-				params->dec = atof(optarg);
-				break;
-			case 'i':
-				params->inter = atof(optarg);
 				break;
 			case 'n':
 				params->normalize = true;
@@ -348,7 +341,7 @@ bool prsArgs(int& nArgs, char** argList, params_t *params) {
 //		tor to store the sketch would have to be elongated several times which might be time consuming. On the other hand, it might
 //		also be time consuming to handle the complete sequence in memory first. Eventually, it will depend on a try to find out
 //		what is the better alternative. Could also be that it does not matter at all!
-bool readFASTA(const string& filePath, string& seq) {
+int readFASTA(const string& filePath, string *seq) {
 	bool headerRead = false, lnBrkDiscvd = false;
 	char c;
 
@@ -356,10 +349,11 @@ bool readFASTA(const string& filePath, string& seq) {
 	ifstream fStr(filePath);
 
 	//Check if the file is open
-	if(!fStr.is_open()) return false;
+	if(!fStr.is_open()) return 1;
 
 	//Read in file character by character
 	while(fStr.get(c)) {
+		c = to_upper(c);
 		//We are done if we find a second header (which can only start after at least one line break) in the file
 		if(c == '>' && headerRead && lnBrkDiscvd) break;
 
@@ -379,106 +373,21 @@ bool readFASTA(const string& filePath, string& seq) {
 		if(headerRead && !lnBrkDiscvd) continue;
 
 		//We are only interested in unambigous, unmasked nucleotides
-		if(c == 'A' || c == 'C' || c == 'G' || c == 'T') seq += c;
+		if(c == 'A' || c == 'C' || c == 'G' || c == 'T') *seq += c;
 	}
 
 	//Close file
 	fStr.close();
 
-	return true;
-}
-
-//This function reads in batches of FASTA sequence entries from file and transforms them into minimap sketches. Returns false if end
-// of file was reached.
-bool lMiniPttnSks(ifstream& fStr, const uint32_t& k, const uint32_t& w, const unordered_map<uint64_t, char>& blmers, 
-	vector<tuple<string, uint32_t, Sketch>>& pSks) {
-	bool headerRead, idRead = false, lnBrkDiscvd = false;
-	char c;
-	string seq, seqID;
-
-	//Check if the file is open
-	if(!fStr.is_open()) return false;
-
-	//If this function is called iteratively, the '>' of the next entry has already been read
-	headerRead = fStr.gcount() != 0;
-
-	//Read in file character by character
-	while(fStr.get(c)) {
-		//An entry's sequence is complete if we find a second header (which can only start after at least one line break) in the 
-		//file
-		if(c == '>' && headerRead && lnBrkDiscvd) {
-			//Add sequence's sketch, length and id to result vector
-			//auto sketch = buildMiniSketch(seq, k, w, blmers);
-			mm128_v a = {0,0,0};
-			mm_sketch(0, seq.c_str(), seq.size(), w, k, 0, 0, &a);
-			auto sketch2 = convertToSketch(&a);
-			//if (sketch.size() != sketch2.size()) {
-			//	cerr << "ERROR: sketch size mismatch" << endl;
-			//	cerr << "sketch:  " << sketch.size() << endl;
-			//	cerr << "sketch2: " << sketch2.size() << endl;
-			//	//exit(1);
-			//}
-			//for (size_t i = 1; i < sketch.size(); ++i) {
-			//	if (sketch[i] != sketch2[i]) {
-			//		cerr << "ERROR: sketch mismatch" << endl;
-			//		cerr << "sketch:  " << sketch[i].first << ", " << sketch[i].second << endl;
-			//		cerr << "sketch2: " << sketch2[i].first << ", " << sketch2[i].second << endl;
-			//		//exit(1);
-			//	}
-			//}	
-			pSks.push_back(make_tuple(seqID, seq.length(), sketch2));//TODO: This function still needs to be tested!
-            //cout << "pattern: " << seq << endl;
-			//Clear sequence id
-			seqID.clear();
-			//Clear sequence
-			seq.clear();
-
-			//Check if enough sequences have been read
-			if(pSks.size() == PATTERN_BATCH_SIZE) return true;
-
-			//Reset id-read flag
-			idRead = false;
-			//Reset line-break-discovered flag
-			lnBrkDiscvd = false;
-			continue;
-		}
-
-		//Note if we have completely read the sequence id
-		idRead = idRead || (headerRead && c == ' ' && !lnBrkDiscvd);
-		//Note if we have found the first line break after a new header started
-		lnBrkDiscvd = lnBrkDiscvd || c == '\n';
-
-		//Update sequence id if we are still reading it
-		if(headerRead && !lnBrkDiscvd && !idRead) {
-			seqID += c;
-			continue;
-		}
-
-		//Note if we have found the beginning of a header
-		headerRead = headerRead || (c == '>');
-
-		//There is no sequence to load in the header line
-		if(headerRead && !lnBrkDiscvd) continue;
-
-		//We are only interested in unambigous, unmasked nucleotides
-		if(c == 'A' || c == 'C' || c == 'G' || c == 'T') seq += c;
-	}
-
-	//Add last entry's sketch and sequence id to result vector if it is not empty
-	if(!seq.empty()) {
-        pSks.push_back(make_tuple(seqID, seq.length(), buildMiniSketch(seq, k, w, blmers)));
-        //cout << "pattern: " << seq << endl;
-    }
-
-	return false;
+	return 0;
 }
 
 //This function reads 64-bit numbers from file and returns them as a hash table
-const unordered_map<uint64_t, char> readBlstKmers(const string& fname) {
+const unordered_map<hash_t, char> readBlstKmers(const string& fname) {
 	char nb[STRING_BUFFER_SIZE_DEFAULT];
 	char* end;
 	ifstream iFile(fname);
-	unordered_map<uint64_t, char> numbers;
+	unordered_map<hash_t, char> numbers;
 
 	if(!iFile.is_open()) {
 		cerr << "readBlstKmers: WARNING input file could not be opened. Hash table will be empty!" << endl;
@@ -492,75 +401,35 @@ const unordered_map<uint64_t, char> readBlstKmers(const string& fname) {
 	return numbers;
 }
 	
-bool reader_t::init_and_index(int argc, char **argv) {
-	//A hash table to store black listed k-mers
-	// unordered_map<uint64_t, char> bLstmers;
-	mm_idx_reader_t *r; 						//An index reader
-
-	cerr << "Reading index " << params.tFile << "..." << endl;
-
-	//Parse arguments
-	if(!prsArgs(argc, argv, &params)) {//TODO: Tests for this function need to be adapted!
-		dsHlp(); //Display help message
-		return 0;
+// Outputs all given mappings
+void mappings2paf(const params_t &params, const vector<Mapping>& res, const pos_t P_sz, const pos_t pLen, const string &seqID, const pos_t T_sz, const string &T_name, const string &text) {
+	for(auto m: res) {
+		//m.print();
+		// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
+		cout << seqID  			// Query sequence name
+			<< "\t" << P_sz     // query sequence length
+			<< "\t" << 0   // query start (0-based; closed)
+			<< "\t" << P_sz  // query end (0-based; open)
+			<< "\t" << "+"   // m.get_strand() //strand; TODO
+			<< "\t" << T_name    // reference name
+			<< "\t" << T_sz  // target sequence length
+			<< "\t" << m.T_l  // target start on original strand (0-based)
+			<< "\t" << m.T_r  // target start on original strand (0-based)
+			<< "\t" << P_sz  // TODO: fix; Number of residue matches (number of nucleotide matches)
+			<< "\t" << P_sz  // TODO: fix; Alignment block length: total number of sequence matches, mismatches, insertions and deletions in the alignment
+			<< "\t" << 60  // Mapping quality (0-255; 255 for missing)
+		// ----- end of required PAF fields -----
+			<< "\t" << "k:i:" << m.k
+			//<< "\t" << "P:i:" << m.P_sz  // redundant
+			<< "\t" << "p:i:" << m.p_sz 
+			<< "\t" << "M:i:" << m.matches // matches of `p` in `s` [kmers]
+			<< "\t" << "I:i:" << m.xmin  // intersection of `p` and `s` [kmers]
+			<< "\t" << "J:f:" << m.J   // Jaccard similarity [0; 1]
+			<< "\t" << "t:f:" << m.map_time
+			<< endl;
+        if (!text.empty())
+            cerr << "   text: " << text.substr(m.T_l, m.T_r-m.T_l+1) << endl;
 	}
-
-	//Set index options to default
-	mm_set_opt(0, &iopt, &mopt);
-	iopt.k = params.k; //Adjust k if necessary
-	iopt.w = params.w;
-	r = mm_idx_reader_open(params.tFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);  //Open an index reader //TODO: We do not allow yet to use a prebuilt index
-
-	//Check if index could be opened successfully
-	if(r == NULL) {
-		cerr << "ERROR: Text sequence file could not be read" << endl;
-		return 1;
-	}
-
-	if (!params.bLstFl.empty()) {
-		bLstmers = readBlstKmers(params.bLstFl);
-	}
-
-	//Construct index of reference
-	if((tidx = mm_idx_reader_read(r, 1)) == 0) { //TODO: Make use of multithreading here!
-		cerr << "ERROR: Text index cannot be read" << endl;
-		return 1;
-	}
-
-	//For simplicity we assume that an index always consists of only one part
-	if(mm_idx_reader_read(r, 1) != 0) {
-		cerr << "ERROR: Text index consists of several parts! We cannot handle this yet" << endl;
-		return 1; 
-	}
-
-	//Open index reader to read pattern
-	//r = mm_idx_reader_open(params.pFile.c_str(), &iopt, INDEX_DEFAULT_DUMP_FILE);
-
-	////Check if index could be opened successfully
-	//if(r == NULL) {
-	//	cerr << "ERROR: Pattern sequence file could not be read" << endl;
-	//	return 1;
-	//}
-
-	////Construct index of reference
-	//if((pidx = mm_idx_reader_read(r, 1)) == 0) {//TODO: Make use of multithreading here!
-	//	cerr << "ERROR: Pattern index cannot be read" << endl;
-	//	return 1;
-	//}
-
-	////For simplicity we assume that an index always consists of only one part
-	//if(mm_idx_reader_read(r, 1) != 0) {
-	//	cerr << "ERROR: Pattern index consists of several parts! We cannot handle this yet" << endl;
-	//	return 1; 
-	//}
-
-	T_sz = tidx->seq->len;  //The length of the text
-	fStr.open(params.pFile);  //Open stream to read in patterns
-
-	//readFASTA(tFile, text);
-	//Sketch tsk = buildMiniSketch(text, kmerLen, tidx->w, bLstmers);
-	//cerr << "|T| = " << text.size() << ", |t| = " << tsk.size() << endl;
-	return 0;
 }
 
 #endif

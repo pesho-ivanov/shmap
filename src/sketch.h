@@ -8,156 +8,48 @@
 #include <iostream>
 #include <vector>
 #include <unordered_map>
-
 #include <math.h>
 
-#include "../minimap2/minimap.h"
-#include "../minimap2/index.c"
-
-//The k-mer size
-#define K 9
-//The window size
-#define W 10
-//The hash value threshold
-#define MAX_HASH 26214
-//The FracMinHash ratio
-//#define HASH_RATIO 0.1
-//Size of the considered alphabet
-#define ALPHABET_SIZE 4
-//Number of times we expect p to occur in t
-#define P_MULTIPLICITY 2
-//Character constants used for nucleotide bases
-#define NUCL_BASE_A 'A'
-#define NUCL_BASE_C 'C'
-#define NUCL_BASE_G 'G'
-#define NUCL_BASE_T 'T'
-//Complements of nucleotide bases
-#define CMPL_BASE_A 'T'
-#define CMPL_BASE_C 'G'
-#define CMPL_BASE_G 'C'
-#define CMPL_BASE_T 'A'
+#include "utils.h"
+#include "io.h"
 
 using namespace std;
-//A PairSketch is a list of offset hash pairs
-using PairSketch = list<pair<uint32_t, uint64_t>>;
-//A Sketch is a list of hashes
-using Sketch = vector<pair<int32_t, uint64_t>>;
 
-//A compare function to sort hashes in a sketch
-inline bool smHshsFrst(const pair<uint32_t, uint64_t>& left, const pair<uint32_t, uint64_t>& right) { return left.second < right.second; }
+using abs_hash_t = pair<pos_t, hash_t>;
+using abs_ord_t  = pair<pos_t, kmer_num_t>; 
 
-//This function returns a numerical value for each nucleotide base
-inline uint64_t getBaseNb(const char& c) {
-	switch(c) {
-		case 'A':
-			return 0;
-		case 'C':
-			return 1;
-		case 'G':
-			return 2;
-		case 'T':
-			return 3;
-		default:
-			cerr << "WARNING: Unsupported character in input sequence detected!" << endl;
-			return 0;
-	}
-}
+using Sketch     = vector<abs_hash_t>;  // (kmer's left 0-based position, kmer hash)
 
-//This function calculates the reverse complement of a DNA sequence
-string revComp(const string &seq) {
-	//The result string
-	string revSeq;
-
-	//Go through the query from the end to the beginning
-	for(int32_t i = seq.length() - 1; i >= 0; --i) {
-		//Check which base we are dealing with and append its complement
-		switch(seq[i]) {
-			case NUCL_BASE_A:
-				revSeq += CMPL_BASE_A;
-				break;
-			case NUCL_BASE_C:
-				revSeq += CMPL_BASE_C;
-				break;
-			case NUCL_BASE_G:
-				revSeq += CMPL_BASE_G;
-				break;
-			case NUCL_BASE_T:
-				revSeq += CMPL_BASE_T;
-				break;
-			default:
-				revSeq += "N";
-				break;
-		}
-	}
-
-	return revSeq;
-}
-
-
-//This function calculates a hash for the given numerical representation of a k-mer and a mask of the form (4**k)-1 where k is the k-mer length;
-//it originates from the minimap2 source code (the function hash64 in sketch.c)
-static inline uint64_t getHash(uint64_t kmer, uint64_t mask) {
-	kmer = (~kmer + (kmer << 21)) & mask; // kmer = (kmer << 21) - kmer - 1;
-	kmer = kmer ^ kmer >> 24;
-	kmer = ((kmer + (kmer << 3)) + (kmer << 8)) & mask; // kmer * 265
-	kmer = kmer ^ kmer >> 14;
-	kmer = ((kmer + (kmer << 2)) + (kmer << 4)) & mask; // kmer * 21
-	kmer = kmer ^ kmer >> 28;
-	kmer = (kmer + (kmer << 31)) & mask;
-	return kmer;
-}
-
-//This function calculates the numerical representation of a k-mer
-uint64_t calcKmerNb(const string& kmer) {
-	uint64_t kmerNb = 0;
-	for(string::const_iterator c = kmer.begin(); c != kmer.end(); ++c)
-		kmerNb = (kmerNb << 2) + getBaseNb(*c);
-	return kmerNb;
-}
-
-Sketch convertToSketch(mm128_v* mm128Vector) {
-    Sketch sketch;
-
-//	info.x = hash64(kmer[z], mask) << 8 | kmer_span;
-//	// info.y = (uint64_t)rid<<32 | (uint32_t)hcnt<<1 | z;
-//	info.y = (uint64_t)rid<<32 | (uint32_t)i<<1 | z;
-
-    // Iterate over the elements of the mm128_v vector
-    for (size_t i = 0; i < mm128Vector->n; ++i) {
-        mm128_t mm128 = mm128Vector->a[i];
-
-        // Extract the necessary information from mm128 and add it to the Sketch
-        uint64_t hash = mm128.x >> 8;
-        int32_t offset = mm128.y >> 32; //) & ((1<<31) - 1);
-        sketch.emplace_back(offset, hash);
-    }
-
-    return sketch;
-}
+//void print_sketches(const string &seqID, const Sketch &sks) {
+//	cout << seqID << endl;
+//	for (const auto& sk : sks) {
+//		cout << "  " << sk.first << ", " << sk.second << endl;
+//	}
+//}
 
 //This function builds a minimap2 sketch of a sequence by querying from a prebuilt minimap index; this function is influenced by the
 // code of "The minimizer Jaccard estimator is biased and inconsistent." from Belbasi et al. (function 
 //"winnowed_minimizers_linear(perm,windowSize)" in file "winnowed_minimizers.py").
-const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_t& w, const unordered_map<uint64_t, char>& blmers) {
-	uint32_t lastIdx = UINT32_MAX;
-	int32_t windowBorder;
-	const uint64_t mask = pow(ALPHABET_SIZE, k) - 1;
-	uint64_t kmerHash, kmerBitSeq, revKmerBitSeq;
+const Sketch buildMiniSketch(const string& seq, const int& k, const int& w, const unordered_map<hash_t, char>& blmers) {
+	pos_t lastIdx = std::numeric_limits<pos_t>::max();
+	pos_t windowBorder;
+	const hash_t mask = static_cast<hash_t>(pow(ALPHABET_SIZE, k) - 1);
+	hash_t kmerHash, kmerBitSeq, revKmerBitSeq;
 	//This stores pairs of k-mer starting positions and their hashes within the current window
-	vector<pair<int32_t, uint64_t>> windowKmers; // TODO: this can be sped up by using a fixed-size cyclic array with two pointers for begin and end
+	vector<pair<pos_t, hash_t>> windowKmers; // TODO: this can be sped up by using a fixed-size cyclic array with two pointers for begin and end
 	Sketch sk;
 
 	//If the sequence is smaller than k we are done
-	if(seq.length() < k) {
+	if((int)seq.length() < k) {
 		cerr << "WARNING: Length of input sequence " << seq << " is smaller than k (k=" << k << ")" << endl;
 		return sk;
 	}
 
 	//Reserve as much space as is approximately needed to store the sketch (which hopefully saves some time)
-	sk.reserve(seq.length() * 0.03);
+	sk.reserve((int)((double)seq.length() * 0.03));
 
 	//Iterate over k-mer starting positions in sequence
-	for(int32_t i = 0; i < (int)seq.length() - k + 1; ++i) {
+	for(pos_t i = 0; i < (int)seq.length() - k + 1; ++i) {
 		// TODO: don't take the substr each time, work only with 1 letter at a time
 		kmerBitSeq = calcKmerNb(seq.substr(i, k));
 		revKmerBitSeq = calcKmerNb(revComp(seq.substr(i, k)));
@@ -181,7 +73,7 @@ const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_
 			windowKmers.pop_back();
 
 		//Add current k-mer hash to windowKmers
-		windowKmers.push_back(make_pair(i, kmerHash));
+		windowKmers.push_back(make_pair(i+k, kmerHash));
 
 		//Remove pairs of k-mers which are no longer inside the window
 		while(!windowKmers.empty() && windowKmers.front().first < windowBorder)
@@ -224,6 +116,122 @@ const Sketch buildMiniSketch(const string& seq, const uint32_t& k, const uint32_
 	sk.shrink_to_fit();
 
 	return sk;
+}
+
+struct kmer_hits_t {
+	pos_t P_l;
+	kmer_num_t kmer_num;
+	vector<abs_ord_t> kmers_in_T;
+
+	kmer_hits_t(pos_t P_l, kmer_num_t kmer_num, const vector<abs_ord_t> &kmers_in_T) :
+		P_l(P_l), kmer_num(kmer_num), kmers_in_T(kmers_in_T) {}
+};
+
+struct SketchIndex {
+	int k;
+	int w;
+	//double s;
+	pos_t T_sz;
+	string name;
+	unordered_map<hash_t, vector<abs_ord_t>> h2pos;
+
+	void populate_h2pos(const Sketch& sketch) {
+		//print_sketches(name, sketch);
+		for (kmer_num_t tpos = 0; tpos < (int)sketch.size(); ++tpos) {
+			const abs_hash_t& abs_hash = sketch[tpos];
+			h2pos[abs_hash.second].push_back(abs_ord_t(abs_hash.first, tpos));
+		}
+	}
+
+	SketchIndex(const Sketch& sketch, pos_t T_sz) : T_sz(T_sz) {
+		populate_h2pos(sketch);
+	}
+
+	SketchIndex(string tFile, int k, int w, const unordered_map<hash_t, char>& bLstmers)
+	: k(k), w(w) {
+		string ref;
+		cerr << "Reading index " << tFile << "..." << endl;
+		if (readFASTA(tFile, &ref)) {
+			cerr << "ERROR: Reference file could not be read" << endl;
+		}
+		T_sz = (pos_t)ref.size();
+		//cout << ref << endl;
+
+		ifstream fStr(tFile);
+		string line;
+		getline(fStr, line);
+		name = line.substr(1);
+
+		Sketch sketch = buildMiniSketch(ref, k, w, bLstmers);
+		populate_h2pos(sketch);
+	}
+};
+
+//This function reads in batches of FASTA sequence entries from file and transforms them into minimap sketches. Returns false if end
+// of file was reached.
+bool lMiniPttnSks(ifstream& fStr, const int& k, const int& w, const unordered_map<hash_t, char>& blmers, 
+	vector<std::tuple<string, pos_t, Sketch>> *pSks) {
+	bool headerRead, idRead = false, lnBrkDiscvd = false;
+	char c;
+	string seq, seqID;
+
+	//Check if the file is open
+	if(!fStr.is_open()) return false;
+
+	//If this function is called iteratively, the '>' of the next entry has already been read
+	headerRead = fStr.gcount() != 0;
+
+	//Read in file character by character
+	while(fStr.get(c)) {
+		//An entry's sequence is complete if we find a second header (which can only start after at least one line break) in the 
+		//file
+		if(c == '>' && headerRead && lnBrkDiscvd) {
+			//Add sequence's sketch, length and id to result vector
+			auto sketch = buildMiniSketch(seq, k, w, blmers);
+			pSks->push_back(make_tuple(seqID, seq.length(), sketch));//TODO: This function still needs to be tested!
+            //cout << "pattern: " << seq << endl;
+			//Clear sequence id
+			seqID.clear();
+			//Clear sequence
+			seq.clear();
+
+			//Check if enough sequences have been read
+			if(pSks->size() == PATTERN_BATCH_SIZE) return true;
+
+			//Reset id-read flag
+			idRead = false;
+			//Reset line-break-discovered flag
+			lnBrkDiscvd = false;
+			continue;
+		}
+
+		//Note if we have completely read the sequence id
+		idRead = idRead || (headerRead && c == ' ' && !lnBrkDiscvd);
+		//Note if we have found the first line break after a new header started
+		lnBrkDiscvd = lnBrkDiscvd || c == '\n';
+
+		//Update sequence id if we are still reading it
+		if(headerRead && !lnBrkDiscvd && !idRead) {
+			seqID += c;
+			continue;
+		}
+
+		//Note if we have found the beginning of a header
+		headerRead = headerRead || (c == '>');
+
+		//There is no sequence to load in the header line
+		if(headerRead && !lnBrkDiscvd) continue;
+
+		//We are only interested in unambigous, unmasked nucleotides
+		if(c == 'A' || c == 'C' || c == 'G' || c == 'T') seq += c;
+	}
+
+	//Add last entry's sketch and sequence id to result vector if it is not empty
+	if(!seq.empty()) {
+        pSks->push_back(make_tuple(seqID, seq.length(), buildMiniSketch(seq, k, w, blmers)));
+    }
+
+	return false;
 }
 
 #endif
