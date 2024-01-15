@@ -29,12 +29,7 @@ using std::unordered_map;
 //#define NORM_FLAG_DEFAULT false
 #define PATTERN_BATCH_SIZE 250000
 #define STRING_BUFFER_SIZE_DEFAULT 50
-#define HASH_RATIO 0.1
 
-//The k-mer size
-#define K 9
-//The window size
-#define W 10
 //The hash value threshold
 #define MAX_HASH 26214
 //The FracMinHash ratio
@@ -120,11 +115,11 @@ struct params_t {
 		normalize = false; 		//Flag to save that scores are to be normalized
 		onlybest = false;
 		overlaps = false;          // 
-		k = K; 						//The k-mer length
-		w = W; 							//The window size
+		k = 15; 						//The k-mer length
+		w = 10; 						//The window size
 		elastic = elastic_t::off;
 		alignment_edges = alignment_edges_t::fine;
-		hFrac = HASH_RATIO;
+		hFrac = 0.1;
 		max_seeds = 10000;
 		max_matches = 1000000;
 		tThres = 0.9; 							//The t-homology threshold
@@ -170,15 +165,15 @@ inline void dsHlp() {
 	cerr << "   -p   --pattern  Pattern sequences file (FASTA format)" << endl;
 	cerr << "   -s   --text     Text sequence file (FASTA format)" << endl << endl;
 	cerr << "Optional parameters with required argument:" << endl;
-	cerr << "   -k   --ksize             K-mer length to be used for sketches (default " << K << ")" << endl;
-	cerr << "   -w   --windowsize        Window size for minimizer sketching approach (default " << W << ")" << endl;
+	cerr << "   -k   --ksize             K-mer length to be used for sketches" << endl;
+	cerr << "   -w   --windowsize        Window size for minimizer sketching approach" << endl;
 	cerr << "   -e   --elastic           Elastic pairs of kmers {off, consecutive, random} [off]" << endl;
 	cerr << "   -a   --alignment_edges   Alignment interval {sketch_edges, extend_equally, fine} [fine]" << endl;
 	//cerr << "   -c   --hashratio         FracMin hash ratio to be used for sketches (default " << HASH_RATIO << ")" << endl;
 	cerr << "   -b   --blacklist         File containing hashes to ignore for sketch calculation" << endl;
 	cerr << "   -S   --max_seeds         Max seeds in a sketch" << endl;
 	cerr << "   -M   --max_matches       Max seed matches in a sketch" << endl;
-	cerr << "   -t   --hom_thres         Homology threshold (default " << 0.9 << ")" << endl;
+	cerr << "   -t   --hom_thres         Homology threshold" << endl;
 	cerr << "   -d   --decent            Decent required for dynamic threshold selection" << endl;
 	cerr << "   -i   --intercept         Intercept required for dynamic threshold selection" << endl;
 	cerr << "   -z   --params     		 Output file with parameters (tsv)" << endl << endl;
@@ -354,7 +349,7 @@ int readFASTA(const string& filePath, string *seq) {
 
 	//Read in file character by character
 	while(fStr.get(c)) {
-		c = to_upper(c);
+		//c = to_upper(c);
 		//We are done if we find a second header (which can only start after at least one line break) in the file
 		if(c == '>' && headerRead && lnBrkDiscvd) break;
 
@@ -374,7 +369,9 @@ int readFASTA(const string& filePath, string *seq) {
 		if(headerRead && !lnBrkDiscvd) continue;
 
 		//We are only interested in unambigous, unmasked nucleotides
-		if(c == 'A' || c == 'C' || c == 'G' || c == 'T') *seq += c;
+		//if(c == 'A' || c == 'C' || c == 'G' || c == 'T') *seq += c;
+		assert();
+		*seq += c;
 	}
 
 	//Close file

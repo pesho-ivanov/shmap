@@ -186,30 +186,9 @@ template<typename TT> auto prev(const typename TT::iterator &it) {
     auto pr = it; return --pr;
 }
 
-//template<typename TT> auto next(const typename TT::iterator &it) {
-//    auto pr = it; return ++pr;
+//inline char to_upper(char c) {
+//	return (c >= 'a' && c <= 'z') ? c - 'a' + 'A' : c;
 //}
-
-//This function returns a numerical value for each nucleotide base
-inline hash_t getBaseNb(const char& c) {
-	switch(c) {
-		case 'A':
-			return 0;
-		case 'C':
-			return 1;
-		case 'G':
-			return 2;
-		case 'T':
-			return 3;
-		default:
-			std::cerr << "WARNING: Unsupported character in input sequence detected!" << std::endl;
-			return 0;
-	}
-}
-
-inline char to_upper(char c) {
-	return (c >= 'a' && c <= 'z') ? c - 'a' + 'A' : c;
-}
 
 //This function calculates the reverse complement of a DNA sequence
 string revComp(const string &seq) {
@@ -241,26 +220,46 @@ string revComp(const string &seq) {
 	return revSeq;
 }
 
+//template<typename TT> auto next(const typename TT::iterator &it) {
+//    auto pr = it; return ++pr;
+//}
+
+//This function returns a numerical value for each nucleotide base
+//inline hash_t getBaseNb(const char& c) {
+//	switch(c) {
+//		case 'A':
+//			return 0;
+//		case 'C':
+//			return 1;
+//		case 'G':
+//			return 2;
+//		case 'T':
+//			return 3;
+//		default:
+//			std::cerr << "WARNING: Unsupported character in input sequence detected!" << std::endl;
+//			return 0;
+//	}
+//}
 
 //This function calculates a hash for the given numerical representation of a k-mer and a mask of the form (4**k)-1 where k is the k-mer length;
 //it originates from the minimap2 source code (the function hash64 in sketch.c)
-static inline uint64_t getHash(uint64_t kmer, uint64_t mask) {
-	kmer = (~kmer + (kmer << 21)) & mask; // kmer = (kmer << 21) - kmer - 1;
-	kmer = kmer ^ kmer >> 24;
-	kmer = ((kmer + (kmer << 3)) + (kmer << 8)) & mask; // kmer * 265
-	kmer = kmer ^ kmer >> 14;
-	kmer = ((kmer + (kmer << 2)) + (kmer << 4)) & mask; // kmer * 21
-	kmer = kmer ^ kmer >> 28;
-	kmer = (kmer + (kmer << 31)) & mask;
-	return kmer;
-}
+//static inline uint64_t getHash(uint64_t kmer, uint64_t mask) {
+//	kmer = (~kmer + (kmer << 21)) & mask; // kmer = (kmer << 21) - kmer - 1;
+//	kmer = kmer ^ kmer >> 24;
+//	kmer = ((kmer + (kmer << 3)) + (kmer << 8)) & mask; // kmer * 265
+//	kmer = kmer ^ kmer >> 14;
+//	kmer = ((kmer + (kmer << 2)) + (kmer << 4)) & mask; // kmer * 21
+//	kmer = kmer ^ kmer >> 28;
+//	kmer = (kmer + (kmer << 31)) & mask;
+//	return kmer;
+//}
 
 //This function calculates the numerical representation of a k-mer
-uint64_t calcKmerNb(const string& kmer) {
-	uint64_t kmerNb = 0;
-	for(string::const_iterator c = kmer.begin(); c != kmer.end(); ++c)
-		kmerNb = (kmerNb << 2) + getBaseNb(*c);
-	return kmerNb;
-}
+//uint64_t calcKmerNb(const string& kmer) {
+//	uint64_t kmerNb = 0;
+//	for(string::const_iterator c = kmer.begin(); c != kmer.end(); ++c)
+//		kmerNb = (kmerNb << 2) + getBaseNb(*c);
+//	return kmerNb;
+//}
 
 #endif

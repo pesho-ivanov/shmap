@@ -9,6 +9,8 @@ int main(int argc, char **argv) {
 	C.inc("matches_limit_reached", 0);
 	C.inc("unmapped_reads", 0);
 
+	initialize_LUT();
+
 	params_t params;
 	if(!prsArgs(argc, argv, &params)) {
 		dsHlp();
@@ -21,7 +23,7 @@ int main(int argc, char **argv) {
 	}
 
 	T.start("indexing");
-	SketchIndex tidx(params.tFile, params.k, params.w, bLstmers);
+	SketchIndex tidx(params.tFile, params, bLstmers);
 	T.stop("indexing");
 	C.inc("T_sz", tidx.T_sz);
 

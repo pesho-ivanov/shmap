@@ -6,7 +6,6 @@
 #include <deque>
 #include <iomanip>
 #include <set>
-//#include <iostream>
 
 #include "io.h"
 #include "sketch.h"
@@ -280,7 +279,7 @@ class SweepMap {
 		while(true) {
 			cerr << "Sketching a batch of reads from " << params.pFile << "..." << endl;
 			T->start("sketching");
-			if (!lMiniPttnSks(reads_stream, params.k, tidx.w, bLstmers, &pSks) && pSks.empty()) {
+			if (!SketchReads(reads_stream, params, bLstmers, &pSks) && pSks.empty()) {
 				T->stop("sketching");
 				break;
 			}
