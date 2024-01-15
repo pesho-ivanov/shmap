@@ -1,8 +1,9 @@
 #ifndef IO_HPP
 #define IO_HPP
 
-#include <getopt.h>
 #include <fstream>
+#include <getopt.h>
+#include <iomanip>
 #include <map>
 #include <string>
 #include <tuple>

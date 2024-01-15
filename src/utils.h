@@ -1,11 +1,12 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
+#include <cassert>
 #include <chrono>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <unordered_map>
-#include <memory>
 
 using std::string;
 
