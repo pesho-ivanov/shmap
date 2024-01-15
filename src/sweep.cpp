@@ -8,10 +8,6 @@
 #include "sketch.h"
 #include "io.h"
 
-int total_reads(0), total_read_len(0), unmapped_reads(0);
-double total_J(0.0);
-int total_matches(0), total_mappings(0), total_sketched_kmers(0);
-
 // Return only reasonable matches (i.e. those that are not J-dominated by
 // another overlapping match). Runs in O(|all|).
 vector<Mapping> filter_reasonable(const params_t &params, const vector<Mapping> &all, const pos_t P_len) {
@@ -85,9 +81,10 @@ void normalize_mappings(const params_t &params, vector<Mapping> *mappings, const
 }
 
 class SweepMap {
-	const SketchIndex *tidx;
+	const SketchIndex &tidx;
 	const params_t &params;
 	Timers *T;
+	Counters *C;
 
 	// return if the kmer has not been seen before
 	inline bool add2hist(
@@ -158,8 +155,8 @@ class SweepMap {
 
 			// Add pattern kmers from the pattern to p_hist 
 			if (add2hist(kmer_hash, p_hist, &hash2num, &kmer_num)) {
-				auto it = tidx->h2pos.find(kmer_hash);
-				if (it != tidx->h2pos.end()) {
+				auto it = tidx.h2pos.find(kmer_hash);
+				if (it != tidx.h2pos.end()) {
 					match_lists.push_back(kmer_hits_t(P_l, kmer_num, it->second));
 				}
 			}
@@ -172,7 +169,7 @@ class SweepMap {
 		int total_hits = 0;
 		for (int seed=0; seed<(int)match_lists.size(); seed++) {
 			if (seed > (int)params.max_seeds) {
-				++seeds_limit_reached;
+				C->inc("seeds_limit_reached");
 				break;
 			}
 			kmer_hits_t &res = match_lists[seed];
@@ -186,7 +183,7 @@ class SweepMap {
 				L->push_back(m);
 			}
 			if ((total_hits += (int)res.kmers_in_T.size()) > (int)params.max_matches) {
-				++matches_limit_reached;
+				C->inc("matches_limit_reached");
 				break;
 			}
 		}
@@ -196,7 +193,6 @@ class SweepMap {
 		sort(L->begin(), L->end(), [](const Match &a, const Match &b) { return a.T_r < b.T_r; });
 		T->stop("sorting");
 	}
-
 
 	// vector<int> diff_hist;  // diff_hist[kmer_hash] = #occurences in `p` - #occurences in `s`
 	// vector<Match> L;   	   // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
@@ -256,6 +252,15 @@ class SweepMap {
 		return mappings;
 	}
 
+  public:
+	SweepMap(const SketchIndex &tidx, const params_t &params, Timers *T, Counters *C)
+		: tidx(tidx), params(params), T(T), C(C) {
+			if (params.tThres < 0.0 || params.tThres > 1.0) {
+				cerr << "tThres = " << params.tThres << " outside of [0,1]." << endl;
+				exit(1);
+			}
+		}
+
 	void map(const string &pFile, const std::unordered_map<hash_t, char> &bLstmers) {
 		ifstream reads_stream;
 		reads_stream.open(pFile);
@@ -272,7 +277,7 @@ class SweepMap {
 		while(true) {
 			cerr << "Sketching a batch of reads from " << params.pFile << "..." << endl;
 			T->start("sketching");
-			if (!lMiniPttnSks(reads_stream, params.k, tidx->w, bLstmers, &pSks) && pSks.empty()) {
+			if (!lMiniPttnSks(reads_stream, params.k, tidx.w, bLstmers, &pSks) && pSks.empty()) {
 				T->stop("sketching");
 				break;
 			}
@@ -280,9 +285,8 @@ class SweepMap {
 
 			cerr << "Mapping a batch of reads..." << endl;
 			// Iterate over pattern sketches
-			for (const auto &[seqID, P_sz, sks] : pSks) {
-				total_read_len += P_sz;
-				const Sketch p;
+			for (const auto &[seqID, P_sz, p] : pSks) {
+				C->inc("read_len", P_sz);
 				vector<int> p_hist;
 				vector<Match> L;
 
@@ -292,26 +296,26 @@ class SweepMap {
 				//print_matches(L);
 
 				T->start("sweep");
-				//print_sketches(seqID, sks);
+				//print_sketches(seqID, p);
 				auto mappings = sweep(p_hist, L, (pos_t)p.size(), P_sz);
 				T->stop("sweep");
 
 				T->start("postproc");
 				auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(params, mappings, P_sz);
-				normalize_mappings(params, &reasonable_mappings, (pos_t)sks.size(), seqID, tidx->T_sz);
+				normalize_mappings(params, &reasonable_mappings, (pos_t)p.size(), seqID, tidx.T_sz);
 
 				for (auto &m: reasonable_mappings) {
-					m.map_time = T->get_secs("sweep") / (double)mappings.size();
-					total_J += m.J;
-					total_mappings ++;
-					total_sketched_kmers += m.p_sz;
-					total_matches += m.matches;
+					m.map_time = T->secs("sweep") / (double)mappings.size();
+					C->inc("J", int(10000.0*m.J));
+					C->inc("mappings");
+					C->inc("sketched_kmers", m.p_sz);
+					C->inc("matches", m.matches);
 				}
-				++total_reads;
+				C->inc("reads");
 				if (!reasonable_mappings.empty())
-					mappings2paf(params, reasonable_mappings, P_sz, (pos_t)sks.size(), seqID, tidx->T_sz, tidx->name, "");
+					mappings2paf(params, reasonable_mappings, P_sz, (pos_t)p.size(), seqID, tidx.T_sz, tidx.name, "");
 				else
-					++unmapped_reads;
+					C->inc("unmapped_reads");
 
 				T->stop("postproc");
 			}
@@ -319,24 +323,48 @@ class SweepMap {
 		}
 		T->stop("mapping");
 	}
-
-  public:
-	// stats
-	int seeds_limit_reached = 0;
-	int matches_limit_reached = 0;
-
-	SweepMap(const SketchIndex *tidx, const params_t &params, Timers *T=nullptr)
-		: tidx(tidx), params(params), T(T) {
-			if (params.tThres < 0.0 || params.tThres > 1.0) {
-				cerr << "tThres = " << params.tThres << " outside of [0,1]." << endl;
-				exit(1);
-			}
-		}
 };
 
+void print_report(const params_t &params, const Counters &C, const Timers &T) {
+	cerr << fixed << setprecision(1);
+	// TODO: report average Jaccard similarity
+	cerr << "Params:" << endl;
+	cerr << " | reference:             " << params.tFile << " (" << C.count("T_sz") << " nb)" << endl;
+	cerr << " | queries:               " << params.pFile << endl;
+	cerr << " | k:                     " << params.k << endl;
+	cerr << " | w:                     " << params.w << endl;
+	cerr << " | blacklist file:        " << (params.bLstFl.size() ? params.bLstFl : "-") << endl;
+	//cerr << " | hFrac:                 " << params.hFrac << endl;
+	cerr << " | max_seeds (S):         " << params.max_seeds << endl;
+	cerr << " | max_matches (M):       " << params.max_matches << endl;
+	cerr << " | onlybest:              " << params.onlybest << endl;
+	cerr << " | tThres:                " << params.tThres << endl;
+	cerr << "Stats:" << endl;
+	cerr << " | Total reads:           " << C.count("reads") << " (~" << 1.0*C.count("read_len") / C.count("reads") << " nb per read)" << endl;
+	cerr << " | Sketched read kmers:   " << C.count("sketched_kmers") << " (" << C.frac("sketched_kmers", "reads") << " per read)" << endl;
+	cerr << " | Kmer matches:          " << C.count("matches") << " (" << C.frac("matches", "reads") << " per read)" << endl;
+	cerr << " | Seed limit reached:    " << C.count("seeds_limit_reached") << " (" << C.perc("seeds_limit_reached", "reads") << "%)" << endl;
+	cerr << " | Matches limit reached: " << C.count("matches_limit_reached") << " (" << C.perc("matches_limit_reached", "reads") << "%)" << endl;
+	cerr << " | Unmapped reads:        " << C.count("unmapped_reads") << " (" << C.perc("unmapped_reads", "reads") << "%)" << endl;
+	cerr << " | Average J:             " << C.frac("J", "mappings") / 10000.0 << endl;
+	cerr << "Total time [sec]:         " << setw(4) << right << T.secs("total")     << " (" << setw(6) << right << T.secs("total") / C.count("reads") << " per read)" << endl;
+	cerr << " | Indexing:              " << setw(4) << right << T.secs("indexing")  << " (" << setw(4) << right << T.perc("indexing", "total") << "\% of total)" << endl;
+	cerr << " | Mapping:               " << setw(4) << right << T.secs("mapping")   << " (" << setw(4) << right << T.perc("mapping", "total") << "\% of total)" << endl;
+	cerr << " |  | sketching reads:    " << setw(4) << right << T.secs("sketching") << " (" << setw(4) << right << T.perc("sketching", "mapping") << "\% of mapping)" << endl;
+	cerr << " |  | match kmers:        " << setw(4) << right << T.secs("matching")  << " (" << setw(4) << right << T.perc("matching", "mapping") << "\%)" << endl;
+	cerr << " |  | sort matches:       " << setw(4) << right << T.secs("sorting")   << " (" << setw(4) << right << T.perc("sorting", "mapping") << "\%)" << endl;
+	cerr << " |  | sweep:              " << setw(4) << right << T.secs("sweep")     << " (" << setw(4) << right << T.perc("sweep", "mapping") << "\%)" << endl;
+	cerr << " |  | post proc:          " << setw(4) << right << T.secs("postproc")  << " (" << setw(4) << right << T.perc("postproc", "mapping") << "\%)" << endl;
+}
+
 int main(int argc, char **argv) {
+	Counters C;
 	Timers T;
+
 	T.start("total");
+	C.inc("seeds_limit_reached", 0);
+	C.inc("matches_limit_reached", 0);
+	C.inc("unmapped_reads", 0);
 
 	params_t params;
 	if(!prsArgs(argc, argv, &params)) {
@@ -352,6 +380,7 @@ int main(int argc, char **argv) {
 	T.start("indexing");
 	SketchIndex tidx(params.tFile, params.k, params.w, bLstmers);
 	T.stop("indexing");
+	C.inc("T_sz", tidx.T_sz);
 
 	if (!params.paramsFile.empty()) {
 		cerr << "Writing parameters to " << params.paramsFile << "..." << endl;
@@ -361,41 +390,11 @@ int main(int argc, char **argv) {
 		params.print(cerr, true);
 	}
 
-	SweepMap mapper(&tidx, params, &T);
+	SweepMap mapper(tidx, params, &T, &C);
 	mapper.map(params.pFile, bLstmers);
+
 	T.stop("total");
-
-//	print_report(params, T);
-
-	cerr << fixed << setprecision(1);
-	// TODO: report average Jaccard similarity
-	cerr << "Params:" << endl;
-	cerr << " | reference:        " << params.tFile << " (" << tidx.T_sz << " nb)" << endl;
-	cerr << " | queries:          " << params.pFile << endl;
-	cerr << " | k:                " << params.k << endl;
-	cerr << " | w:                " << params.w << endl;
-	cerr << " | blacklist file:   " << (params.bLstFl.size() ? params.bLstFl : "-") << endl;
-	//cerr << " | hFrac:            " << params.hFrac << endl;
-	cerr << " | max_seeds (S):    " << params.max_seeds << endl;
-	cerr << " | max_matches (M):  " << params.max_matches << endl;
-	cerr << " | onlybest:         " << params.onlybest << endl;
-	cerr << " | tThres:           " << params.tThres << endl;
-	cerr << "Stats:" << endl;
-	cerr << " | Total reads:           " << total_reads << " (~" << 1.0*total_read_len / total_reads << " nb per read)" << endl;
-	cerr << " | Sketched read kmers:   " << total_sketched_kmers << " (" << 1.0*total_sketched_kmers / total_reads << " per read)" << endl;
-	cerr << " | Kmer matches:          " << total_matches << " (" << 1.0*total_matches / total_reads << " per read)" << endl;
-	cerr << " | Seed limit reached:    " << mapper.seeds_limit_reached << " (" << 100.0 * mapper.seeds_limit_reached / total_reads << "%)" << endl;
-	cerr << " | Matches limit reached: " << mapper.matches_limit_reached << " (" << 100.0 * mapper.matches_limit_reached / total_reads << "%)" << endl;
-	cerr << " | Unmapped reads:        " << unmapped_reads << " (" << 100.0 * unmapped_reads / total_reads << "%)" << endl;
-	cerr << " | Average J:             " << total_J / total_mappings << endl;
-	cerr << "Total time [sec]:     " << setw(4) << right << T.get_secs("total")     << " (" << setw(6) << right << T.get_secs("total") / total_reads << " per read)" << endl;
-	cerr << " | Indexing:          " << setw(4) << right << T.get_secs("indexing")  << " (" << setw(4) << right << T.get_perc("indexing", "total") << "\% of total)" << endl;
-	cerr << " | Mapping:           " << setw(4) << right << T.get_secs("mapping")   << " (" << setw(4) << right << T.get_perc("mapping", "total") << "\% of total)" << endl;
-	cerr << " |  | read sketching: " << setw(4) << right << T.get_secs("sketching") << " (" << setw(4) << right << T.get_perc("sketching", "mapping") << "\% of mapping)" << endl;
-	cerr << " |  | match kmers:    " << setw(4) << right << T.get_secs("matching")  << " (" << setw(4) << right << T.get_perc("matching", "mapping") << "\%)" << endl;
-	cerr << " |  | sort matches:   " << setw(4) << right << T.get_secs("sorting")   << " (" << setw(4) << right << T.get_perc("sorting", "mapping") << "\%)" << endl;
-	cerr << " |  | sweep:          " << setw(4) << right << T.get_secs("sweep")     << " (" << setw(4) << right << T.get_perc("sweep", "mapping") << "\%)" << endl;
-	cerr << " |  | post proc:      " << setw(4) << right << T.get_secs("postproc")  << " (" << setw(4) << right << T.get_perc("postproc", "mapping") << "\%)" << endl;
+	print_report(params, C, T);
 
 	return 0;
 }

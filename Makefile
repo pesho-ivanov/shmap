@@ -7,7 +7,7 @@ DEPFLAGS = -MMD -MP
 
 TIME_CMD = /usr/bin/time -f "%U\t%M"
 
-SRCS = src/sweep.cpp src/io.h src/sketch.h
+SRCS = src/sweep.cpp src/io.h src/sketch.h src/utils.h
 SWEEP_BIN = ./sweep
 MINIMAP_BIN = minimap2
 MAPQUIK_BIN = mapquik
