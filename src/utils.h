@@ -53,7 +53,7 @@ public:
         }
     }
 
-    double get_secs() const {
+    double secs() const {
 		assert(!running_);
 		return accumulated_time_;
     }
@@ -79,7 +79,7 @@ public:
         auto it = timers_.find(name);
 		assert(it != timers_.end());
         if (it != timers_.end()) {
-            return it->second.get_secs();
+            return it->second.secs();
         }
         return 0.0;
     }
@@ -91,7 +91,7 @@ public:
 		assert(it_total != timers_.end());
         if (it != timers_.end()) {
 			if (it_total != timers_.end()) {
-				return it->second.get_secs() / it_total->second.get_secs() * 100.0;
+				return it->second.secs() / it_total->second.secs() * 100.0;
 			}
         }
         return 0.0;

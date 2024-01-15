@@ -356,6 +356,8 @@ class SweepMap {
 		cerr << " |  | sort matches:       " << setw(5) << right << T.secs("sorting")   << " (" << setw(4) << right << T.perc("sorting", "mapping") << "\%)" << endl;
 		cerr << " |  | sweep:              " << setw(5) << right << T.secs("sweep")     << " (" << setw(4) << right << T.perc("sweep", "mapping") << "\%)" << endl;
 		cerr << " |  | post proc:          " << setw(5) << right << T.secs("postproc")  << " (" << setw(4) << right << T.perc("postproc", "mapping") << "\%)" << endl;
+
+		cerr << "Total sketching time:     " << setw(5) << right << FMH_time.secs() << " (" << setw(4) << right << FMH_time.secs() / T.secs("total") << "\%)" << endl; // << " (" << setw(4) << right << T.perc("postproc", "mapping") << "\%)" << endl;
 	}
 };
 

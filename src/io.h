@@ -370,7 +370,6 @@ int readFASTA(const string& filePath, string *seq) {
 
 		//We are only interested in unambigous, unmasked nucleotides
 		//if(c == 'A' || c == 'C' || c == 'G' || c == 'T') *seq += c;
-		assert();
 		*seq += c;
 	}
 
