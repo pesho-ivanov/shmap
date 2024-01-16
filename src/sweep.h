@@ -263,7 +263,7 @@ class SweepMap {
 			}
 		}
 
-	void map(const string &pFile, const std::unordered_map<hash_t, char> &bLstmers) {
+	void map(const string &pFile, const blmers_t &bLstmers) {
 		//ifstream reads_stream;
 		//reads_stream.open(pFile);
 		//if (!reads_stream.is_open()) {

@@ -54,12 +54,12 @@ void initialize_LUT() {
 	LUT_rc['t'] = LUT_rc['T'] = LUT_fw['A'];
 }
 
-//unordered_map<hash_t, char> blmers;
+//blmers_t blmers;
 //string s = "ACGTTAG";
 //Sketch sk1 = buildFMHSketch(s, 5, 1.0, blmers);
 //Sketch sk2 = buildFMHSketch(revComp(s), 5, 1.0, blmers);
 //return 0;
-const Sketch buildFMHSketch(const string& s, int k, double hFrac, const unordered_map<hash_t, char>& blmers) {
+const Sketch buildFMHSketch(const string& s, int k, double hFrac, const blmers_t& blmers) {
 	FMH_time.start();
 
 	Sketch sk;
@@ -126,13 +126,13 @@ struct SketchIndex {
 		populate_h2pos(sketch);
 	}
 
-	SketchIndex(const string &name, const string &ref, const params_t &params, const unordered_map<hash_t, char>& bLstmers)
+	SketchIndex(const string &name, const string &ref, const params_t &params, const blmers_t &bLstmers)
 		: T_sz((pos_t)ref.size()), name(name) {
 		Sketch sketch = buildFMHSketch(ref, params.k, params.hFrac, bLstmers);
 		populate_h2pos(sketch);
 	}
 
-	//SketchIndex(const string &tFile, const params_t &params, const unordered_map<hash_t, char>& bLstmers) {
+	//SketchIndex(const string &tFile, const params_t &params, const blmers_t &bLstmers) {
 	//	read_fasta_klib(tFile, [this, &params, &bLstmers](kseq_t *seq) {
 	//		assert(name.empty());  // TODO: support multi-sequence files
 	//		name = seq->name.s;

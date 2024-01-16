@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	unordered_map<hash_t, char> bLstmers;
+	blmers_t bLstmers;
 	if (!params.bLstFl.empty()) {
 		bLstmers = readBlstKmers(params.bLstFl);
 	}

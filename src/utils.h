@@ -13,6 +13,7 @@ using std::string;
 using hash_t     = uint64_t;
 using pos_t      = int32_t;
 using kmer_num_t = int32_t;
+using blmers_t   = unordered_map<hash_t, char>;
 
 const double EPS = 1e-7;
 

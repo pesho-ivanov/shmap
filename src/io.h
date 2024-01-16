@@ -349,7 +349,7 @@ void read_fasta_klib(const std::string& filename, std::function<void(kseq_t*)> c
 }
 
 //This function reads 64-bit numbers from file and returns them as a hash table
-const unordered_map<hash_t, char> readBlstKmers(const string& fname) {
+const blmers_t readBlstKmers(const string& fname) {
 	char nb[STRING_BUFFER_SIZE_DEFAULT];
 	char* end;
 	ifstream iFile(fname);
