@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 CC = g++
 CXX_STANDARD = -std=c++2a
-CFLAGS = -O3 -march=native -lm -lpthread -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -Wconversion
+CFLAGS = -O3 -g -march=native -lm -lpthread -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -Wconversion
 LIBS = minimap2/libminimap2.a -lz
 DEPFLAGS = -MMD -MP
 

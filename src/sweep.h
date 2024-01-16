@@ -16,12 +16,8 @@ class SweepMap {
 	Timers *T;
 	Counters *C;
 
-	// return if the kmer has not been seen before
-	inline bool add2hist(
-			const hash_t kmer_hash,
-			vector<int> *hist,
-			unordered_map<hash_t, kmer_num_t> *hash2num,
-			kmer_num_t *kmer_num) {
+	// return if the kmer has not been seen before and construct hash2num[kmer_hash] = kmer_num, which is not more than |p| 
+	inline bool add2hist(const hash_t kmer_hash, vector<int> *hist, unordered_map<hash_t, kmer_num_t> *hash2num, kmer_num_t *kmer_num) {
 		auto num_it = hash2num->find(kmer_hash);
 		if (num_it != hash2num->end()) {
 			*kmer_num = num_it->second;
@@ -40,7 +36,8 @@ class SweepMap {
 	// Returns the Jaccard score of the window [l,r)
 	inline double J(size_t p_sz, const vector<Match>::const_iterator l, const vector<Match>::const_iterator r, int xmin) {
 		int s_sz = prev(r)->t_pos - l->t_pos + 1;
-		if (s_sz < 0) return 0;
+		assert(s_sz >= 0);
+		//if (s_sz < 0) return 0;
 		assert(p_sz + s_sz - xmin > 0);
 		double scj = double(xmin) / double(p_sz + s_sz - xmin);
 		if (!(0.0 <= scj && scj <= 1.0))
@@ -86,14 +83,15 @@ class SweepMap {
 			// Add pattern kmers from the pattern to p_hist 
 			if (add2hist(kmer_hash, p_hist, &hash2num, &kmer_num)) {
 				auto it = tidx.h2pos.find(kmer_hash);
-				if (it != tidx.h2pos.end()) {
-					match_lists.push_back(kmer_hits_t(P_l, kmer_num, it->second));
-				}
+				if (it != tidx.h2pos.end())
+					match_lists.emplace_back(P_l, kmer_num, &it->second);
 			}
 		}
 
 		// Sort the matching kmers by number of hits in the reference
-		sort(match_lists.begin(), match_lists.end(), [](const kmer_hits_t &a, const kmer_hits_t &b) { return a.kmers_in_T.size() < b.kmers_in_T.size(); });
+		sort(match_lists.begin(), match_lists.end(), [](const kmer_hits_t &a, const kmer_hits_t &b) {
+			return a.kmers_in_T->size() < b.kmers_in_T->size();
+		});
 
 		// Get MAX_SEEDS of kmers with the lowest number of hits.
 		int total_hits = 0;
@@ -103,7 +101,7 @@ class SweepMap {
 				break;
 			}
 			kmer_hits_t &res = match_lists[seed];
-			for (const auto &hit: res.kmers_in_T) {
+			for (const auto &hit: *(res.kmers_in_T)) {
 				Match m;
 				m.P_l      = res.P_l;
 				m.kmer_ord = res.kmer_num;
@@ -112,7 +110,7 @@ class SweepMap {
 				//m->strand  = 0;
 				L->push_back(m);
 			}
-			if ((total_hits += (int)res.kmers_in_T.size()) > (int)params.max_matches) {
+			if ((total_hits += (int)res.kmers_in_T->size()) > (int)params.max_matches) {
 				C->inc("matches_limit_reached");
 				break;
 			}
@@ -120,7 +118,9 @@ class SweepMap {
 
 		T->start("sorting");
 		// Sort L by ascending positions in reference so that we can next sweep through it.
-		sort(L->begin(), L->end(), [](const Match &a, const Match &b) { return a.T_r < b.T_r; });
+		sort(L->begin(), L->end(), [](const Match &a, const Match &b) {
+			return a.T_r < b.T_r;
+		});
 		T->stop("sorting");
 	}
 

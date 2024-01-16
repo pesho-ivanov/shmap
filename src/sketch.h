@@ -68,22 +68,22 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac, const unordere
 
 	for (r=0; r<k; r++) {
 		h_fw ^= rotl(LUT_fw[(int)s[r]], k-r-1);
-		h_rc ^= rotl(LUT_rc[(int)s[r]], r);
+		//h_rc ^= rotl(LUT_rc[(int)s[r]], r);
 	}
 
 	while(true) {
-		h = h_fw ^ h_rc;
+		//h = h_fw ^ h_rc;
 //		cerr << s << " " << r << " " << std::hex << std::setfill('0') << std::setw(16) << h
 //							<< " = " << std::hex << std::setfill('0') << std::setw(16) << h_fw
 //							<< " ^ " << std::hex << std::setfill('0') << std::setw(16) << h_rc << endl;
-		if (h < hThres)  // optimize to only look at specific bits
+		if (h_fw < hThres)  // optimize to only look at specific bits
 			//sk.emplace_back(r, h);
 			sk.emplace_back(r, h_fw);
 		
 		if (r >= (int)s.size()) break;
 
 		h_fw = rotl(h_fw, 1) ^ rotl(LUT_fw[(int)s[r-k]], k) ^ LUT_fw[(int)s[r]];
-		h_rc = rotr(h_rc, 1) ^ rotr(LUT_rc[(int)s[r-k]], 1) ^ rotl(LUT_rc[(int)s[r]], k-1);
+		//h_rc = rotr(h_rc, 1) ^ rotr(LUT_rc[(int)s[r-k]], 1) ^ rotl(LUT_rc[(int)s[r]], k-1);
 
 		++r;
 	}
@@ -95,9 +95,9 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac, const unordere
 struct kmer_hits_t {
 	pos_t P_l;
 	kmer_num_t kmer_num;
-	vector<abs_ord_t> kmers_in_T;
+	const vector<abs_ord_t> *kmers_in_T;
 
-	kmer_hits_t(pos_t P_l, kmer_num_t kmer_num, const vector<abs_ord_t> &kmers_in_T) :
+	kmer_hits_t(pos_t P_l, kmer_num_t kmer_num, const vector<abs_ord_t> *kmers_in_T) :
 		P_l(P_l), kmer_num(kmer_num), kmers_in_T(kmers_in_T) {}
 };
 
