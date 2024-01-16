@@ -57,8 +57,8 @@ ifeq ($(wildcard $(READS)),)
 	samtools faidx $(REF)
 	paftools.js pbsim2fq $(REF).fai "$(READS_PREFIX)"_*.maf >$(READS)_
 	rm -f "$(READS_PREFIX)"_*.maf "$(READS_PREFIX)"_*.ref "$(READS_PREFIX)"_*.fastq
-	mv $(READS)_ $(READS)
-#	awk '/^>/ {printit = /+$$/} printit' $(READS)_ >$(READS)
+#	mv $(READS)_ $(READS)
+	awk '/^>/ {printit = /+$$/} printit' $(READS)_ >$(READS)
 endif
 
 eval_abe: sweep gen_reads
