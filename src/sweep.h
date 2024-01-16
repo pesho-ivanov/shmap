@@ -278,8 +278,6 @@ class SweepMap {
 		// Load pattern sequences in batches
 		cerr << "Sketching and mapping a batch of reads from " << params.pFile << "..." << endl;
 		read_fasta_klib(pFile, [this, &bLstmers](kseq_t *seq) {
-			// For each read
-
 			T->start("sketching");
 			Sketch p = buildFMHSketch(seq->seq.s, params.k, params.hFrac, bLstmers);
 			T->stop("sketching");

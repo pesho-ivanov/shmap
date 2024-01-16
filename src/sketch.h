@@ -128,92 +128,84 @@ struct SketchIndex {
 	}
 
 	SketchIndex(const string &tFile, const params_t &params, const unordered_map<hash_t, char>& bLstmers) {
-		string ref;
-		cerr << "Reading index " << tFile << "..." << endl;
-		if (readFASTA(tFile, &ref)) {
-			cerr << "ERROR: Reference file could not be read" << endl;
-		}
-		T_sz = (pos_t)ref.size();
-
-		ifstream fStr(tFile);
-		string line;
-		getline(fStr, line);
-		name = line.substr(1);
-
-		//Sketch sketch = buildMiniSketch(ref, params.k, params.w, bLstmers);
-		Sketch sketch = buildFMHSketch(ref, params.k, params.hFrac, bLstmers);
-		populate_h2pos(sketch);
+		read_fasta_klib(tFile, [this, &params, &bLstmers](kseq_t *seq) {
+			assert(name.empty());  // TODO: support multi-sequence files
+			name = seq->name.s;
+			T_sz = seq->seq.l;
+			Sketch sketch = buildFMHSketch(seq->seq.s, params.k, params.hFrac, bLstmers);
+			populate_h2pos(sketch);
+		});
 	}
 };
 
 //This function reads in batches of FASTA sequence entries from file and transforms them into minimap sketches. Returns false if end
 // of file was reached.
-bool SketchReads(ifstream& fStr, const params_t &params, const unordered_map<hash_t, char>& blmers, 
-	vector<std::tuple<string, pos_t, Sketch>> *pSks) {
-	bool headerRead, idRead = false, lnBrkDiscvd = false;
-	char c;
-	string seq, seqID;
-
-	//Check if the file is open
-	if(!fStr.is_open()) return false;
-
-	//If this function is called iteratively, the '>' of the next entry has already been read
-	headerRead = fStr.gcount() != 0;
-
-	//Read in file character by character
-	while(fStr.get(c)) {
-		//An entry's sequence is complete if we find a second header (which can only start after at least one line break) in the 
-		//file
-		if(c == '>' && headerRead && lnBrkDiscvd) {
-			//Add sequence's sketch, length and id to result vector
-			//auto sketch = buildMiniSketch(seq, params.k, params.w, blmers);
-			auto sketch = buildFMHSketch(seq, params.k, params.hFrac, blmers);
-			pSks->push_back(make_tuple(seqID, seq.length(), sketch));//TODO: This function still needs to be tested!
-            //cout << "pattern: " << seq << endl;
-			//Clear sequence id
-			seqID.clear();
-			//Clear sequence
-			seq.clear();
-
-			//Check if enough sequences have been read
-			if(pSks->size() == PATTERN_BATCH_SIZE) return true;
-
-			//Reset id-read flag
-			idRead = false;
-			//Reset line-break-discovered flag
-			lnBrkDiscvd = false;
-			continue;
-		}
-
-		//Note if we have completely read the sequence id
-		idRead = idRead || (headerRead && c == ' ' && !lnBrkDiscvd);
-		//Note if we have found the first line break after a new header started
-		lnBrkDiscvd = lnBrkDiscvd || c == '\n';
-
-		//Update sequence id if we are still reading it
-		if(headerRead && !lnBrkDiscvd && !idRead) {
-			seqID += c;
-			continue;
-		}
-
-		//Note if we have found the beginning of a header
-		headerRead = headerRead || (c == '>');
-
-		//There is no sequence to load in the header line
-		if(headerRead && !lnBrkDiscvd) continue;
-
-		//We are only interested in unambigous, unmasked nucleotides
-		if(c == 'A' || c == 'C' || c == 'G' || c == 'T') seq += c;
-	}
-
-	//Add last entry's sketch and sequence id to result vector if it is not empty
-	if(!seq.empty()) {
-        //pSks->push_back(make_tuple(seqID, seq.length(), buildMiniSketch(seq, params.k, params.w, blmers)));
-        pSks->push_back(make_tuple(seqID, seq.length(), buildFMHSketch(seq, params.k, params.hFrac, blmers)));
-    }
-
-	return false;
-}
+//bool SketchReads(ifstream& fStr, const params_t &params, const unordered_map<hash_t, char>& blmers, 
+//	vector<std::tuple<string, pos_t, Sketch>> *pSks) {
+//	bool headerRead, idRead = false, lnBrkDiscvd = false;
+//	char c;
+//	string seq, seqID;
+//
+//	//Check if the file is open
+//	if(!fStr.is_open()) return false;
+//
+//	//If this function is called iteratively, the '>' of the next entry has already been read
+//	headerRead = fStr.gcount() != 0;
+//
+//	//Read in file character by character
+//	while(fStr.get(c)) {
+//		//An entry's sequence is complete if we find a second header (which can only start after at least one line break) in the 
+//		//file
+//		if(c == '>' && headerRead && lnBrkDiscvd) {
+//			//Add sequence's sketch, length and id to result vector
+//			//auto sketch = buildMiniSketch(seq, params.k, params.w, blmers);
+//			auto sketch = buildFMHSketch(seq, params.k, params.hFrac, blmers);
+//			pSks->push_back(make_tuple(seqID, seq.length(), sketch));//TODO: This function still needs to be tested!
+//            //cout << "pattern: " << seq << endl;
+//			//Clear sequence id
+//			seqID.clear();
+//			//Clear sequence
+//			seq.clear();
+//
+//			//Check if enough sequences have been read
+//			if(pSks->size() == PATTERN_BATCH_SIZE) return true;
+//
+//			//Reset id-read flag
+//			idRead = false;
+//			//Reset line-break-discovered flag
+//			lnBrkDiscvd = false;
+//			continue;
+//		}
+//
+//		//Note if we have completely read the sequence id
+//		idRead = idRead || (headerRead && c == ' ' && !lnBrkDiscvd);
+//		//Note if we have found the first line break after a new header started
+//		lnBrkDiscvd = lnBrkDiscvd || c == '\n';
+//
+//		//Update sequence id if we are still reading it
+//		if(headerRead && !lnBrkDiscvd && !idRead) {
+//			seqID += c;
+//			continue;
+//		}
+//
+//		//Note if we have found the beginning of a header
+//		headerRead = headerRead || (c == '>');
+//
+//		//There is no sequence to load in the header line
+//		if(headerRead && !lnBrkDiscvd) continue;
+//
+//		//We are only interested in unambigous, unmasked nucleotides
+//		if(c == 'A' || c == 'C' || c == 'G' || c == 'T') seq += c;
+//	}
+//
+//	//Add last entry's sketch and sequence id to result vector if it is not empty
+//	if(!seq.empty()) {
+//        //pSks->push_back(make_tuple(seqID, seq.length(), buildMiniSketch(seq, params.k, params.w, blmers)));
+//        pSks->push_back(make_tuple(seqID, seq.length(), buildFMHSketch(seq, params.k, params.hFrac, blmers)));
+//    }
+//
+//	return false;
+//}
 
 //This function builds a minimap2 sketch of a sequence by querying from a prebuilt minimap index; this function is influenced by the
 // code of "The minimizer Jaccard estimator is biased and inconsistent." from Belbasi et al. (function 
