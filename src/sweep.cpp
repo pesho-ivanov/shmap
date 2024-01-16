@@ -1,6 +1,14 @@
 #include "sweep.h"
 
 int main(int argc, char **argv) {
+	initialize_LUT();
+
+	//unordered_map<hash_t, char> blmers;
+	//string s = "ACGTTAG";
+	//Sketch sk1 = buildFMHSketch(s, 5, 1.0, blmers);
+	//Sketch sk2 = buildFMHSketch(revComp(s), 5, 1.0, blmers);
+	//return 0;
+
 	Counters C;
 	Timers T;
 
@@ -8,8 +16,6 @@ int main(int argc, char **argv) {
 	C.inc("seeds_limit_reached", 0);
 	C.inc("matches_limit_reached", 0);
 	C.inc("unmapped_reads", 0);
-
-	initialize_LUT();
 
 	params_t params;
 	if(!prsArgs(argc, argv, &params)) {
@@ -23,7 +29,23 @@ int main(int argc, char **argv) {
 	}
 
 	T.start("indexing");
-	SketchIndex tidx(params.tFile, params, bLstmers);
+	T.start("index_reading");
+	string ref;
+	ref.reserve(35000000000);
+	cerr << "Reading index " << params.tFile << "..." << endl;
+	if (readFASTA(params.tFile, &ref)) {
+		cerr << "ERROR: Reference file could not be read" << endl;
+	}
+	ifstream fStr(params.tFile);
+	string line;
+	getline(fStr, line);
+	string name = line.substr(1);
+	T.stop("index_reading");
+
+	T.start("index_sketching");
+	SketchIndex tidx(name, ref, params, bLstmers);
+	T.stop("index_sketching");
+	//SketchIndex tidx(params.tFile, params, bLstmers);
 	T.stop("indexing");
 	C.inc("T_sz", tidx.T_sz);
 

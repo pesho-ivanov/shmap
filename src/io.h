@@ -119,7 +119,7 @@ struct params_t {
 		w = 10; 						//The window size
 		elastic = elastic_t::off;
 		alignment_edges = alignment_edges_t::fine;
-		hFrac = 0.1;
+		hFrac = 0.05;
 		max_seeds = 10000;
 		max_matches = 1000000;
 		tThres = 0.9; 							//The t-homology threshold

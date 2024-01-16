@@ -350,14 +350,15 @@ class SweepMap {
 		cerr << " | Average J:             " << C.frac("J", "mappings") / 10000.0 << endl;
 		cerr << "Total time [sec]:         " << setw(5) << right << T.secs("total")     << " (" << setw(4) << right << T.secs("total") / C.count("reads") << " per read)" << endl;
 		cerr << " | Indexing:              " << setw(5) << right << T.secs("indexing")  << " (" << setw(4) << right << T.perc("indexing", "total") << "\% of total)" << endl;
+		cerr << " |  | reading:               " << setw(5) << right << T.secs("index_reading")  << " (" << setw(4) << right << T.perc("index_reading", "indexing") << "\% of total)" << endl;
+		cerr << " |  | sketching:             " << setw(5) << right << T.secs("index_sketching")<< " (" << setw(4) << right << T.perc("index_sketching", "indexing") << "\% of total)" << endl;
 		cerr << " | Mapping:               " << setw(5) << right << T.secs("mapping")   << " (" << setw(4) << right << T.perc("mapping", "total") << "\% of total)" << endl;
-		cerr << " |  | sketching reads:    " << setw(5) << right << T.secs("sketching") << " (" << setw(4) << right << T.perc("sketching", "mapping") << "\% of mapping)" << endl;
-		cerr << " |  | match kmers:        " << setw(5) << right << T.secs("matching")  << " (" << setw(4) << right << T.perc("matching", "mapping") << "\%)" << endl;
-		cerr << " |  | sort matches:       " << setw(5) << right << T.secs("sorting")   << " (" << setw(4) << right << T.perc("sorting", "mapping") << "\%)" << endl;
-		cerr << " |  | sweep:              " << setw(5) << right << T.secs("sweep")     << " (" << setw(4) << right << T.perc("sweep", "mapping") << "\%)" << endl;
-		cerr << " |  | post proc:          " << setw(5) << right << T.secs("postproc")  << " (" << setw(4) << right << T.perc("postproc", "mapping") << "\%)" << endl;
-
-		cerr << "Total sketching time:     " << setw(5) << right << FMH_time.secs() << " (" << setw(4) << right << FMH_time.secs() / T.secs("total") << "\%)" << endl; // << " (" << setw(4) << right << T.perc("postproc", "mapping") << "\%)" << endl;
+		cerr << " |  | sketching reads:       " << setw(5) << right << T.secs("sketching") << " (" << setw(4) << right << T.perc("sketching", "mapping") << "\% of mapping)" << endl;
+		cerr << " |  | match kmers:           " << setw(5) << right << T.secs("matching")  << " (" << setw(4) << right << T.perc("matching", "mapping") << "\%)" << endl;
+		cerr << " |  |  | sort matches:          " << setw(5) << right << T.secs("sorting")   << " (" << setw(4) << right << T.perc("sorting", "matching") << "\% of matching)" << endl;
+		cerr << " |  | sweep:                 " << setw(5) << right << T.secs("sweep")     << " (" << setw(4) << right << T.perc("sweep", "mapping") << "\%)" << endl;
+		cerr << " |  | post proc:             " << setw(5) << right << T.secs("postproc")  << " (" << setw(4) << right << T.perc("postproc", "mapping") << "\%)" << endl;
+		cerr << "Total sketching time:     " << setw(5) << right << FMH_time.secs()     << " (" << setw(4) << right << FMH_time.secs() / T.secs("total") << "\%)" << endl; // << " (" << setw(4) << right << T.perc("postproc", "mapping") << "\%)" << endl;
 	}
 };
 

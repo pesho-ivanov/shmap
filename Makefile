@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 CC = g++
 CXX_STANDARD = -std=c++2a
-CFLAGS = -g -O3 -march=native -lm -lpthread -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -Wconversion
+CFLAGS = -O3 -march=native -lm -lpthread -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -Wconversion
 LIBS = minimap2/libminimap2.a -lz
 DEPFLAGS = -MMD -MP
 
@@ -57,7 +57,8 @@ ifeq ($(wildcard $(READS)),)
 	samtools faidx $(REF)
 	paftools.js pbsim2fq $(REF).fai "$(READS_PREFIX)"_*.maf >$(READS)_
 	rm -f "$(READS_PREFIX)"_*.maf "$(READS_PREFIX)"_*.ref "$(READS_PREFIX)"_*.fastq
-	awk '/^>/ {printit = /+$$/} printit' $(READS)_ >$(READS)
+	mv $(READS)_ $(READS)
+#	awk '/^>/ {printit = /+$$/} printit' $(READS)_ >$(READS)
 endif
 
 eval_abe: sweep gen_reads

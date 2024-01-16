@@ -2,6 +2,7 @@
 #define SKETCH_HPP
 
 #include <bit>
+//#include <bitset>
 #include <cstdint>
 #include <utility>
 #include <list>
@@ -13,6 +14,7 @@
 
 #include "utils.h"
 #include "io.h"
+#include <climits>
 
 using namespace std;
 
@@ -23,14 +25,33 @@ using Sketch     = vector<abs_hash_t>;  // (kmer's left 0-based position, kmer h
 
 using std::rotl;
 
-static hash_t LUT[256];
+static hash_t LUT_fw[256], LUT_rc[256];
 static Timer FMH_time;
 
+void print_sketches(const string &seqID, const Sketch &sks) {
+	cout << seqID << endl;
+	for (const auto& sk : sks) {
+		cout << "  " << sk.first << ", " << sk.second << endl;
+	}
+}
+
 void initialize_LUT() {
-    LUT['a'] = LUT['A'] = 0x3c8b'fbb3'95c6'0470;
-    LUT['c'] = LUT['C'] = 0x3193'c185'62a0'2b4c;
-	LUT['g'] = LUT['G'] = 0x2032'3ed0'8257'2324;
-	LUT['t'] = LUT['T'] = 0x2d2a'04e6'7531'0c18;
+	LUT_fw['a'] = LUT_fw['A'] = 0x3c8b'fbb3'95c6'0474; // Daniel's
+	//LUT_fw['a'] = LUT_fw['A'] = 0x3c8bfbb395c60470;  // Ragnar's
+	LUT_fw['c'] = LUT_fw['C'] = 0x3193'c185'62a0'2b4c; // Daniel's
+	LUT_fw['g'] = LUT_fw['G'] = 0x2032'3ed0'8257'2324; // Daniel's
+	LUT_fw['t'] = LUT_fw['T'] = 0x2955'49f5'4be2'4456; // Daniel's
+	//LUT_fw['t'] = LUT_fw['T'] = 0x2d2a04e675310c18;  // Ragnar's
+	
+	//l[b'A' as usize] = 0x3c8bfbb395c60474u64;
+    //l[b'C' as usize] = 0x3193c18562a02b4cu64;
+    //l[b'G' as usize] = 0x20323ed082572324u64;
+    //l[b'T' as usize] = 0x295549f54be24456u64;
+
+	LUT_rc['a'] = LUT_rc['A'] = LUT_fw['T'];
+	LUT_rc['c'] = LUT_rc['C'] = LUT_fw['G'];
+	LUT_rc['g'] = LUT_rc['G'] = LUT_fw['C'];
+	LUT_rc['t'] = LUT_rc['T'] = LUT_fw['A'];
 }
 
 const Sketch buildFMHSketch(const string& s, int k, double hFrac, const unordered_map<hash_t, char>& blmers) {
@@ -41,20 +62,30 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac, const unordere
 
 	if ((int)s.size() < k) return sk;
 
-	int i = 0;
-	hash_t h = 0;
+	hash_t h, h_fw = 0, h_rc = 0;
 	hash_t hThres = hash_t(hFrac * double(std::numeric_limits<hash_t>::max()));
+	int r;
 
-	for (; i<k; i++)
-		h ^= rotl(LUT[(int)s[i]], k-i-1);
+	for (r=0; r<k; r++) {
+		h_fw ^= rotl(LUT_fw[(int)s[r]], k-r-1);
+		h_rc ^= rotl(LUT_rc[(int)s[r]], r);
+	}
 
-	if (h < hThres)  // optimize to only look at specific bits
-		sk.emplace_back(i, h);
+	while(true) {
+		h = h_fw ^ h_rc;
+//		cerr << s << " " << r << " " << std::hex << std::setfill('0') << std::setw(16) << h
+//							<< " = " << std::hex << std::setfill('0') << std::setw(16) << h_fw
+//							<< " ^ " << std::hex << std::setfill('0') << std::setw(16) << h_rc << endl;
+		if (h < hThres)  // optimize to only look at specific bits
+			//sk.emplace_back(r, h);
+			sk.emplace_back(r, h_fw);
+		
+		if (r >= (int)s.size()) break;
 
-	for (; i<(int)s.size(); i++) {
-		h = rotl(h, 1) ^ rotl(LUT[(int)s[i-k]], k) ^ LUT[(int)s[i]];
-		if (h < hThres)
-			sk.emplace_back(i, h);
+		h_fw = rotl(h_fw, 1) ^ rotl(LUT_fw[(int)s[r-k]], k) ^ LUT_fw[(int)s[r]];
+		h_rc = rotr(h_rc, 1) ^ rotr(LUT_rc[(int)s[r-k]], 1) ^ rotl(LUT_rc[(int)s[r]], k-1);
+
+		++r;
 	}
 
 	FMH_time.stop();
@@ -85,7 +116,14 @@ struct SketchIndex {
 		}
 	}
 
-	SketchIndex(const Sketch& sketch, pos_t T_sz) : T_sz(T_sz) {
+	SketchIndex(const Sketch& sketch, pos_t T_sz)
+		: T_sz(T_sz) {
+		populate_h2pos(sketch);
+	}
+
+	SketchIndex(const string &name, const string &ref, const params_t &params, const unordered_map<hash_t, char>& bLstmers)
+		: T_sz((pos_t)ref.size()), name(name) {
+		Sketch sketch = buildFMHSketch(ref, params.k, params.hFrac, bLstmers);
 		populate_h2pos(sketch);
 	}
 
@@ -96,7 +134,6 @@ struct SketchIndex {
 			cerr << "ERROR: Reference file could not be read" << endl;
 		}
 		T_sz = (pos_t)ref.size();
-		//cout << ref << endl;
 
 		ifstream fStr(tFile);
 		string line;
@@ -177,13 +214,6 @@ bool SketchReads(ifstream& fStr, const params_t &params, const unordered_map<has
 
 	return false;
 }
-
-//void print_sketches(const string &seqID, const Sketch &sks) {
-//	cout << seqID << endl;
-//	for (const auto& sk : sks) {
-//		cout << "  " << sk.first << ", " << sk.second << endl;
-//	}
-//}
 
 //This function builds a minimap2 sketch of a sequence by querying from a prebuilt minimap index; this function is influenced by the
 // code of "The minimizer Jaccard estimator is biased and inconsistent." from Belbasi et al. (function 
