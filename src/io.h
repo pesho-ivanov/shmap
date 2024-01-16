@@ -8,6 +8,8 @@
 #include <string>
 #include <tuple>
 
+#include <zlib.h>  
+#include "kseq.h"  
 #include "utils.h"
 
 using std::cerr;
@@ -377,6 +379,26 @@ int readFASTA(const string& filePath, string *seq) {
 	fStr.close();
 
 	return 0;
+}
+
+// STEP 1: declare the type of file handler and the read() function  
+KSEQ_INIT(gzFile, gzread)  
+
+// std::cout << "name: " << seq->name.s << "\n";
+// if (seq->comment.l) std::cout << "comment: " << seq->comment.s << "\n";
+// std::cout << "seq: " << seq->seq.s << "\n";
+// if (seq->qual.l) std::cout << "qual: " << seq->qual.s << "\n";
+void read_fasta_klib(const std::string& filename, std::function<void(kseq_t*)> callback) {
+    gzFile fp = gzopen(filename.c_str(), "r");
+    kseq_t *seq = kseq_init(fp);
+    int l;
+
+    while ((l = kseq_read(seq)) >= 0) {
+        callback(seq);
+    }
+
+    kseq_destroy(seq);
+    gzclose(fp);
 }
 
 //This function reads 64-bit numbers from file and returns them as a hash table

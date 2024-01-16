@@ -3,12 +3,6 @@
 int main(int argc, char **argv) {
 	initialize_LUT();
 
-	//unordered_map<hash_t, char> blmers;
-	//string s = "ACGTTAG";
-	//Sketch sk1 = buildFMHSketch(s, 5, 1.0, blmers);
-	//Sketch sk2 = buildFMHSketch(revComp(s), 5, 1.0, blmers);
-	//return 0;
-
 	Counters C;
 	Timers T;
 

@@ -306,4 +306,10 @@ bool SketchReads(ifstream& fStr, const params_t &params, const unordered_map<has
 //	return sk;
 //}
 
+	//unordered_map<hash_t, char> blmers;
+	//string s = "ACGTTAG";
+	//Sketch sk1 = buildFMHSketch(s, 5, 1.0, blmers);
+	//Sketch sk2 = buildFMHSketch(revComp(s), 5, 1.0, blmers);
+	//return 0;
+
 #endif

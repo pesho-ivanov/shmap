@@ -1,13 +1,13 @@
 SHELL := /bin/bash
 CC = g++
 CXX_STANDARD = -std=c++2a
-CFLAGS = -O3 -g -march=native -lm -lpthread -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -Wconversion
+CFLAGS = -O3 -g -march=native -lm -lpthread -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -Wconversion -fpermissive
 LIBS = minimap2/libminimap2.a -lz
 DEPFLAGS = -MMD -MP
 
 TIME_CMD = /usr/bin/time -f "%U\t%M"
 
-SRCS = src/sweep.cpp src/sweep.h src/io.h src/sketch.h src/utils.h
+SRCS = src/sweep.cpp src/sweep.h src/io.h src/sketch.h src/utils.h src/kseq.h
 SWEEP_BIN = ./sweep
 MINIMAP_BIN = minimap2
 MAPQUIK_BIN = mapquik

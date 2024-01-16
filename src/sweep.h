@@ -264,65 +264,62 @@ class SweepMap {
 		}
 
 	void map(const string &pFile, const std::unordered_map<hash_t, char> &bLstmers) {
-		ifstream reads_stream;
-		reads_stream.open(pFile);
-		if (!reads_stream.is_open()) {
-			cerr << "ERROR: Could not open " << params.pFile << endl;
-			return;
-		}
+		//ifstream reads_stream;
+		//reads_stream.open(pFile);
+		//if (!reads_stream.is_open()) {
+		//	cerr << "ERROR: Could not open " << params.pFile << endl;
+		//	return;
+		//}
 
 		//cerr << "aligning reads from " << params.pFile << "..." << endl;
-		vector<std::tuple<string, pos_t, Sketch>> pSks;
+		//vector<std::tuple<string, pos_t, Sketch>> pSks;
 
 		T->start("mapping");
 		// Load pattern sequences in batches
-		while(true) {
-			cerr << "Sketching a batch of reads from " << params.pFile << "..." << endl;
+		cerr << "Sketching and mapping a batch of reads from " << params.pFile << "..." << endl;
+		read_fasta_klib(pFile, [this, &bLstmers](kseq_t *seq) {
+			// For each read
+
 			T->start("sketching");
-			if (!SketchReads(reads_stream, params, bLstmers, &pSks) && pSks.empty()) {
-				T->stop("sketching");
-				break;
-			}
+			Sketch p = buildFMHSketch(seq->seq.s, params.k, params.hFrac, bLstmers);
 			T->stop("sketching");
 
-			cerr << "Mapping a batch of reads..." << endl;
-			// Iterate over pattern sketches
-			for (const auto &[seqID, P_sz, p] : pSks) {
-				C->inc("read_len", P_sz);
-				vector<int> p_hist;
-				vector<Match> L;
+			string seqID = seq->name.s;
+			pos_t P_sz = seq->seq.l;
 
-				T->start("matching");
-				match_kmers(p, &p_hist, &L);
-				T->stop("matching");
-				//print_matches(L);
+			C->inc("read_len", P_sz);
+			vector<int> p_hist;
+			vector<Match> L;
 
-				T->start("sweep");
-				//print_sketches(seqID, p);
-				auto mappings = sweep(p_hist, L, (pos_t)p.size(), P_sz);
-				T->stop("sweep");
+			T->start("matching");
+			match_kmers(p, &p_hist, &L);
+			T->stop("matching");
+			//print_matches(L);
 
-				T->start("postproc");
-				auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(mappings, P_sz);
-				normalize_mappings(&reasonable_mappings, (pos_t)p.size(), seqID);
+			T->start("sweep");
+			//print_sketches(seqID, p);
+			auto mappings = sweep(p_hist, L, (pos_t)p.size(), P_sz);
+			T->stop("sweep");
 
-				for (auto &m: reasonable_mappings) {
-					m.map_time = T->secs("sweep") / (double)mappings.size();
-					C->inc("J", int(10000.0*m.J));
-					C->inc("mappings");
-					C->inc("sketched_kmers", m.p_sz);
-					C->inc("matches", m.matches);
-				}
-				C->inc("reads");
-				if (!reasonable_mappings.empty())
-					mappings2paf(params, reasonable_mappings, P_sz, (pos_t)p.size(), seqID, tidx.T_sz, tidx.name, "");
-				else
-					C->inc("unmapped_reads");
+			T->start("postproc");
+			auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(mappings, P_sz);
+			normalize_mappings(&reasonable_mappings, (pos_t)p.size(), seqID);
 
-				T->stop("postproc");
+			for (auto &m: reasonable_mappings) {
+				m.map_time = T->secs("sweep") / (double)mappings.size();
+				C->inc("J", int(10000.0*m.J));
+				C->inc("mappings");
+				C->inc("sketched_kmers", m.p_sz);
+				C->inc("matches", m.matches);
 			}
-			pSks.clear();
-		}
+			C->inc("reads");
+			if (!reasonable_mappings.empty())
+				mappings2paf(params, reasonable_mappings, P_sz, (pos_t)p.size(), seqID, tidx.T_sz, tidx.name, "");
+			else
+				C->inc("unmapped_reads");
+
+			T->stop("postproc");
+		});
 		T->stop("mapping");
 	}
 
