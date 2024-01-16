@@ -283,7 +283,7 @@ class SweepMap {
 			T->stop("sketching");
 
 			string seqID = seq->name.s;
-			pos_t P_sz = seq->seq.l;
+			pos_t P_sz = (pos_t)seq->seq.l;
 
 			C->inc("read_len", P_sz);
 			vector<int> p_hist;
@@ -345,8 +345,9 @@ class SweepMap {
 		cerr << " | Average J:             " << C.frac("J", "mappings") / 10000.0 << endl;
 		cerr << "Total time [sec]:         " << setw(5) << right << T.secs("total")     << " (" << setw(4) << right << T.secs("total") / C.count("reads") << " per read)" << endl;
 		cerr << " | Indexing:              " << setw(5) << right << T.secs("indexing")  << " (" << setw(4) << right << T.perc("indexing", "total") << "\% of total)" << endl;
-		cerr << " |  | reading:               " << setw(5) << right << T.secs("index_reading")  << " (" << setw(4) << right << T.perc("index_reading", "indexing") << "\% of total)" << endl;
-		cerr << " |  | sketching:             " << setw(5) << right << T.secs("index_sketching")<< " (" << setw(4) << right << T.perc("index_sketching", "indexing") << "\% of total)" << endl;
+		cerr << " |  | reading:               " << setw(5) << right << T.secs("index_reading")  << " (" << setw(4) << right << T.perc("index_reading", "indexing") << "\% of indexing)" << endl;
+		cerr << " |  | sketching:             " << setw(5) << right << T.secs("index_sketching")<< " (" << setw(4) << right << T.perc("index_sketching", "indexing") << "\%)" << endl;
+		cerr << " |  | initializing:          " << setw(5) << right << T.secs("index_initializing")<< " (" << setw(4) << right << T.perc("index_initializing", "indexing") << "\%)" << endl;
 		cerr << " | Mapping:               " << setw(5) << right << T.secs("mapping")   << " (" << setw(4) << right << T.perc("mapping", "total") << "\% of total)" << endl;
 		cerr << " |  | sketching reads:       " << setw(5) << right << T.secs("sketching") << " (" << setw(4) << right << T.perc("sketching", "mapping") << "\% of mapping)" << endl;
 		cerr << " |  | match kmers:           " << setw(5) << right << T.secs("matching")  << " (" << setw(4) << right << T.perc("matching", "mapping") << "\%)" << endl;

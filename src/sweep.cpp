@@ -28,19 +28,20 @@ int main(int argc, char **argv) {
 	string ref_name;
 	pos_t T_sz;
 	Sketch t;
-	read_fasta_klib(params.tFile, [&t, &params, &bLstmers, &ref_name, &T_sz](kseq_t *seq) {
+	read_fasta_klib(params.tFile, [&t, &params, &bLstmers, &ref_name, &T_sz, &T](kseq_t *seq) {
 		assert(ref_name.empty());  // TODO: support multi-sequence files
+		T.start("index_sketching");
 		t = buildFMHSketch(seq->seq.s, params.k, params.hFrac, bLstmers);
-		T_sz = seq->seq.l;
+		T.stop("index_sketching");
+		T_sz = (pos_t)seq->seq.l;
 		ref_name = seq->name.s;
 	});
 	T.stop("index_reading");
 
-	T.start("index_sketching");
+	T.start("index_initializing");
 	SketchIndex tidx(t, T_sz, ref_name);
-	T.stop("index_sketching");
+	T.stop("index_initializing");
 
-	//SketchIndex tidx(params.tFile, params, bLstmers);
 	T.stop("indexing");
 	C.inc("T_sz", tidx.T_sz);
 
