@@ -332,62 +332,9 @@ bool prsArgs(int& nArgs, char** argList, params_t *params) {
 	return !params->pFile.empty() && !params->tFile.empty();
 }
 
-//This function reads a file in FASTA format and returns true on success
-//NOTE: Using this function, we first read in a complete sequence before calculating a sketch from it. Calculating a sketch could
-//		also be done on the fly while reading the file. This possibility would be more memory saving most likely, because we would
-//		not have to store the whole sequence in memory first. However, we had no chance to estimate the sketch size. Thus, the vec-
-//		tor to store the sketch would have to be elongated several times which might be time consuming. On the other hand, it might
-//		also be time consuming to handle the complete sequence in memory first. Eventually, it will depend on a try to find out
-//		what is the better alternative. Could also be that it does not matter at all!
-int readFASTA(const string& filePath, string *seq) {
-	bool headerRead = false, lnBrkDiscvd = false;
-	char c;
-
-	//Open the file
-	ifstream fStr(filePath);
-
-	//Check if the file is open
-	if(!fStr.is_open()) return 1;
-
-	//Read in file character by character
-	while(fStr.get(c)) {
-		//c = to_upper(c);
-		//We are done if we find a second header (which can only start after at least one line break) in the file
-		if(c == '>' && headerRead && lnBrkDiscvd) break;
-
-		//Header lines are skipped
-		if(c == '>') {
-			headerRead = true;
-			continue;
-		}
-
-		//The first line break indicates that we have left the header line
-		if(c == '\n') {
-			lnBrkDiscvd = true;
-			continue;
-		}
-
-		//There is no sequence to load in the header line
-		if(headerRead && !lnBrkDiscvd) continue;
-
-		//We are only interested in unambigous, unmasked nucleotides
-		//if(c == 'A' || c == 'C' || c == 'G' || c == 'T') *seq += c;
-		*seq += c;
-	}
-
-	//Close file
-	fStr.close();
-
-	return 0;
-}
-
-// STEP 1: declare the type of file handler and the read() function  
 KSEQ_INIT(gzFile, gzread)  
 
-// std::cout << "name: " << seq->name.s << "\n";
-// if (seq->comment.l) std::cout << "comment: " << seq->comment.s << "\n";
-// std::cout << "seq: " << seq->seq.s << "\n";
-// if (seq->qual.l) std::cout << "qual: " << seq->qual.s << "\n";
+// seq->name.s, seq->comment.l, seq->comment.s, seq->seq.s, seq->qual.l
 void read_fasta_klib(const std::string& filename, std::function<void(kseq_t*)> callback) {
     gzFile fp = gzopen(filename.c_str(), "r");
     kseq_t *seq = kseq_init(fp);

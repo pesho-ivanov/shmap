@@ -24,21 +24,22 @@ int main(int argc, char **argv) {
 
 	T.start("indexing");
 	T.start("index_reading");
-	string ref;
-	ref.reserve(35000000000);
 	cerr << "Reading index " << params.tFile << "..." << endl;
-	if (readFASTA(params.tFile, &ref)) {
-		cerr << "ERROR: Reference file could not be read" << endl;
-	}
-	ifstream fStr(params.tFile);
-	string line;
-	getline(fStr, line);
-	string name = line.substr(1);
+	string ref_name;
+	pos_t T_sz;
+	Sketch t;
+	read_fasta_klib(params.tFile, [&t, &params, &bLstmers, &ref_name, &T_sz](kseq_t *seq) {
+		assert(ref_name.empty());  // TODO: support multi-sequence files
+		t = buildFMHSketch(seq->seq.s, params.k, params.hFrac, bLstmers);
+		T_sz = seq->seq.l;
+		ref_name = seq->name.s;
+	});
 	T.stop("index_reading");
 
 	T.start("index_sketching");
-	SketchIndex tidx(name, ref, params, bLstmers);
+	SketchIndex tidx(t, T_sz, ref_name);
 	T.stop("index_sketching");
+
 	//SketchIndex tidx(params.tFile, params, bLstmers);
 	T.stop("indexing");
 	C.inc("T_sz", tidx.T_sz);
