@@ -59,7 +59,7 @@ class SweepMap {
 	Counters *C;
 
 	// return if the kmer has not been seen before and construct hash2num[kmer_hash] = kmer_num, which is not more than |p| 
-	inline bool add2hist(const hash_t kmer_hash, vector<int> *hist, unordered_map<hash_t, kmer_num_t> *hash2num, kmer_num_t *kmer_num) {
+	inline bool add2hist(const hash_t kmer_hash, vector<int> *hist, ankerl::unordered_dense::map<hash_t, kmer_num_t> *hash2num, kmer_num_t *kmer_num) {
 		auto num_it = hash2num->find(kmer_hash);
 		if (num_it != hash2num->end()) {
 			*kmer_num = num_it->second;
@@ -94,7 +94,7 @@ class SweepMap {
 
 	// Initializes the histogram of the pattern and the list of matches
 	void match_kmers(const Sketch& p, vector<int> *p_hist, vector<Match> *L) {
-		unordered_map<hash_t, kmer_num_t> hash2num;
+		ankerl::unordered_dense::map<hash_t, kmer_num_t> hash2num;
 		L->reserve(P_MULTIPLICITY * p.size());
 
 		vector<kmer_hits_t> match_lists;
