@@ -279,7 +279,6 @@ class SweepMap {
 	void map(const string &pFile, const blmers_t &bLstmers) {
 		T->start("mapping");
 		// Load pattern sequences in batches
-		cerr << "Sketching and mapping a batch of reads from " << params.pFile << "..." << endl;
 		T->start("query_reading");
 		read_fasta_klib(pFile, [this, &bLstmers](kseq_t *seq) {
 			T->stop("query_reading");

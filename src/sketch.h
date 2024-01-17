@@ -12,6 +12,7 @@
 #include <math.h>
 
 #include <ankerl/unordered_dense.h>
+//#include "phmap.hpp"
 
 #include "utils.h"
 #include "io.h"
@@ -113,6 +114,8 @@ struct SketchIndex {
 	string name;
 	//unordered_map<hash_t, vector<abs_ord_t>> h2pos;
 	ankerl::unordered_dense::map<hash_t, vector<abs_ord_t>> h2pos;
+	//gtl::flat_hash_map<hash_t, vector<abs_ord_t>> h2pos;
+	//gtl::node_hash_map<hash_t, vector<abs_ord_t>> h2pos;
 
 	void populate_h2pos(const Sketch& sketch) {
 		//print_sketches(name, sketch);

@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
 
 	T.start("indexing");
 	T.start("index_reading");
-	cerr << "Reading index " << params.tFile << "..." << endl;
+	cerr << "Indexing " << params.tFile << "..." << endl;
 	string ref_name;
 	pos_t T_sz;
 	Sketch t;
@@ -55,6 +55,7 @@ int main(int argc, char **argv) {
 		params.print(cerr, true);
 	}
 
+	cerr << "Mapping reads " << params.pFile << "..." << endl;
 	SweepMap mapper(tidx, params, &T, &C);
 	mapper.map(params.pFile, bLstmers);
 
