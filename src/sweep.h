@@ -10,6 +10,48 @@
 #include "io.h"
 #include "sketch.h"
 
+struct Mapping {
+	int k; 	   // kmer size
+	pos_t P_sz;     // pattern size |P| bp 
+	pos_t p_sz;     // pattern sketch size |p| kmers
+	int matches;  // L.size() -- total number of matches in `t' 
+	pos_t T_l;      // the position of the leftmost nucleotide of the mapping
+	pos_t T_r;      // the position of the rightmost nucleotide of the mapping
+	pos_t s_sz;      // the position of the rightmost nucleotide of the mapping
+	int xmin;     // the number of kmers in the intersection between the pattern and its mapping in `t'
+	double sim;     // the number of kmers in the intersection between the pattern and its mapping in `t'
+	double map_time;
+
+    Mapping() {}
+	Mapping(int k, pos_t P_sz, pos_t p_sz, int matches, pos_t T_l, pos_t T_r, pos_t s_sz, int xmin)
+		: k(k), P_sz(P_sz), p_sz(p_sz), matches(matches), T_l(T_l), T_r(T_r), s_sz(s_sz), xmin(xmin), sim(double(xmin) / std::max(p_sz, s_sz)) {}
+
+    void print_paf(const params_t &params, const string &seqID, const pos_t T_sz, const string &T_name) const {
+		// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
+		cout << seqID  			// Query sequence name
+			<< "\t" << P_sz     // query sequence length
+			<< "\t" << 0   // query start (0-based; closed)
+			<< "\t" << P_sz  // query end (0-based; open)
+			<< "\t" << "+"   // m.get_strand() //strand; TODO
+			<< "\t" << T_name    // reference name
+			<< "\t" << T_sz  // target sequence length
+			<< "\t" << T_l  // target start on original strand (0-based)
+			<< "\t" << T_r  // target start on original strand (0-based)
+			<< "\t" << P_sz  // TODO: fix; Number of residue matches (number of nucleotide matches)
+			<< "\t" << P_sz  // TODO: fix; Alignment block length: total number of sequence matches, mismatches, insertions and deletions in the alignment
+			<< "\t" << 60  // Mapping quality (0-255; 255 for missing)
+		// ----- end of required PAF fields -----
+			<< "\t" << "k:i:" << k
+			<< "\t" << "M:i:" << matches // matches of `p` in `s` [kmers]
+			<< "\t" << "p:i:" << p_sz 
+			<< "\t" << "s:i:" << s_sz
+			<< "\t" << "I:i:" << xmin  // intersection of `p` and `s` [kmers]
+			<< "\t" << "S:f:" << sim   // similarity [0; 1]
+			<< "\t" << "t:f:" << map_time
+			<< endl;
+	}
+};
+
 class SweepMap {
 	const SketchIndex &tidx;
 	const params_t &params;
@@ -142,15 +184,16 @@ class SweepMap {
 				assert (l->T_r <= r->T_r);
 			}
 
-			//auto curr_J = xmin;
-			auto m = Mapping(params.k, P_len, p_len, (int)L.size(), l->T_r, prev(r)->T_r, xmin);  // TODO: create only if curr_J is high enough
-
 			if (params.onlybest) {
-				if (xmin > best.xmin)
+				if (xmin > best.xmin) {
+					auto m = Mapping(params.k, P_len, p_len, (int)L.size(), l->T_r, prev(r)->T_r, pos_t(r-l), xmin);
 					best = m;
+				}
 			} else {
-				if (xmin > params.tThres * max(p_len, pos_t(r-l)))  // TODO: test
+				auto m = Mapping(params.k, P_len, p_len, (int)L.size(), l->T_r, prev(r)->T_r, pos_t(r-l), xmin);
+				if (m.sim > params.tThres) {
 					mappings.push_back(m);
+				}
 			}
 
 			// Prepare for the next step by moving `l` to the right.
@@ -261,19 +304,17 @@ class SweepMap {
 
 			T->start("postproc");
 			auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(mappings, P_sz);
-			//normalize_mappings(&reasonable_mappings, (pos_t)p.size(), seqID);
 
 			for (auto &m: reasonable_mappings) {
+				m.print_paf(params, seqID, tidx.T_sz, tidx.name);
 				m.map_time = T->secs("sweep") / (double)mappings.size();
-				C->inc("J", int(10000.0*m.xmin / max(m.p_sz, m.T_r-m.T_l)));
+				C->inc("similarity", int(10000.0*m.sim));
 				C->inc("mappings");
 				C->inc("sketched_kmers", m.p_sz);
 				C->inc("matches", m.matches);
 			}
 			C->inc("reads");
-			if (!reasonable_mappings.empty())
-				mappings2paf(params, reasonable_mappings, P_sz, (pos_t)p.size(), seqID, tidx.T_sz, tidx.name, "");
-			else
+			if (reasonable_mappings.empty())
 				C->inc("unmapped_reads");
 
 			T->stop("postproc");
@@ -302,7 +343,7 @@ class SweepMap {
 		cerr << " | Seed limit reached:    " << C.count("seeds_limit_reached") << " (" << C.perc("seeds_limit_reached", "reads") << "%)" << endl;
 		cerr << " | Matches limit reached: " << C.count("matches_limit_reached") << " (" << C.perc("matches_limit_reached", "reads") << "%)" << endl;
 		cerr << " | Unmapped reads:        " << C.count("unmapped_reads") << " (" << C.perc("unmapped_reads", "reads") << "%)" << endl;
-		cerr << " | Average J:             " << C.frac("J", "mappings") / 10000.0 << endl;
+		cerr << " | Average similarity:    " << C.frac("similarity", "mappings") / 10000.0 << endl;
 		cerr << "Total time [sec]:         " << setw(5) << right << T.secs("total")     << " (" << setw(4) << right << T.secs("total") / C.count("reads") << " per read)" << endl;
 		cerr << " | Indexing:              " << setw(5) << right << T.secs("indexing")  << " (" << setw(4) << right << T.perc("indexing", "total") << "\% of total)" << endl;
 		cerr << " |  | reading:               " << setw(5) << right << T.secs("index_reading")  << " (" << setw(4) << right << T.perc("index_reading", "indexing") << "\% of indexing)" << endl;

@@ -366,36 +366,5 @@ const blmers_t readBlstKmers(const string& fname) {
 
 	return numbers;
 }
-	
-// Outputs all given mappings
-void mappings2paf(const params_t &params, const vector<Mapping>& res, const pos_t P_sz, const pos_t pLen, const string &seqID, const pos_t T_sz, const string &T_name, const string &text) {
-	for(auto m: res) {
-		//m.print();
-		// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
-		cout << seqID  			// Query sequence name
-			<< "\t" << P_sz     // query sequence length
-			<< "\t" << 0   // query start (0-based; closed)
-			<< "\t" << P_sz  // query end (0-based; open)
-			<< "\t" << "+"   // m.get_strand() //strand; TODO
-			<< "\t" << T_name    // reference name
-			<< "\t" << T_sz  // target sequence length
-			<< "\t" << m.T_l  // target start on original strand (0-based)
-			<< "\t" << m.T_r  // target start on original strand (0-based)
-			<< "\t" << P_sz  // TODO: fix; Number of residue matches (number of nucleotide matches)
-			<< "\t" << P_sz  // TODO: fix; Alignment block length: total number of sequence matches, mismatches, insertions and deletions in the alignment
-			<< "\t" << 60  // Mapping quality (0-255; 255 for missing)
-		// ----- end of required PAF fields -----
-			<< "\t" << "k:i:" << m.k
-			//<< "\t" << "P:i:" << m.P_sz  // redundant
-			<< "\t" << "p:i:" << m.p_sz 
-			<< "\t" << "M:i:" << m.matches // matches of `p` in `s` [kmers]
-			<< "\t" << "I:i:" << m.xmin  // intersection of `p` and `s` [kmers]
-			//<< "\t" << "J:f:" << m.J   // Jaccard similarity [0; 1]
-			<< "\t" << "t:f:" << m.map_time
-			<< endl;
-        if (!text.empty())
-            cerr << "   text: " << text.substr(m.T_l, m.T_r-m.T_l+1) << endl;
-	}
-}
 
 #endif

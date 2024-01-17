@@ -139,20 +139,6 @@ struct Match {
 	//}
 };
 
-struct Mapping {
-	int k; 	   // kmer size
-	pos_t P_sz;     // pattern size |P| bp 
-	pos_t p_sz;     // pattern sketch size |p| kmers
-	int matches;  // L.size() -- total number of matches in `t' 
-	pos_t T_l;      // the position of the leftmost nucleotide of the mapping
-	pos_t T_r;      // the position of the rightmost nucleotide of the mapping
-	int xmin;     // the number of kmers in the intersection between the pattern and its mapping in `t'
-	double map_time;
-
-	Mapping(int k=0, pos_t P_sz=0, pos_t p_sz=0, int matches=0, pos_t T_l=0, pos_t T_r=0, int xmin=0)
-		: k(k), P_sz(P_sz), p_sz(p_sz), matches(matches), T_l(T_l), T_r(T_r), xmin(xmin) {}
-};
-
 template<typename TT> auto prev(const typename TT::iterator &it) {
     auto pr = it; return --pr;
 }
