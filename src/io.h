@@ -120,7 +120,7 @@ struct params_t {
 		k = 15; 						//The k-mer length
 		w = 10; 						//The window size
 		elastic = elastic_t::off;
-		alignment_edges = alignment_edges_t::fine;
+		alignment_edges = alignment_edges_t::extend_equally;
 		hFrac = 0.05;
 		max_seeds = 10000;
 		max_matches = 1000000;
@@ -390,7 +390,7 @@ void mappings2paf(const params_t &params, const vector<Mapping>& res, const pos_
 			<< "\t" << "p:i:" << m.p_sz 
 			<< "\t" << "M:i:" << m.matches // matches of `p` in `s` [kmers]
 			<< "\t" << "I:i:" << m.xmin  // intersection of `p` and `s` [kmers]
-			<< "\t" << "J:f:" << m.J   // Jaccard similarity [0; 1]
+			//<< "\t" << "J:f:" << m.J   // Jaccard similarity [0; 1]
 			<< "\t" << "t:f:" << m.map_time
 			<< endl;
         if (!text.empty())

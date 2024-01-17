@@ -31,19 +31,6 @@ class SweepMap {
 		}
 	}
 
-	// Returns the Jaccard score of the window [l,r)
-	inline double J(size_t p_sz, const vector<Match>::const_iterator l, const vector<Match>::const_iterator r, int xmin) {
-		int s_sz = prev(r)->t_pos - l->t_pos + 1;
-		assert(s_sz >= 0);
-		//if (s_sz < 0) return 0;
-		assert(p_sz + s_sz - xmin > 0);
-		double scj = double(xmin) / double(p_sz + s_sz - xmin);
-		if (!(0.0 <= scj && scj <= 1.0))
-			cerr << "ERROR: scj=" << scj << ", xmin=" << xmin << ", p_sz=" << p_sz << ", s_sz=" << s_sz << ", l=" << l->t_pos << ", r=" << r->t_pos << endl;
-		//assert (0.0 <= scj && scj <= 1.0);
-		return scj;
-	}
-
 	// Returns true if the window [l,r) should be extended to the right
 	inline bool should_extend_right(
 			const vector<int> &hist,
@@ -95,6 +82,19 @@ class SweepMap {
 
 		T->start("collect_matches");
 		// Get MAX_SEEDS of kmers with the lowest number of hits.
+
+	// Returns the Jaccard score of the window [l,r)
+	//inline double J(size_t p_sz, const vector<Match>::const_iterator l, const vector<Match>::const_iterator r, int xmin) {
+	//	int s_sz = prev(r)->t_pos - l->t_pos + 1;
+	//	assert(s_sz >= 0);
+	//	//if (s_sz < 0) return 0;
+	//	assert(p_sz + s_sz - xmin > 0);
+	//	double scj = double(xmin) / double(p_sz + s_sz - xmin);
+	//	if (!(0.0 <= scj && scj <= 1.0))
+	//		cerr << "ERROR: scj=" << scj << ", xmin=" << xmin << ", p_sz=" << p_sz << ", s_sz=" << s_sz << ", l=" << l->t_pos << ", r=" << r->t_pos << endl;
+	//	//assert (0.0 <= scj && scj <= 1.0);
+	//	return scj;
+	//}
 		int total_hits = 0;
 		for (int seed=0; seed<(int)match_lists.size(); seed++) {
 			if (seed > (int)params.max_seeds) {
@@ -123,45 +123,36 @@ class SweepMap {
 	// vector<Match> L;   	   // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
 	const vector<Mapping> sweep(vector<int> &diff_hist, const vector<Match> &L, const pos_t p_len, const pos_t P_len) {
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
-		//multiset<pos_t> P_l_set;  // TODO: use a vector instead? // TODO: remove this set altogether (get the leftmost P_l from l and r)
 
 		int xmin = 0;
 		Mapping best;
 		best.k = params.k;
 		best.P_sz = P_len;
 		best.p_sz = p_len;
+		best.xmin = 0;
 
 		// Increase the left point end of the window [l,r) one by one. O(matches)
 		int i = 0, j = 0;
 		for(auto l = L.begin(), r = L.begin(); l != L.end(); ++l, ++i) {
 			// Increase the right end of the window [l,r) until it gets out.
 			for(; should_extend_right(diff_hist, L, l, r, xmin, P_len, params.k); ++r, ++j) {
-				//P_l_set.insert(r->P_l);
 				// If taking this kmer from T increases the intersection with P.
 				if (--diff_hist[r->kmer_ord] >= 0)
 					++xmin;
 				assert (l->T_r <= r->T_r);
 			}
 
-			auto curr_J = J(p_len, l, r, xmin);
-			auto m = Mapping(params.k, P_len, p_len, (int)L.size(), l->T_r, prev(r)->T_r, xmin, 0, 0, curr_J);  // TODO: create only if curr_J is high enough
-
-			//if (params.alignment_edges == alignment_edges_t::fine) {
-			//	if (P_l_set.size() > 0) {
-			//		m.dT_l = - *P_l_set.begin();
-			//		m.dT_r = P_len - (*P_l_set.rbegin()+params.k);
-			//	}
-			//}
+			//auto curr_J = xmin;
+			auto m = Mapping(params.k, P_len, p_len, (int)L.size(), l->T_r, prev(r)->T_r, xmin);  // TODO: create only if curr_J is high enough
 
 			if (params.onlybest) {
-				if (curr_J > best.J)
+				if (xmin > best.xmin)
 					best = m;
 			} else {
-				if (curr_J > params.tThres)
+				if (xmin > params.tThres * max(p_len, pos_t(r-l)))  // TODO: test
 					mappings.push_back(m);
 			}
 
-			//P_l_set.erase(P_l_set.find(l->P_l));
 			// Prepare for the next step by moving `l` to the right.
 			if (++diff_hist[l->kmer_ord] > 0)
 				--xmin;
@@ -214,9 +205,9 @@ class SweepMap {
 			// 2. Remove from the deque front all mappings that are strictly
 			//    less similar than the current J. This keeps the deque sorted
 			//    descending in J from left to right
-			while(!recent.empty() && recent.front().J < next.J - EPS)
+			while(!recent.empty() && recent.front().xmin < next.xmin)
 				recent.pop_front();
-			assert(recent.empty() || (recent.back().J >= recent.front().J - EPS && recent.front().J >= next.J - EPS));
+			assert(recent.empty() || (recent.back().xmin >= recent.front().xmin && recent.front().xmin >= next.xmin));
 
 			// 3. Add the next mapping to the front
 			recent.push_front(next);	 
@@ -231,22 +222,6 @@ class SweepMap {
 			reasonable.push_back(recent.back());
 
 		return reasonable;
-	}
-
-	// Extends the mappings to the left and right
-	void normalize_mappings(vector<Mapping> *mappings, const pos_t pLen, const string &seqID) {
-		for(auto &m: *mappings) {
-			if (params.alignment_edges == alignment_edges_t::extend_equally) {
-				int span   = m.T_r - m.T_l + 1;
-				//assert(span <= m.P_sz);
-				int shift  = (m.P_sz - span) / 2;       assert(shift >= 0);
-				m.T_l -= shift; m.T_l = max(0, m.T_l);
-				m.T_r += shift; m.T_r = min(tidx.T_sz-1, m.T_r);
-			} else if (params.alignment_edges == alignment_edges_t::fine) {
-				m.T_l += m.dT_l;
-				m.T_r += m.dT_r;
-			}
-		}
 	}
 
   public:
@@ -286,11 +261,11 @@ class SweepMap {
 
 			T->start("postproc");
 			auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(mappings, P_sz);
-			normalize_mappings(&reasonable_mappings, (pos_t)p.size(), seqID);
+			//normalize_mappings(&reasonable_mappings, (pos_t)p.size(), seqID);
 
 			for (auto &m: reasonable_mappings) {
 				m.map_time = T->secs("sweep") / (double)mappings.size();
-				C->inc("J", int(10000.0*m.J));
+				C->inc("J", int(10000.0*m.xmin / max(m.p_sz, m.T_r-m.T_l)));
 				C->inc("mappings");
 				C->inc("sketched_kmers", m.p_sz);
 				C->inc("matches", m.matches);

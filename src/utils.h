@@ -147,13 +147,10 @@ struct Mapping {
 	pos_t T_l;      // the position of the leftmost nucleotide of the mapping
 	pos_t T_r;      // the position of the rightmost nucleotide of the mapping
 	int xmin;     // the number of kmers in the intersection between the pattern and its mapping in `t'
-	pos_t dT_l;      // delta to be applied before output
-	pos_t dT_r;      // -- || --
-	double J;          // Jaccard score/similarity [0;1]
 	double map_time;
 
-	Mapping(int k=0, pos_t P_sz=0, pos_t p_sz=0, int matches=0, pos_t T_l=0, pos_t T_r=0, int xmin=0, pos_t dT_l=0, pos_t dT_r=0, double J=0.0)
-		: k(k), P_sz(P_sz), p_sz(p_sz), matches(matches), T_l(T_l), T_r(T_r), xmin(xmin), dT_l(dT_l), dT_r(dT_r), J(J) {}
+	Mapping(int k=0, pos_t P_sz=0, pos_t p_sz=0, int matches=0, pos_t T_l=0, pos_t T_r=0, int xmin=0)
+		: k(k), P_sz(P_sz), p_sz(p_sz), matches(matches), T_l(T_l), T_r(T_r), xmin(xmin) {}
 };
 
 template<typename TT> auto prev(const typename TT::iterator &it) {
