@@ -171,6 +171,7 @@ class SweepMap {
 		best.P_sz = P_len;
 		best.p_sz = p_len;
 		best.xmin = 0;
+		best.sim = 0.0;
 
 		// Increase the left point end of the window [l,r) one by one. O(matches)
 		int i = 0, j = 0;
@@ -183,13 +184,13 @@ class SweepMap {
 				assert (l->T_r <= r->T_r);
 			}
 
+			auto m = Mapping(params.k, P_len, p_len, (int)L.size(), l->T_r, prev(r)->T_r, pos_t(r-l), xmin);
 			if (params.onlybest) {
-				if (xmin > best.xmin) {
-					auto m = Mapping(params.k, P_len, p_len, (int)L.size(), l->T_r, prev(r)->T_r, pos_t(r-l), xmin);
+				//if (xmin > best.xmin) {
+				if (m.sim > best.sim) {
 					best = m;
 				}
 			} else {
-				auto m = Mapping(params.k, P_len, p_len, (int)L.size(), l->T_r, prev(r)->T_r, pos_t(r-l), xmin);
 				if (m.sim > params.tThres) {
 					mappings.push_back(m);
 				}
