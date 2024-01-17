@@ -73,11 +73,10 @@ class SweepMap {
 		vector<kmer_hits_t> match_lists;
 		match_lists.reserve(p.size());
 
+		T->start("collect_seed_info");
 		hash_t kmer_hash;
-		for(auto p_it = p.begin(); p_it != p.end(); ++p_it) {
+		for (auto &[P_l, kmer_hash] : p) {
 			// TODO: limit the number of kmers in the pattern p
-			pos_t P_l = p_it->first;
-			kmer_hash = p_it->second;
 			kmer_num_t kmer_num;
 
 			// Add pattern kmers from the pattern to p_hist 
@@ -87,12 +86,16 @@ class SweepMap {
 					match_lists.emplace_back(P_l, kmer_num, &it->second);
 			}
 		}
+		T->stop("collect_seed_info");
 
+		T->start("sort_seeds");
 		// Sort the matching kmers by number of hits in the reference
 		sort(match_lists.begin(), match_lists.end(), [](const kmer_hits_t &a, const kmer_hits_t &b) {
 			return a.kmers_in_T->size() < b.kmers_in_T->size();
 		});
+		T->stop("sort_seeds");
 
+		T->start("collect_matches");
 		// Get MAX_SEEDS of kmers with the lowest number of hits.
 		int total_hits = 0;
 		for (int seed=0; seed<(int)match_lists.size(); seed++) {
@@ -115,13 +118,14 @@ class SweepMap {
 				break;
 			}
 		}
+		T->stop("collect_matches");
 
-		T->start("sorting");
+		T->start("sort_matches");
 		// Sort L by ascending positions in reference so that we can next sweep through it.
 		sort(L->begin(), L->end(), [](const Match &a, const Match &b) {
 			return a.T_r < b.T_r;
 		});
-		T->stop("sorting");
+		T->stop("sort_matches");
 	}
 
 	// vector<int> diff_hist;  // diff_hist[kmer_hash] = #occurences in `p` - #occurences in `s`
@@ -264,16 +268,6 @@ class SweepMap {
 		}
 
 	void map(const string &pFile, const blmers_t &bLstmers) {
-		//ifstream reads_stream;
-		//reads_stream.open(pFile);
-		//if (!reads_stream.is_open()) {
-		//	cerr << "ERROR: Could not open " << params.pFile << endl;
-		//	return;
-		//}
-
-		//cerr << "aligning reads from " << params.pFile << "..." << endl;
-		//vector<std::tuple<string, pos_t, Sketch>> pSks;
-
 		T->start("mapping");
 		// Load pattern sequences in batches
 		cerr << "Sketching and mapping a batch of reads from " << params.pFile << "..." << endl;
@@ -351,7 +345,10 @@ class SweepMap {
 		cerr << " | Mapping:               " << setw(5) << right << T.secs("mapping")   << " (" << setw(4) << right << T.perc("mapping", "total") << "\% of total)" << endl;
 		cerr << " |  | sketching reads:       " << setw(5) << right << T.secs("sketching") << " (" << setw(4) << right << T.perc("sketching", "mapping") << "\% of mapping)" << endl;
 		cerr << " |  | match kmers:           " << setw(5) << right << T.secs("matching")  << " (" << setw(4) << right << T.perc("matching", "mapping") << "\%)" << endl;
-		cerr << " |  |  | sort matches:          " << setw(5) << right << T.secs("sorting")   << " (" << setw(4) << right << T.perc("sorting", "matching") << "\% of matching)" << endl;
+		cerr << " |  |  | collect seed info:     " << setw(5) << right << T.secs("collect_seed_info")   << " (" << setw(4) << right << T.perc("collect_seed_info", "matching") << "\% of matching)" << endl;
+		cerr << " |  |  | sort seeds:            " << setw(5) << right << T.secs("sort_seeds")   << " (" << setw(4) << right << T.perc("sort_seeds", "matching") << "\%)" << endl;
+		cerr << " |  |  | collect matches:       " << setw(5) << right << T.secs("collect_matches")   << " (" << setw(4) << right << T.perc("collect_matches", "matching") << "\%)" << endl;
+		cerr << " |  |  | sort matches:          " << setw(5) << right << T.secs("sort_matches")   << " (" << setw(4) << right << T.perc("sort_matches", "matching") << "\%)" << endl;
 		cerr << " |  | sweep:                 " << setw(5) << right << T.secs("sweep")     << " (" << setw(4) << right << T.perc("sweep", "mapping") << "\%)" << endl;
 		cerr << " |  | post proc:             " << setw(5) << right << T.secs("postproc")  << " (" << setw(4) << right << T.perc("postproc", "mapping") << "\%)" << endl;
 		cerr << "Total sketching time:     " << setw(5) << right << FMH_time.secs()     << " (" << setw(4) << right << FMH_time.secs() / T.secs("total") << "\%)" << endl; // << " (" << setw(4) << right << T.perc("postproc", "mapping") << "\%)" << endl;
