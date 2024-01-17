@@ -21,11 +21,18 @@ ACCURACY ?= 0.99
 DEPTH ?= 1
 MEANLEN ?= 10000
 
-K ?= 22
-W ?= 20
+K ?= 24
+R ?= 0.05 
+#W ?= 20
 S ?= 200
 M ?= 2000
 T ?= 0.0
+
+K_SLOW ?= 24
+R_SLOW ?= 0.1
+S_SLOW ?= 1000
+M_SLOW ?= 10000
+T_SLOW ?= 0.0
 
 DIR = newevals
 REF = $(DIR)/$(REFNAME).fa
@@ -98,9 +105,14 @@ eval_sweep_max_seeds: sweep gen_reads
 
 eval_sweep: sweep gen_reads
 	mkdir -p $(OUTDIR)
-	$(TIME_CMD) -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep.params -x -t $(T) -k $(K) -w $(W) -S $(S) -M $(M) 2> >(tee $(OUTDIR)/sweep.log) >$(OUTDIR)/sweep.paf 
-	#$(TIME_CMD) -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep.params -b blacklist_chm13-1Bk15w10n100.txt -x -t $(T) -k $(K) -w $(W) -S $(S) -M $(M) 2> >(tee $(OUTDIR)/sweep.log) >$(OUTDIR)/sweep.paf 
+	$(TIME_CMD) -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep.params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2> >(tee $(OUTDIR)/sweep.log) >$(OUTDIR)/sweep.paf 
+#$(TIME_CMD) -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep.params -b blacklist_chm13-1Bk15w10n100.txt -x -t $(T) -k $(K) -w $(W) -S $(S) -M $(M) 2> >(tee $(OUTDIR)/sweep.log) >$(OUTDIR)/sweep.paf 
 	paftools.js mapeval $(OUTDIR)/sweep.paf | tee $(OUTDIR)/sweep.eval
+
+eval_sweep_slow: sweep gen_reads
+	mkdir -p $(OUTDIR)
+	$(TIME_CMD) -o $(OUTDIR)/sweep-slow.time $(SWEEP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep-slow.params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) 2> >(tee $(OUTDIR)/sweep-slow.log) >$(OUTDIR)/sweep-slow.paf 
+	paftools.js mapeval $(OUTDIR)/sweep-slow.paf | tee $(OUTDIR)/sweep-slow.eval
 
 eval_winnowmap: gen_reads
 	mkdir -p $(OUTDIR)
