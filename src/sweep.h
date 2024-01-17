@@ -102,15 +102,8 @@ class SweepMap {
 				break;
 			}
 			kmer_hits_t &res = match_lists[seed];
-			for (const auto &hit: *(res.kmers_in_T)) {
-				Match m;
-				m.P_l      = res.P_l;
-				m.kmer_ord = res.kmer_num;
-				m.T_r      = hit.first;
-				m.t_pos    = hit.second;
-				//m->strand  = 0;
-				L->push_back(m);
-			}
+			for (const auto &hit: *(res.kmers_in_T))
+				L->emplace_back(res.kmer_num, res.P_l, hit.first, hit.second);
 			if ((total_hits += (int)res.kmers_in_T->size()) > (int)params.max_matches) {
 				C->inc("matches_limit_reached");
 				break;
