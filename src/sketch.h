@@ -11,6 +11,8 @@
 #include <unordered_map>
 #include <math.h>
 
+#include <ankerl/unordered_dense.h>
+
 #include "utils.h"
 #include "io.h"
 #include <climits>
@@ -100,10 +102,17 @@ struct kmer_hits_t {
 		P_l(P_l), kmer_num(kmer_num), kmers_in_T(kmers_in_T) {}
 };
 
+//struct EmptyHash {
+//    size_t operator()(hash_t key) const {
+//        return key; // ^ (key >> 32);
+//    }
+//};
+
 struct SketchIndex {
 	pos_t T_sz;
 	string name;
-	unordered_map<hash_t, vector<abs_ord_t>> h2pos;
+	//unordered_map<hash_t, vector<abs_ord_t>> h2pos;
+	ankerl::unordered_dense::map<hash_t, vector<abs_ord_t>> h2pos;
 
 	void populate_h2pos(const Sketch& sketch) {
 		//print_sketches(name, sketch);

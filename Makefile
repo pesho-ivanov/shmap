@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 CC = g++
 CXX_STANDARD = -std=c++2a
-CFLAGS = -O2 -g -march=native -lm -lpthread -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive #-Wconversion 
+CFLAGS = -O3 -g -march=native -lm -lpthread -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive #-Wconversion 
 LIBS = minimap2/libminimap2.a -lz
 DEPFLAGS = -MMD -MP
 
@@ -19,7 +19,7 @@ EDLIB_BIN = ~/libs/edlib/build/bin/edlib-aligner
 REFNAME ?= chm13-1B
 ACCURACY ?= 0.99
 DEPTH ?= 1
-MEANLEN ?= 10000  # hifi
+MEANLEN ?= 10000
 
 K ?= 22
 W ?= 20
@@ -29,14 +29,13 @@ T ?= 0.0
 
 DIR = newevals
 REF = $(DIR)/$(REFNAME).fa
-READS_PARAMS = $(REFNAME)-a$(ACCURACY)-d$(DEPTH)
+READS_PARAMS = $(REFNAME)-a$(ACCURACY)-d$(DEPTH)-l$(MEANLEN)
 READS_PREFIX = reads-$(READS_PARAMS)
 READS = $(DIR)/$(READS_PREFIX).fa
 OUTDIR = $(DIR)/$(READS_PARAMS)
 
 MAX_SEEDS = 10000
 MAX_MATCHES = 100 300 1000 3000 10000 30000 100000
-#10000000
 
 all: sweep
 

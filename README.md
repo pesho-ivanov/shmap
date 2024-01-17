@@ -1,4 +1,4 @@
-# ESKEMAP - Exact SKEtch-based read MAPping
+# SweepMap - Fast and accurate sketch mapper of a set of reads to a reference
 
 This directory contains the source code of ESKEMAP and the documentation of experiments we performed in our paper.
 

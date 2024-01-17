@@ -17,8 +17,7 @@ sweep
 indexDump.idx
 newevals/eval_sweep-ChrY/
 newevals/eval_sweep-ChrY-K22/
-reads-chm13-positive.fa
-reads-chm13.fa
+reads-*
 newevals/
 merylDB/
 winnowmap_repetitive_k15.txt

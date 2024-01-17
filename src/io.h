@@ -2,11 +2,13 @@
 #define IO_HPP
 
 #include <fstream>
+#include <functional>
 #include <getopt.h>
 #include <iomanip>
 #include <map>
 #include <string>
 #include <tuple>
+#include <vector>
 
 #include <zlib.h>  
 #include "kseq.h"  

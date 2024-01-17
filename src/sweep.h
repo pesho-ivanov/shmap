@@ -280,7 +280,9 @@ class SweepMap {
 		T->start("mapping");
 		// Load pattern sequences in batches
 		cerr << "Sketching and mapping a batch of reads from " << params.pFile << "..." << endl;
+		T->start("query_reading");
 		read_fasta_klib(pFile, [this, &bLstmers](kseq_t *seq) {
+			T->stop("query_reading");
 			T->start("sketching");
 			Sketch p = buildFMHSketch(seq->seq.s, params.k, params.hFrac, bLstmers);
 			T->stop("sketching");
@@ -318,7 +320,9 @@ class SweepMap {
 				C->inc("unmapped_reads");
 
 			T->stop("postproc");
+			T->start("query_reading");
 		});
+		T->stop("query_reading");
 		T->stop("mapping");
 	}
 
@@ -345,12 +349,13 @@ class SweepMap {
 		cerr << " | Unmapped reads:        " << C.count("unmapped_reads") << " (" << C.perc("unmapped_reads", "reads") << "%)" << endl;
 		cerr << " | Average similarity:    " << C.frac("similarity", "mappings") / 10000.0 << endl;
 		cerr << "Total time [sec]:         " << setw(5) << right << T.secs("total")     << " (" << setw(4) << right << T.secs("total") / C.count("reads") << " per read)" << endl;
-		cerr << " | Indexing:              " << setw(5) << right << T.secs("indexing")  << " (" << setw(4) << right << T.perc("indexing", "total") << "\% of total)" << endl;
-		cerr << " |  | reading:               " << setw(5) << right << T.secs("index_reading")  << " (" << setw(4) << right << T.perc("index_reading", "indexing") << "\% of indexing)" << endl;
-		cerr << " |  | sketching:             " << setw(5) << right << T.secs("index_sketching")<< " (" << setw(4) << right << T.perc("index_sketching", "indexing") << "\%)" << endl;
-		cerr << " |  | initializing:          " << setw(5) << right << T.secs("index_initializing")<< " (" << setw(4) << right << T.perc("index_initializing", "indexing") << "\%)" << endl;
-		cerr << " | Mapping:               " << setw(5) << right << T.secs("mapping")   << " (" << setw(4) << right << T.perc("mapping", "total") << "\% of total)" << endl;
-		cerr << " |  | sketching reads:       " << setw(5) << right << T.secs("sketching") << " (" << setw(4) << right << T.perc("sketching", "mapping") << "\% of mapping)" << endl;
+		cerr << " | Index:                 " << setw(5) << right << T.secs("indexing")  << " (" << setw(4) << right << T.perc("indexing", "total") << "\% of total)" << endl;
+		cerr << " |  | read:                  " << setw(5) << right << T.secs("index_reading")  << " (" << setw(4) << right << T.perc("index_reading", "indexing") << "\% of indexing)" << endl;
+		cerr << " |  | sketch:                " << setw(5) << right << T.secs("index_sketching")<< " (" << setw(4) << right << T.perc("index_sketching", "indexing") << "\%)" << endl;
+		cerr << " |  | initialize:            " << setw(5) << right << T.secs("index_initializing")<< " (" << setw(4) << right << T.perc("index_initializing", "indexing") << "\%)" << endl;
+		cerr << " | Map:                   " << setw(5) << right << T.secs("mapping")   << " (" << setw(4) << right << T.perc("mapping", "total") << "\% of total)" << endl;
+		cerr << " |  | read queries:          " << setw(5) << right << T.secs("query_reading")  << " (" << setw(4) << right << T.perc("query_reading", "mapping") << "\% of mapping)" << endl;
+		cerr << " |  | sketch reads:          " << setw(5) << right << T.secs("sketching") << " (" << setw(4) << right << T.perc("sketching", "mapping") << "\%)" << endl;
 		cerr << " |  | match kmers:           " << setw(5) << right << T.secs("matching")  << " (" << setw(4) << right << T.perc("matching", "mapping") << "\%)" << endl;
 		cerr << " |  |  | collect seed info:     " << setw(5) << right << T.secs("collect_seed_info")   << " (" << setw(4) << right << T.perc("collect_seed_info", "matching") << "\% of matching)" << endl;
 		cerr << " |  |  | sort seeds:            " << setw(5) << right << T.secs("sort_seeds")   << " (" << setw(4) << right << T.perc("sort_seeds", "matching") << "\%)" << endl;
@@ -358,7 +363,7 @@ class SweepMap {
 		cerr << " |  |  | sort matches:          " << setw(5) << right << T.secs("sort_matches")   << " (" << setw(4) << right << T.perc("sort_matches", "matching") << "\%)" << endl;
 		cerr << " |  | sweep:                 " << setw(5) << right << T.secs("sweep")     << " (" << setw(4) << right << T.perc("sweep", "mapping") << "\%)" << endl;
 		cerr << " |  | post proc:             " << setw(5) << right << T.secs("postproc")  << " (" << setw(4) << right << T.perc("postproc", "mapping") << "\%)" << endl;
-		cerr << "Total sketching time:     " << setw(5) << right << FMH_time.secs()     << " (" << setw(4) << right << FMH_time.secs() / T.secs("total") << "\%)" << endl; // << " (" << setw(4) << right << T.perc("postproc", "mapping") << "\%)" << endl;
+//		cerr << "Total sketching time:     " << setw(5) << right << FMH_time.secs()     << " (" << setw(4) << right << FMH_time.secs() / T.secs("total") << "\%)" << endl; // << " (" << setw(4) << right << T.perc("postproc", "mapping") << "\%)" << endl;
 	}
 };
 
