@@ -101,7 +101,6 @@ class SweepMap {
 		match_lists.reserve(p.size());
 
 		T->start("collect_seed_info");
-		hash_t kmer_hash;
 		for (auto &[P_l, kmer_hash] : p) {
 			// TODO: limit the number of kmers in the pattern p
 			kmer_num_t kmer_num;

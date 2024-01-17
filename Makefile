@@ -21,7 +21,7 @@ ACCURACY ?= 0.99
 DEPTH ?= 1
 MEANLEN ?= 10000
 
-K ?= 24
+K ?= 22
 R ?= 0.05 
 #W ?= 20
 S ?= 200

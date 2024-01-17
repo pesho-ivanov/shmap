@@ -64,7 +64,8 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac, const blmers_t
 
 	if ((int)s.size() < k) return sk;
 
-	hash_t h, h_fw = 0, h_rc = 0;
+	//hash_t h, h_fw = 0, h_rc = 0;
+	hash_t h_fw = 0;
 	hash_t hThres = hash_t(hFrac * double(std::numeric_limits<hash_t>::max()));
 	int r;
 
