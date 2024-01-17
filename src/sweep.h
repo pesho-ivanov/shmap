@@ -25,10 +25,8 @@ class SweepMap {
 			return false;
 		} else {
 			*kmer_num = (kmer_num_t)hist->size();
-			hash2num->insert({kmer_hash, *kmer_num});  //(*hash2ord)[kmer_hash] = kmer_ord;
-			//ord2hash->push_back(kmer_hash);
+			hash2num->insert({kmer_hash, *kmer_num});
 			hist->push_back(1);
-			//assert(hist->size() == ord2hash->size());
 			return true;
 		}
 	}

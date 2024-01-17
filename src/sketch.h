@@ -2,7 +2,6 @@
 #define SKETCH_HPP
 
 #include <bit>
-//#include <bitset>
 #include <cstdint>
 #include <utility>
 #include <list>
@@ -42,11 +41,6 @@ void initialize_LUT() {
 	LUT_fw['g'] = LUT_fw['G'] = 0x2032'3ed0'8257'2324; // Daniel's
 	LUT_fw['t'] = LUT_fw['T'] = 0x2955'49f5'4be2'4456; // Daniel's
 	//LUT_fw['t'] = LUT_fw['T'] = 0x2d2a04e675310c18;  // Ragnar's
-	
-	//l[b'A' as usize] = 0x3c8bfbb395c60474u64;
-    //l[b'C' as usize] = 0x3193c18562a02b4cu64;
-    //l[b'G' as usize] = 0x20323ed082572324u64;
-    //l[b'T' as usize] = 0x295549f54be24456u64;
 
 	LUT_rc['a'] = LUT_rc['A'] = LUT_fw['T'];
 	LUT_rc['c'] = LUT_rc['C'] = LUT_fw['G'];
@@ -107,8 +101,6 @@ struct kmer_hits_t {
 };
 
 struct SketchIndex {
-	//double s;
-	//const params_t &params;
 	pos_t T_sz;
 	string name;
 	unordered_map<hash_t, vector<abs_ord_t>> h2pos;
