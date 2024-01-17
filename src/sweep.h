@@ -130,7 +130,7 @@ class SweepMap {
 	// vector<Match> L;   	   // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
 	const vector<Mapping> sweep(vector<int> &diff_hist, const vector<Match> &L, const pos_t p_len, const pos_t P_len) {
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
-		multiset<pos_t> P_l_set;  // TODO: use a vector instead?
+		//multiset<pos_t> P_l_set;  // TODO: use a vector instead? // TODO: remove this set altogether (get the leftmost P_l from l and r)
 
 		int xmin = 0;
 		Mapping best;
@@ -143,7 +143,7 @@ class SweepMap {
 		for(auto l = L.begin(), r = L.begin(); l != L.end(); ++l, ++i) {
 			// Increase the right end of the window [l,r) until it gets out.
 			for(; should_extend_right(diff_hist, L, l, r, xmin, P_len, params.k); ++r, ++j) {
-				P_l_set.insert(r->P_l);
+				//P_l_set.insert(r->P_l);
 				// If taking this kmer from T increases the intersection with P.
 				if (--diff_hist[r->kmer_ord] >= 0)
 					++xmin;
@@ -153,12 +153,12 @@ class SweepMap {
 			auto curr_J = J(p_len, l, r, xmin);
 			auto m = Mapping(params.k, P_len, p_len, (int)L.size(), l->T_r, prev(r)->T_r, xmin, 0, 0, curr_J);  // TODO: create only if curr_J is high enough
 
-			if (params.alignment_edges == alignment_edges_t::fine) {
-				if (P_l_set.size() > 0) {
-					m.dT_l = - *P_l_set.begin();
-					m.dT_r = P_len - (*P_l_set.rbegin()+params.k);
-				}
-			}
+			//if (params.alignment_edges == alignment_edges_t::fine) {
+			//	if (P_l_set.size() > 0) {
+			//		m.dT_l = - *P_l_set.begin();
+			//		m.dT_r = P_len - (*P_l_set.rbegin()+params.k);
+			//	}
+			//}
 
 			if (params.onlybest) {
 				if (curr_J > best.J)
@@ -168,7 +168,7 @@ class SweepMap {
 					mappings.push_back(m);
 			}
 
-			P_l_set.erase(P_l_set.find(l->P_l));
+			//P_l_set.erase(P_l_set.find(l->P_l));
 			// Prepare for the next step by moving `l` to the right.
 			if (++diff_hist[l->kmer_ord] > 0)
 				--xmin;
