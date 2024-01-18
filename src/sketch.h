@@ -100,6 +100,7 @@ struct kmer_hits_t {
 	kmer_num_t kmer_num;
 	const vector<abs_ord_t> *kmers_in_T;
 
+	kmer_hits_t() {}
 	kmer_hits_t(pos_t P_l, kmer_num_t kmer_num, const vector<abs_ord_t> *kmers_in_T) :
 		P_l(P_l), kmer_num(kmer_num), kmers_in_T(kmers_in_T) {}
 };

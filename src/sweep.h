@@ -86,6 +86,7 @@ class SweepMap {
 			kmer_num_t kmer_num;
 
 			// Add pattern kmers from the pattern to p_hist 
+			// TODO: make p_hist smaller since we don't use all seeds
 			if (add2hist(kmer_hash, p_hist, &hash2num, &kmer_num)) {
 				T->start("collect_seed_info|find");
 				auto it = tidx.h2pos.find(kmer_hash);
@@ -96,16 +97,17 @@ class SweepMap {
 		}
 		T->stop("collect_seed_info");
 
-		// TODO: instead of sorting, place the seeds in a heap which retains only top-K
-		// TODO: instead of sorting, find top-K value, and filter seeds below of it
-		// TODO: make p_hist smaller since we don't use all seeds
 
 		T->start("sort_seeds");
-		// Sort the matching kmers by number of hits in the reference
 		sort(seeds.begin(), seeds.end(), [](const kmer_hits_t &a, const kmer_hits_t &b) {
+			// Sort the matching kmers by number of hits in the reference
 			return a.kmers_in_T->size() < b.kmers_in_T->size();
 		});
 		T->stop("sort_seeds");
+
+		// keep only the first max_seeds elements of seeds
+		if ((int)seeds.size() > max_seeds)
+			seeds.resize(max_seeds);
 
 		return seeds;
 	}
@@ -118,12 +120,7 @@ class SweepMap {
 		L.reserve(P_MULTIPLICITY * p.size());
 
 		int total_hits = 0;
-		for (int seed=0; seed<(int)seeds.size(); seed++) {
-			if (seed > (int)params.max_seeds) {
-				C->inc("seeds_limit_reached");
-				break;
-			}
-			const kmer_hits_t &res = seeds[seed];
+		for (const auto &res : seeds) {
 			for (const auto &hit: *(res.kmers_in_T))
 				L.emplace_back(res.kmer_num, res.P_l, hit.first, hit.second);
 			if ((total_hits += (int)res.kmers_in_T->size()) > (int)params.max_matches) {
@@ -134,8 +131,8 @@ class SweepMap {
 		T->stop("collect_matches");
 
 		T->start("sort_matches");
-		// Sort L by ascending positions in reference so that we can next sweep through it.
 		sort(L.begin(), L.end(), [](const Match &a, const Match &b) {
+			// Sort L by ascending positions in reference so that we can next sweep through it.
 			return a.T_r < b.T_r;
 		});
 		T->stop("sort_matches");
@@ -330,7 +327,7 @@ class SweepMap {
 		cerr << " | Total reads:           " << C.count("reads") << " (~" << 1.0*C.count("read_len") / C.count("reads") << " nb per read)" << endl;
 		cerr << " | Sketched read kmers:   " << C.count("sketched_kmers") << " (" << C.frac("sketched_kmers", "reads") << " per read)" << endl;
 		cerr << " | Kmer matches:          " << C.count("matches") << " (" << C.frac("matches", "reads") << " per read)" << endl;
-		cerr << " | Seed limit reached:    " << C.count("seeds_limit_reached") << " (" << C.perc("seeds_limit_reached", "reads") << "%)" << endl;
+		//cerr << " | Seed limit reached:    " << C.count("seeds_limit_reached") << " (" << C.perc("seeds_limit_reached", "reads") << "%)" << endl;
 		cerr << " | Matches limit reached: " << C.count("matches_limit_reached") << " (" << C.perc("matches_limit_reached", "reads") << "%)" << endl;
 		cerr << " | Unmapped reads:        " << C.count("unmapped_reads") << " (" << C.perc("unmapped_reads", "reads") << "%)" << endl;
 		cerr << " | Average similarity:    " << C.frac("similarity", "mappings") / 10000.0 << endl;
@@ -356,23 +353,3 @@ class SweepMap {
 };
 
 #endif
-
-	// Returns the Jaccard score of the window [l,r)
-	//inline double J(size_t p_sz, const vector<Match>::const_iterator l, const vector<Match>::const_iterator r, int xmin) {
-	//	int s_sz = prev(r)->t_pos - l->t_pos + 1;
-	//	assert(s_sz >= 0);
-	//	//if (s_sz < 0) return 0;
-	//	assert(p_sz + s_sz - xmin > 0);
-	//	double scj = double(xmin) / double(p_sz + s_sz - xmin);
-	//	if (!(0.0 <= scj && scj <= 1.0))
-	//		cerr << "ERROR: scj=" << scj << ", xmin=" << xmin << ", p_sz=" << p_sz << ", s_sz=" << s_sz << ", l=" << l->t_pos << ", r=" << r->t_pos << endl;
-	//	//assert (0.0 <= scj && scj <= 1.0);
-	//	return scj;
-	//}
-
-	//void print_matches(const vector<Match> &L) const {
-	//	cout << "Matches:" << endl;
-	//	for (auto &m: L) {
-	//		cout << "kmer_ord=" << m.kmer_ord << ", P_l=" << m.P_l << ", T_r=" << m.T_r << ", t_pos=" << m.t_pos << endl;
-	//	}
-	//}

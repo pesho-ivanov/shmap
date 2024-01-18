@@ -139,6 +139,13 @@ struct Match {
 	//}
 };
 
+//void print_matches(const vector<Match> &L) {
+//	cout << "Matches:" << endl;
+//	for (auto &m: L) {
+//		cout << "kmer_ord=" << m.kmer_ord << ", P_l=" << m.P_l << ", T_r=" << m.T_r << ", t_pos=" << m.t_pos << endl;
+//	}
+//}
+
 template<typename TT> auto prev(const typename TT::iterator &it) {
     auto pr = it; return --pr;
 }
