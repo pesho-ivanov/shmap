@@ -113,11 +113,11 @@ class SweepMap {
 	}
 
 	// Initializes the histogram of the pattern and the list of matches
-	vector<Match> match_seeds(const Sketch& p, const seeds_t &seeds, vector<int> *p_hist) {
+	vector<Match> match_seeds(pos_t p_sz, const seeds_t &seeds, vector<int> *p_hist) {
 		T->start("collect_matches");
 		// Get MAX_SEEDS of kmers with the lowest number of hits.
 		vector<Match> L;
-		L.reserve(P_MULTIPLICITY * p.size());
+		L.reserve(P_MULTIPLICITY * p_sz);
 
 		int total_hits = 0;
 		for (const auto &res : seeds) {
@@ -278,7 +278,7 @@ class SweepMap {
 			T->stop("seeding");
 
 			T->start("matching");
-			auto L = match_seeds(p, seeds, &p_hist);
+			auto L = match_seeds(p.size(), seeds, &p_hist);
 			T->stop("matching");
 			//print_matches(L);
 

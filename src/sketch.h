@@ -59,8 +59,8 @@ void initialize_LUT() {
 const Sketch buildFMHSketch(const string& s, int k, double hFrac, const blmers_t& blmers) {
 	FMH_time.start();
 
-	Sketch sk;
-	sk.reserve((int)(1.1 * (double)s.size() * hFrac));
+Sketch sk;
+sk.reserve((int)(1.1 * (double)s.size() * hFrac));
 
 	if ((int)s.size() < k) return sk;
 
@@ -81,8 +81,9 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac, const blmers_t
 //							<< " ^ " << std::hex << std::setfill('0') << std::setw(16) << h_rc << endl;
 		if (h_fw < hThres)  // optimize to only look at specific bits
 			//sk.emplace_back(r, h);
+			//sk.emplace_back(r, encode32(s.c_str()+r-k, k));
 			sk.emplace_back(r, h_fw);
-		
+					
 		if (r >= (int)s.size()) break;
 
 		h_fw = rotl(h_fw, 1) ^ rotl(LUT_fw[(int)s[r-k]], k) ^ LUT_fw[(int)s[r]];
@@ -113,7 +114,7 @@ struct kmer_hits_t {
 
 struct SketchIndex {
 	pos_t T_sz;
-	string name;
+		string name;
 	//unordered_map<hash_t, vector<abs_ord_t>> h2pos;
 	ankerl::unordered_dense::map<hash_t, vector<abs_ord_t>> h2pos;
 	//gtl::flat_hash_map<hash_t, vector<abs_ord_t>> h2pos;
@@ -126,7 +127,7 @@ struct SketchIndex {
 		int kmers = 0;
 		for (const auto& h2p : h2pos) {
 			kmers++;
-			if (h2p.second.size() >= (int)hist.size())
+			if (h2p.second.size() >= hist.size())
 				++inf_bucket;
 			else 
 				++hist[h2p.second.size()];
@@ -136,8 +137,7 @@ struct SketchIndex {
 		for (i=0; i<(int)hist.size(); ++i)
 			if (hist[i] > 0)
 				cerr << setw(5) << right << i << " occ: " << hist[i] << " kmers" << endl;
-		cerr << setw(4) << right << i << "+ occ: " << hist[i] << " kmers" << endl;
-	
+		cerr << setw(4) << right << i << "+ occ: " << hist[i] << " kmers" << endl;	
 	}
 
 	void populate_h2pos(const Sketch& sketch) {
