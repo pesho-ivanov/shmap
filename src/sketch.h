@@ -139,12 +139,12 @@ struct SketchIndex {
 		}
 
 		cerr << fixed << setprecision(2);
-		cerr << "Histogram of " << kmers << " kmers ("
+		cerr << "Histogram of " << kmers << " different kmers ("
 			<< 100.0*double(different_kmers)/double(kmers) << "\% different) covering "
-			<< 100.0*double(params.k*kmers)/double(T_sz) << "\% of the " << T_sz << "nb index" << endl;
+			<< 100.0*double(params.k)*double(kmers)/double(T_sz) << "\% of the " << T_sz << "nb index" << endl;
 		for (size_t i=0; i<hist.size(); ++i)
 			if (hist[i] > 0)
-				cerr << setw(5) << right << i << (i<hist.size()-1?"":"+") << " occ: " << setw(9) << right << hist[i] << " kmers (" << 100.0*double(hist[i])/double(kmers) << "\%)" << endl;
+				cerr << setw(5) << right << i << (i<hist.size()-1?" ":"+") << "occ: " << setw(9) << right << hist[i] << " different kmers (" << 100.0*double(hist[i])/double(different_kmers) << "\%)" << endl;
 	}
 
 	void populate_h2pos(const Sketch& sketch) {

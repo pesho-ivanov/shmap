@@ -39,12 +39,11 @@ int main(int argc, char **argv) {
 
 	T.start("index_initializing");
 	SketchIndex tidx(t, T_sz, ref_name, params);
+	tidx.print_hist();
 	T.stop("index_initializing");
 	T.stop("indexing");
 
 	C.inc("T_sz", tidx.T_sz);
-
-	tidx.print_hist();
 
 	if (!params.paramsFile.empty()) {
 		cerr << "Writing parameters to " << params.paramsFile << "..." << endl;
