@@ -12,7 +12,7 @@ using std::string;
 
 using hash_t     = uint64_t;
 using pos_t      = int32_t;
-using kmer_num_t = int32_t;
+using kmer_num_t = hash_t;
 using blmers_t   = std::unordered_map<hash_t, char>;
 
 const double EPS = 1e-7;
@@ -128,7 +128,7 @@ public:
 };
 
 struct Match {
-	kmer_num_t kmer_ord;
+	kmer_num_t kmer;
 	pos_t P_l;
 	pos_t T_r;
 	pos_t t_pos;

@@ -59,40 +59,36 @@ class SweepMap {
 	Counters *C;
 
 	using seeds_t = vector<kmer_hits_t>;
+	using hist_t = ankerl::unordered_dense::map<hash_t, int>;
 
 	// return if the kmer has not been seen before and construct hash2num[kmer_hash] = kmer_num, which is not more than |p| 
-	inline bool add2hist(const hash_t kmer_hash, vector<int> *hist, ankerl::unordered_dense::map<hash_t, kmer_num_t> *hash2num, kmer_num_t *kmer_num) {
-		auto num_it = hash2num->find(kmer_hash);
-		if (num_it != hash2num->end()) {
-			*kmer_num = num_it->second;
-			++(*hist)[*kmer_num];
+	inline bool add2hist(const hash_t kmer_hash, hist_t *hist) {
+		auto it = hist->find(kmer_hash);
+		if (it != hist->end()) {
+			++(it->second);
 			return false;
 		} else {
-			*kmer_num = (kmer_num_t)hist->size();
-			hash2num->insert({kmer_hash, *kmer_num});
-			hist->push_back(1);
+			(*hist)[kmer_hash] = 1;
 			return true;
 		}
 	}
 
-	seeds_t choose_seeds(const Sketch& p, int max_seeds, vector<int> *p_hist) {
-		ankerl::unordered_dense::map<hash_t, kmer_num_t> hash2num;
+	seeds_t choose_seeds(const Sketch& p, int max_seeds, hist_t *p_hist) {
 		seeds_t seeds;
 		seeds.reserve(p.size());
 
 		T->start("collect_seed_info");
 		for (auto &[P_l, kmer_hash] : p) {
 			// TODO: limit the number of kmers in the pattern p
-			kmer_num_t kmer_num;
 
 			// Add pattern kmers from the pattern to p_hist 
 			// TODO: make p_hist smaller since we don't use all seeds
-			if (add2hist(kmer_hash, p_hist, &hash2num, &kmer_num)) {
+			if (add2hist(kmer_hash, p_hist)) {
 				T->start("collect_seed_info|find");
 				auto it = tidx.h2pos.find(kmer_hash);
 				T->stop("collect_seed_info|find");
 				if (it != tidx.h2pos.end())
-					seeds.emplace_back(P_l, kmer_num, &it->second);
+					seeds.emplace_back(P_l, kmer_hash, &it->second); // TODO: remove kmer_hash
 			}
 		}
 		T->stop("collect_seed_info");
@@ -113,7 +109,7 @@ class SweepMap {
 	}
 
 	// Initializes the histogram of the pattern and the list of matches
-	vector<Match> match_seeds(pos_t p_sz, const seeds_t &seeds, vector<int> *p_hist) {
+	vector<Match> match_seeds(pos_t p_sz, const seeds_t &seeds) {
 		T->start("collect_matches");
 		// Get MAX_SEEDS of kmers with the lowest number of hits.
 		vector<Match> L;
@@ -140,9 +136,9 @@ class SweepMap {
 		return L;
 	}
 
-	// vector<int> diff_hist;  // diff_hist[kmer_hash] = #occurences in `p` - #occurences in `s`
+	// vector<hash_t> diff_hist;  // diff_hist[kmer_hash] = #occurences in `p` - #occurences in `s`
 	// vector<Match> L;   	   // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
-	const vector<Mapping> sweep(vector<int> &diff_hist, const vector<Match> &L, const pos_t p_len, const pos_t P_len) {
+	const vector<Mapping> sweep(hist_t &diff_hist, const vector<Match> &L, const pos_t p_len, const pos_t P_len) {
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
 
 		int xmin = 0;
@@ -160,7 +156,7 @@ class SweepMap {
 			//for(; should_extend_right(diff_hist, L, l, r, xmin, P_len, params.k); ++r, ++j) {
 			for(; r != L.end() && r->T_r + params.k <= l->T_r + P_len; ++r, ++j) {
 				// If taking this kmer from T increases the intersection with P.
-				if (--diff_hist[r->kmer_ord] >= 0)
+				if (--diff_hist[r->kmer] >= 0)
 					++xmin;
 				assert (l->T_r <= r->T_r);
 			}
@@ -178,7 +174,7 @@ class SweepMap {
 			}
 
 			// Prepare for the next step by moving `l` to the right.
-			if (++diff_hist[l->kmer_ord] > 0)
+			if (++diff_hist[l->kmer] > 0)
 				--xmin;
 
 			assert(xmin >= 0);
@@ -271,19 +267,17 @@ class SweepMap {
 			pos_t P_sz = (pos_t)seq->seq.l;
 
 			C->inc("read_len", P_sz);
-			vector<int> p_hist;
+			hist_t p_hist;
 
 			T->start("seeding");
 			auto seeds = choose_seeds(p, params.max_seeds, &p_hist);
 			T->stop("seeding");
 
 			T->start("matching");
-			auto L = match_seeds(p.size(), seeds, &p_hist);
+			auto L = match_seeds(p.size(), seeds);
 			T->stop("matching");
-			//print_matches(L);
 
 			T->start("sweep");
-			//print_sketches(seqID, p);
 			auto mappings = sweep(p_hist, L, (pos_t)p.size(), P_sz);
 			T->stop("sweep");
 
