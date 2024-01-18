@@ -72,38 +72,26 @@ class SweepMap {
 	using seeds_t = vector<kmer_hits_t>;
 	using hist_t = ankerl::unordered_dense::map<hash_t, int>;
 
-	// return if the kmer has not been seen before and construct hash2num[kmer_hash] = kmer_num, which is not more than |p| 
-	inline bool add2hist(const hash_t kmer_hash, hist_t *hist) {
-		auto it = hist->find(kmer_hash);
-		if (it != hist->end()) {
-			++(it->second);
-			return false;
-		} else {
-			(*hist)[kmer_hash] = 1;
-			return true;
-		}
-	}
-
-	seeds_t choose_seeds(const Sketch& p, int max_seeds, hist_t *p_hist) {
+	seeds_t choose_seeds(const Sketch& p, int max_seeds, hist_t *hist) {
 		seeds_t seeds;
 		seeds.reserve(p.size());
 
 		T->start("collect_seed_info");
-		for (auto &[P_l, kmer_hash] : p) {
+		for (const auto &curr: p) {
 			// TODO: limit the number of kmers in the pattern p
-
-			// Add pattern kmers from the pattern to p_hist 
+			// TODO: Add pattern kmers from the pattern to p_hist 
 			// TODO: make p_hist smaller since we don't use all seeds
-			if (add2hist(kmer_hash, p_hist)) {
-				T->start("collect_seed_info|find");
-				auto it = tidx.h2pos.find(kmer_hash);
-				T->stop("collect_seed_info|find");
-				if (it != tidx.h2pos.end())
-					seeds.emplace_back(P_l, kmer_hash, &it->second); // TODO: remove kmer_hash
+			auto hist_it = hist->find(curr.kmer);
+			if (hist_it != hist->end()) {
+				++(hist_it->second);
+			} else {
+				(*hist)[curr.kmer] = 1;
+				auto t_it = tidx.h2pos.find(curr.kmer);
+				if (t_it != tidx.h2pos.end())
+					seeds.emplace_back(curr.r, curr.kmer, &t_it->second); // TODO: remove kmer_hash
 			}
 		}
 		T->stop("collect_seed_info");
-
 
 		T->start("sort_seeds");
 		sort(seeds.begin(), seeds.end(), [](const kmer_hits_t &a, const kmer_hits_t &b) {
@@ -112,7 +100,6 @@ class SweepMap {
 		});
 		T->stop("sort_seeds");
 
-		// keep only the first max_seeds elements of seeds
 		if ((int)seeds.size() > max_seeds)
 			seeds.resize(max_seeds);
 
@@ -346,7 +333,6 @@ class SweepMap {
 		cerr << " |  | sketch reads:          " << setw(5) << right << T.secs("sketching") << " (" << setw(4) << right << T.perc("sketching", "mapping") << "\%)" << endl;
 		cerr << " |  | seeding:            " << setw(5) << right << T.secs("seeding")  << " (" << setw(4) << right << T.perc("seeding", "mapping") << "\%)" << endl;
 		cerr << " |  |  | collect seed info:     " << setw(5) << right << T.secs("collect_seed_info")   << " (" << setw(4) << right << T.perc("collect_seed_info", "seeding") << "\% of seeding)" << endl;
-		cerr << " |  |  |  | hashtable find:        " << setw(5) << right << T.secs("collect_seed_info|find")   << " (" << setw(4) << right << T.perc("collect_seed_info|find", "collect_seed_info") << "\% of collecting seed info)" << endl;
 		cerr << " |  |  | sort seeds by #matches:" << setw(5) << right << T.secs("sort_seeds")   << " (" << setw(4) << right << T.perc("sort_seeds", "seeding") << "\%)" << endl;
 		cerr << " |  | matching seeds:        " << setw(5) << right << T.secs("matching")  << " (" << setw(4) << right << T.perc("matching", "mapping") << "\%)" << endl;
 		cerr << " |  |  | collect matches:       " << setw(5) << right << T.secs("collect_matches")   << " (" << setw(4) << right << T.perc("collect_matches", "matching") << "\% of matching)" << endl;

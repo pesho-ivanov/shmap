@@ -19,10 +19,15 @@ using hash_t     = uint64_t;
 using pos_t      = int32_t;
 using blmers_t   = std::unordered_map<hash_t, char>;
 
-using abs_hash_t = pair<pos_t, hash_t>;
+struct kmer_with_pos_t {
+	pos_t r;
+	hash_t kmer;
+};
+
+//using abs_hash_t = pair<pos_t, hash_t>;
 using abs_ord_t  = pair<pos_t, pos_t>; 
 
-using Sketch     = vector<abs_hash_t>;  // (kmer's left 0-based position, kmer hash)
+using Sketch     = vector<kmer_with_pos_t>;  // (kmer hash, kmer's left 0-based position)
 
 using std::rotl;
 
@@ -32,7 +37,7 @@ static Timer FMH_time;
 void print_sketches(const string &seqID, const Sketch &sks) {
 	cout << seqID << endl;
 	for (const auto& sk : sks) {
-		cout << "  " << sk.first << ", " << sk.second << endl;
+		cout << "  " << sk.r << ", " << sk.kmer << endl;
 	}
 }
 
@@ -142,8 +147,8 @@ struct SketchIndex {
 	void populate_h2pos(const Sketch& sketch) {
 		//print_sketches(name, sketch);
 		for (size_t tpos = 0; tpos < sketch.size(); ++tpos) {
-			const abs_hash_t& abs_hash = sketch[tpos];
-			h2pos[abs_hash.second].push_back(abs_ord_t(abs_hash.first, tpos));
+			const kmer_with_pos_t& abs_hash = sketch[tpos];
+			h2pos[abs_hash.kmer].push_back(abs_ord_t(abs_hash.r, tpos));
 		}
 	}
 
