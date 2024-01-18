@@ -13,9 +13,10 @@ class Timer {
 public:
     std::chrono::time_point<std::chrono::high_resolution_clock> start_time_point_, end_time_point_;
     double accumulated_time_;
+    double min_, max_;
     bool running_;
 
-    Timer() : accumulated_time_(0.0), running_(false) {}
+    Timer() : accumulated_time_(0.0), min_(1e9), max_(-1.0), running_(false) {}
 
     void start() {
         if (!running_) {
@@ -28,14 +29,22 @@ public:
 		assert(running_);
         if (running_) {
             end_time_point_ = std::chrono::high_resolution_clock::now();
-            accumulated_time_ += std::chrono::duration<double>(end_time_point_ - start_time_point_).count();
+            auto diff = std::chrono::duration<double>(end_time_point_ - start_time_point_).count();
+            accumulated_time_ += diff;
             running_ = false;
+            if (diff < min_) min_ = diff;
+            if (diff > max_) max_ = diff;
         }
     }
 
     double secs() const {
 		assert(!running_);
 		return accumulated_time_;
+    }
+
+    double range_ratio() const {
+        assert(!running_);
+        return max_ / min_;
     }
 };
 
@@ -59,6 +68,16 @@ public:
 		assert(it != timers_.end());
         if (it != timers_.end()) {
             return it->second.secs();
+        }
+        assert(false);
+        return 0.0;
+    }
+
+    double range_ratio(const std::string& name) const {
+        auto it = timers_.find(name);
+		assert(it != timers_.end());
+        if (it != timers_.end()) {
+            return it->second.range_ratio();
         }
         assert(false);
         return 0.0;
