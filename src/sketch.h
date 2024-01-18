@@ -118,6 +118,27 @@ struct SketchIndex {
 	ankerl::unordered_dense::map<hash_t, vector<abs_ord_t>> h2pos;
 	//gtl::flat_hash_map<hash_t, vector<abs_ord_t>> h2pos;
 	//gtl::node_hash_map<hash_t, vector<abs_ord_t>> h2pos;
+	//ankerl::unordered_dense::map<hash_t, abs_ord_t> h2singlepos;
+
+	void print_hist() {
+		vector<int> hist(30, 0);
+		int inf_bucket = 0;
+		int kmers = 0;
+		for (const auto& h2p : h2pos) {
+			kmers++;
+			if (h2p.second.size() >= (int)hist.size())
+				++inf_bucket;
+			else 
+				++hist[h2p.second.size()];
+		}
+		cerr << "Histogram of " << kmers << " kmers from index " << name << " of length " << T_sz << endl;
+		int i;
+		for (i=0; i<(int)hist.size(); ++i)
+			if (hist[i] > 0)
+				cerr << setw(5) << right << i << " occ: " << hist[i] << " kmers" << endl;
+		cerr << setw(4) << right << i << "+ occ: " << hist[i] << " kmers" << endl;
+	
+	}
 
 	void populate_h2pos(const Sketch& sketch) {
 		//print_sketches(name, sketch);
