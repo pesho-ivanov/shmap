@@ -75,7 +75,7 @@ class SweepMap {
 		}
 	}
 
-	seeds_t choose_seeds(const Sketch& p, vector<int> *p_hist) {
+	seeds_t choose_seeds(const Sketch& p, int max_seeds, vector<int> *p_hist) {
 		ankerl::unordered_dense::map<hash_t, kmer_num_t> hash2num;
 		seeds_t seeds;
 		seeds.reserve(p.size());
@@ -87,7 +87,9 @@ class SweepMap {
 
 			// Add pattern kmers from the pattern to p_hist 
 			if (add2hist(kmer_hash, p_hist, &hash2num, &kmer_num)) {
+				T->start("collect_seed_info|find");
 				auto it = tidx.h2pos.find(kmer_hash);
+				T->stop("collect_seed_info|find");
 				if (it != tidx.h2pos.end())
 					seeds.emplace_back(P_l, kmer_num, &it->second);
 			}
@@ -275,7 +277,7 @@ class SweepMap {
 			vector<int> p_hist;
 
 			T->start("seeding");
-			auto seeds = choose_seeds(p, &p_hist);
+			auto seeds = choose_seeds(p, params.max_seeds, &p_hist);
 			T->stop("seeding");
 
 			T->start("matching");
@@ -342,6 +344,7 @@ class SweepMap {
 		cerr << " |  | sketch reads:          " << setw(5) << right << T.secs("sketching") << " (" << setw(4) << right << T.perc("sketching", "mapping") << "\%)" << endl;
 		cerr << " |  | seeding:            " << setw(5) << right << T.secs("seeding")  << " (" << setw(4) << right << T.perc("seeding", "mapping") << "\%)" << endl;
 		cerr << " |  |  | collect seed info:     " << setw(5) << right << T.secs("collect_seed_info")   << " (" << setw(4) << right << T.perc("collect_seed_info", "seeding") << "\% of seeding)" << endl;
+		cerr << " |  |  |  | hashtable find:        " << setw(5) << right << T.secs("collect_seed_info|find")   << " (" << setw(4) << right << T.perc("collect_seed_info|find", "collect_seed_info") << "\% of collecting seed info)" << endl;
 		cerr << " |  |  | sort seeds by #matches:" << setw(5) << right << T.secs("sort_seeds")   << " (" << setw(4) << right << T.perc("sort_seeds", "seeding") << "\%)" << endl;
 		cerr << " |  | matching seeds:        " << setw(5) << right << T.secs("matching")  << " (" << setw(4) << right << T.perc("matching", "mapping") << "\%)" << endl;
 		cerr << " |  |  | collect matches:       " << setw(5) << right << T.secs("collect_matches")   << " (" << setw(4) << right << T.perc("collect_matches", "matching") << "\% of matching)" << endl;
