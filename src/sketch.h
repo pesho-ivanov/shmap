@@ -32,7 +32,7 @@ using Sketch     = vector<kmer_with_pos_t>;  // (kmer hash, kmer's left 0-based 
 using std::rotl;
 
 static hash_t LUT_fw[256], LUT_rc[256];
-static Timer FMH_time;
+//static Timer FMH_time;
 
 //void print_sketches(const string &seqID, const Sketch &sks) {
 //	cout << seqID << endl;
@@ -61,10 +61,10 @@ void initialize_LUT() {
 //Sketch sk2 = buildFMHSketch(revComp(s), 5, 1.0, blmers);
 //return 0;
 const Sketch buildFMHSketch(const string& s, int k, double hFrac, const blmers_t& blmers) {
-	FMH_time.start();
+	//FMH_time.start();
 
-Sketch sk;
-sk.reserve((int)(1.1 * (double)s.size() * hFrac));
+	Sketch sk;
+	sk.reserve((int)(1.1 * (double)s.size() * hFrac));
 
 	if ((int)s.size() < k) return sk;
 
@@ -96,7 +96,7 @@ sk.reserve((int)(1.1 * (double)s.size() * hFrac));
 		++r;
 	}
 
-	FMH_time.stop();
+	//FMH_time.stop();
 	return sk;
 }
 
