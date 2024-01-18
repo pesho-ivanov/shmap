@@ -58,6 +58,8 @@ class SweepMap {
 	Timers *T;
 	Counters *C;
 
+	using seeds_t = vector<kmer_hits_t>;
+
 	// return if the kmer has not been seen before and construct hash2num[kmer_hash] = kmer_num, which is not more than |p| 
 	inline bool add2hist(const hash_t kmer_hash, vector<int> *hist, ankerl::unordered_dense::map<hash_t, kmer_num_t> *hash2num, kmer_num_t *kmer_num) {
 		auto num_it = hash2num->find(kmer_hash);
@@ -92,13 +94,10 @@ class SweepMap {
 	//	}
 	//}
 
-	// Initializes the histogram of the pattern and the list of matches
-	void match_kmers(const Sketch& p, vector<int> *p_hist, vector<Match> *L) {
+	seeds_t choose_seeds(const Sketch& p, vector<int> *p_hist) {
 		ankerl::unordered_dense::map<hash_t, kmer_num_t> hash2num;
-		L->reserve(P_MULTIPLICITY * p.size());
-
-		vector<kmer_hits_t> match_lists;
-		match_lists.reserve(p.size());
+		seeds_t seeds;
+		seeds.reserve(p.size());
 
 		T->start("collect_seed_info");
 		for (auto &[P_l, kmer_hash] : p) {
@@ -109,42 +108,41 @@ class SweepMap {
 			if (add2hist(kmer_hash, p_hist, &hash2num, &kmer_num)) {
 				auto it = tidx.h2pos.find(kmer_hash);
 				if (it != tidx.h2pos.end())
-					match_lists.emplace_back(P_l, kmer_num, &it->second);
+					seeds.emplace_back(P_l, kmer_num, &it->second);
 			}
 		}
 		T->stop("collect_seed_info");
 
+		// TODO: instead of sorting, place the seeds in a heap which retains only top-K
+		// TODO: instead of sorting, find top-K value, and filter seeds below of it
+		// TODO: make p_hist smaller since we don't use all seeds
+
 		T->start("sort_seeds");
 		// Sort the matching kmers by number of hits in the reference
-		sort(match_lists.begin(), match_lists.end(), [](const kmer_hits_t &a, const kmer_hits_t &b) {
+		sort(seeds.begin(), seeds.end(), [](const kmer_hits_t &a, const kmer_hits_t &b) {
 			return a.kmers_in_T->size() < b.kmers_in_T->size();
 		});
 		T->stop("sort_seeds");
 
+		return seeds;
+	}
+
+	// Initializes the histogram of the pattern and the list of matches
+	vector<Match> match_seeds(const Sketch& p, const seeds_t &seeds, vector<int> *p_hist) {
 		T->start("collect_matches");
 		// Get MAX_SEEDS of kmers with the lowest number of hits.
+		vector<Match> L;
+		L.reserve(P_MULTIPLICITY * p.size());
 
-	// Returns the Jaccard score of the window [l,r)
-	//inline double J(size_t p_sz, const vector<Match>::const_iterator l, const vector<Match>::const_iterator r, int xmin) {
-	//	int s_sz = prev(r)->t_pos - l->t_pos + 1;
-	//	assert(s_sz >= 0);
-	//	//if (s_sz < 0) return 0;
-	//	assert(p_sz + s_sz - xmin > 0);
-	//	double scj = double(xmin) / double(p_sz + s_sz - xmin);
-	//	if (!(0.0 <= scj && scj <= 1.0))
-	//		cerr << "ERROR: scj=" << scj << ", xmin=" << xmin << ", p_sz=" << p_sz << ", s_sz=" << s_sz << ", l=" << l->t_pos << ", r=" << r->t_pos << endl;
-	//	//assert (0.0 <= scj && scj <= 1.0);
-	//	return scj;
-	//}
 		int total_hits = 0;
-		for (int seed=0; seed<(int)match_lists.size(); seed++) {
+		for (int seed=0; seed<(int)seeds.size(); seed++) {
 			if (seed > (int)params.max_seeds) {
 				C->inc("seeds_limit_reached");
 				break;
 			}
-			kmer_hits_t &res = match_lists[seed];
+			const kmer_hits_t &res = seeds[seed];
 			for (const auto &hit: *(res.kmers_in_T))
-				L->emplace_back(res.kmer_num, res.P_l, hit.first, hit.second);
+				L.emplace_back(res.kmer_num, res.P_l, hit.first, hit.second);
 			if ((total_hits += (int)res.kmers_in_T->size()) > (int)params.max_matches) {
 				C->inc("matches_limit_reached");
 				break;
@@ -154,10 +152,12 @@ class SweepMap {
 
 		T->start("sort_matches");
 		// Sort L by ascending positions in reference so that we can next sweep through it.
-		sort(L->begin(), L->end(), [](const Match &a, const Match &b) {
+		sort(L.begin(), L.end(), [](const Match &a, const Match &b) {
 			return a.T_r < b.T_r;
 		});
 		T->stop("sort_matches");
+
+		return L;
 	}
 
 	// vector<int> diff_hist;  // diff_hist[kmer_hash] = #occurences in `p` - #occurences in `s`
@@ -291,10 +291,13 @@ class SweepMap {
 
 			C->inc("read_len", P_sz);
 			vector<int> p_hist;
-			vector<Match> L;
+
+			T->start("seeding");
+			auto seeds = choose_seeds(p, &p_hist);
+			T->stop("seeding");
 
 			T->start("matching");
-			match_kmers(p, &p_hist, &L);
+			auto L = match_seeds(p, seeds, &p_hist);
 			T->stop("matching");
 			//print_matches(L);
 
@@ -355,10 +358,11 @@ class SweepMap {
 		cerr << " | Map:                   " << setw(5) << right << T.secs("mapping")   << " (" << setw(4) << right << T.perc("mapping", "total") << "\% of total)" << endl;
 		cerr << " |  | read queries:          " << setw(5) << right << T.secs("query_reading")  << " (" << setw(4) << right << T.perc("query_reading", "mapping") << "\% of mapping)" << endl;
 		cerr << " |  | sketch reads:          " << setw(5) << right << T.secs("sketching") << " (" << setw(4) << right << T.perc("sketching", "mapping") << "\%)" << endl;
-		cerr << " |  | match kmers:           " << setw(5) << right << T.secs("matching")  << " (" << setw(4) << right << T.perc("matching", "mapping") << "\%)" << endl;
-		cerr << " |  |  | collect seed info:     " << setw(5) << right << T.secs("collect_seed_info")   << " (" << setw(4) << right << T.perc("collect_seed_info", "matching") << "\% of matching)" << endl;
-		cerr << " |  |  | sort seeds:            " << setw(5) << right << T.secs("sort_seeds")   << " (" << setw(4) << right << T.perc("sort_seeds", "matching") << "\%)" << endl;
-		cerr << " |  |  | collect matches:       " << setw(5) << right << T.secs("collect_matches")   << " (" << setw(4) << right << T.perc("collect_matches", "matching") << "\%)" << endl;
+		cerr << " |  | seeding the read:      " << setw(5) << right << T.secs("seeding")  << " (" << setw(4) << right << T.perc("seeding", "mapping") << "\%)" << endl;
+		cerr << " |  |  | collect seed info:     " << setw(5) << right << T.secs("collect_seed_info")   << " (" << setw(4) << right << T.perc("collect_seed_info", "seeding") << "\% of seeding)" << endl;
+		cerr << " |  |  | sort seeds:            " << setw(5) << right << T.secs("sort_seeds")   << " (" << setw(4) << right << T.perc("sort_seeds", "seeding") << "\%)" << endl;
+		cerr << " |  | matching seeds:        " << setw(5) << right << T.secs("matching")  << " (" << setw(4) << right << T.perc("matching", "mapping") << "\%)" << endl;
+		cerr << " |  |  | collect matches:       " << setw(5) << right << T.secs("collect_matches")   << " (" << setw(4) << right << T.perc("collect_matches", "matching") << "\% of matching)" << endl;
 		cerr << " |  |  | sort matches:          " << setw(5) << right << T.secs("sort_matches")   << " (" << setw(4) << right << T.perc("sort_matches", "matching") << "\%)" << endl;
 		cerr << " |  | sweep:                 " << setw(5) << right << T.secs("sweep")     << " (" << setw(4) << right << T.perc("sweep", "mapping") << "\%)" << endl;
 		cerr << " |  | post proc:             " << setw(5) << right << T.secs("postproc")  << " (" << setw(4) << right << T.perc("postproc", "mapping") << "\%)" << endl;
@@ -367,3 +371,16 @@ class SweepMap {
 };
 
 #endif
+
+	// Returns the Jaccard score of the window [l,r)
+	//inline double J(size_t p_sz, const vector<Match>::const_iterator l, const vector<Match>::const_iterator r, int xmin) {
+	//	int s_sz = prev(r)->t_pos - l->t_pos + 1;
+	//	assert(s_sz >= 0);
+	//	//if (s_sz < 0) return 0;
+	//	assert(p_sz + s_sz - xmin > 0);
+	//	double scj = double(xmin) / double(p_sz + s_sz - xmin);
+	//	if (!(0.0 <= scj && scj <= 1.0))
+	//		cerr << "ERROR: scj=" << scj << ", xmin=" << xmin << ", p_sz=" << p_sz << ", s_sz=" << s_sz << ", l=" << l->t_pos << ", r=" << r->t_pos << endl;
+	//	//assert (0.0 <= scj && scj <= 1.0);
+	//	return scj;
+	//}
