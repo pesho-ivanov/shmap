@@ -75,25 +75,6 @@ class SweepMap {
 		}
 	}
 
-	// Returns true if the window [l,r) should be extended to the right
-	inline bool should_extend_right(
-			const vector<int> &hist,
-			const vector<Match> &L,
-			const vector<Match>::const_iterator l, const vector<Match>::const_iterator r,
-			const int xmin, const int Plen_nucl, const int k) {
-		if (r == L.end())
-			return false;
-		bool extension_stays_within_window = r->T_r + k <= l->T_r + Plen_nucl;
-		return extension_stays_within_window;
-	}
-
-	//void print_matches(const vector<Match> &L) const {
-	//	cout << "Matches:" << endl;
-	//	for (auto &m: L) {
-	//		cout << "kmer_ord=" << m.kmer_ord << ", P_l=" << m.P_l << ", T_r=" << m.T_r << ", t_pos=" << m.t_pos << endl;
-	//	}
-	//}
-
 	seeds_t choose_seeds(const Sketch& p, vector<int> *p_hist) {
 		ankerl::unordered_dense::map<hash_t, kmer_num_t> hash2num;
 		seeds_t seeds;
@@ -177,7 +158,8 @@ class SweepMap {
 		int i = 0, j = 0;
 		for(auto l = L.begin(), r = L.begin(); l != L.end(); ++l, ++i) {
 			// Increase the right end of the window [l,r) until it gets out.
-			for(; should_extend_right(diff_hist, L, l, r, xmin, P_len, params.k); ++r, ++j) {
+			//for(; should_extend_right(diff_hist, L, l, r, xmin, P_len, params.k); ++r, ++j) {
+			for(; r != L.end() && r->T_r + params.k <= l->T_r + P_len; ++r, ++j) {
 				// If taking this kmer from T increases the intersection with P.
 				if (--diff_hist[r->kmer_ord] >= 0)
 					++xmin;
@@ -358,9 +340,9 @@ class SweepMap {
 		cerr << " | Map:                   " << setw(5) << right << T.secs("mapping")   << " (" << setw(4) << right << T.perc("mapping", "total") << "\% of total)" << endl;
 		cerr << " |  | read queries:          " << setw(5) << right << T.secs("query_reading")  << " (" << setw(4) << right << T.perc("query_reading", "mapping") << "\% of mapping)" << endl;
 		cerr << " |  | sketch reads:          " << setw(5) << right << T.secs("sketching") << " (" << setw(4) << right << T.perc("sketching", "mapping") << "\%)" << endl;
-		cerr << " |  | seeding the read:      " << setw(5) << right << T.secs("seeding")  << " (" << setw(4) << right << T.perc("seeding", "mapping") << "\%)" << endl;
+		cerr << " |  | seeding:            " << setw(5) << right << T.secs("seeding")  << " (" << setw(4) << right << T.perc("seeding", "mapping") << "\%)" << endl;
 		cerr << " |  |  | collect seed info:     " << setw(5) << right << T.secs("collect_seed_info")   << " (" << setw(4) << right << T.perc("collect_seed_info", "seeding") << "\% of seeding)" << endl;
-		cerr << " |  |  | sort seeds:            " << setw(5) << right << T.secs("sort_seeds")   << " (" << setw(4) << right << T.perc("sort_seeds", "seeding") << "\%)" << endl;
+		cerr << " |  |  | sort seeds by #matches:" << setw(5) << right << T.secs("sort_seeds")   << " (" << setw(4) << right << T.perc("sort_seeds", "seeding") << "\%)" << endl;
 		cerr << " |  | matching seeds:        " << setw(5) << right << T.secs("matching")  << " (" << setw(4) << right << T.perc("matching", "mapping") << "\%)" << endl;
 		cerr << " |  |  | collect matches:       " << setw(5) << right << T.secs("collect_matches")   << " (" << setw(4) << right << T.perc("collect_matches", "matching") << "\% of matching)" << endl;
 		cerr << " |  |  | sort matches:          " << setw(5) << right << T.secs("sort_matches")   << " (" << setw(4) << right << T.perc("sort_matches", "matching") << "\%)" << endl;
@@ -383,4 +365,11 @@ class SweepMap {
 	//		cerr << "ERROR: scj=" << scj << ", xmin=" << xmin << ", p_sz=" << p_sz << ", s_sz=" << s_sz << ", l=" << l->t_pos << ", r=" << r->t_pos << endl;
 	//	//assert (0.0 <= scj && scj <= 1.0);
 	//	return scj;
+	//}
+
+	//void print_matches(const vector<Match> &L) const {
+	//	cout << "Matches:" << endl;
+	//	for (auto &m: L) {
+	//		cout << "kmer_ord=" << m.kmer_ord << ", P_l=" << m.P_l << ", T_r=" << m.T_r << ", t_pos=" << m.t_pos << endl;
+	//	}
 	//}
