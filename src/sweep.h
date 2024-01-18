@@ -10,6 +10,18 @@
 #include "io.h"
 #include "sketch.h"
 
+struct Match {
+	hash_t kmer;
+	pos_t P_l;
+	pos_t T_r;
+	pos_t t_pos;
+	//bool strand;  // 0 - forward, 1 - reverse
+
+	//char get_strand() const {
+	//	return strand ? '-' : '+';
+	//}
+};
+
 struct Mapping {
 	int k; 	   // kmer size
 	pos_t P_sz;     // pattern size |P| bp 
@@ -118,7 +130,7 @@ class SweepMap {
 		int total_hits = 0;
 		for (const auto &res : seeds) {
 			for (const auto &hit: *(res.kmers_in_T))
-				L.emplace_back(res.kmer_num, res.P_l, hit.first, hit.second);
+				L.emplace_back(res.kmer, res.P_l, hit.first, hit.second);
 			if ((total_hits += (int)res.kmers_in_T->size()) > (int)params.max_matches) {
 				C->inc("matches_limit_reached");
 				break;

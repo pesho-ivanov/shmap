@@ -17,10 +17,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	blmers_t bLstmers;
-	if (!params.bLstFl.empty()) {
-		bLstmers = readBlstKmers(params.bLstFl);
-	}
+	blmers_t bLstmers;  // TODO: not used
 
 	T.start("indexing");
 	T.start("index_reading");

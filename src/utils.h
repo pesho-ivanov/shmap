@@ -10,13 +10,6 @@
 
 using std::string;
 
-using hash_t     = uint64_t;
-using pos_t      = int32_t;
-using kmer_num_t = hash_t;
-using blmers_t   = std::unordered_map<hash_t, char>;
-
-const double EPS = 1e-7;
-
 class Timer {
 private:
     std::chrono::time_point<std::chrono::high_resolution_clock> start_time_point_, end_time_point_;
@@ -127,27 +120,8 @@ public:
 	}
 };
 
-struct Match {
-	kmer_num_t kmer;
-	pos_t P_l;
-	pos_t T_r;
-	pos_t t_pos;
-	//bool strand;  // 0 - forward, 1 - reverse
-
-	//char get_strand() const {
-	//	return strand ? '-' : '+';
-	//}
-};
-
-//void print_matches(const vector<Match> &L) {
-//	cout << "Matches:" << endl;
-//	for (auto &m: L) {
-//		cout << "kmer_ord=" << m.kmer_ord << ", P_l=" << m.P_l << ", T_r=" << m.T_r << ", t_pos=" << m.t_pos << endl;
-//	}
+//template<typename TT> auto prev(const typename TT::iterator &it) {
+//    auto pr = it; return --pr;
 //}
-
-template<typename TT> auto prev(const typename TT::iterator &it) {
-    auto pr = it; return --pr;
-}
 
 #endif

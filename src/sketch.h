@@ -20,6 +20,10 @@
 
 using namespace std;
 
+using hash_t     = uint64_t;
+using pos_t      = int32_t;
+using blmers_t   = std::unordered_map<hash_t, char>;
+
 using abs_hash_t = pair<pos_t, hash_t>;
 using abs_ord_t  = pair<pos_t, pos_t>; 
 
@@ -98,12 +102,12 @@ sk.reserve((int)(1.1 * (double)s.size() * hFrac));
 
 struct kmer_hits_t {
 	pos_t P_l;
-	kmer_num_t kmer_num;
+	hash_t kmer;
 	const vector<abs_ord_t> *kmers_in_T;
 
 	kmer_hits_t() {}
-	kmer_hits_t(pos_t P_l, kmer_num_t kmer_num, const vector<abs_ord_t> *kmers_in_T) :
-		P_l(P_l), kmer_num(kmer_num), kmers_in_T(kmers_in_T) {}
+	kmer_hits_t(pos_t P_l, hash_t kmer, const vector<abs_ord_t> *kmers_in_T) :
+		P_l(P_l), kmer(kmer), kmers_in_T(kmers_in_T) {}
 };
 
 //struct EmptyHash {

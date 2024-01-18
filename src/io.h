@@ -350,23 +350,4 @@ void read_fasta_klib(const std::string& filename, std::function<void(kseq_t*)> c
     gzclose(fp);
 }
 
-//This function reads 64-bit numbers from file and returns them as a hash table
-const blmers_t readBlstKmers(const string& fname) {
-	char nb[STRING_BUFFER_SIZE_DEFAULT];
-	char* end;
-	ifstream iFile(fname);
-	unordered_map<hash_t, char> numbers;
-
-	if(!iFile.is_open()) {
-		cerr << "readBlstKmers: WARNING input file could not be opened. Hash table will be empty!" << endl;
-		return numbers;
-	}
-
-	//Read kmer hashes
-	while(iFile.getline(nb, STRING_BUFFER_SIZE_DEFAULT))
-		numbers[strtoull(nb, &end, 0)] = 1;
-
-	return numbers;
-}
-
 #endif
