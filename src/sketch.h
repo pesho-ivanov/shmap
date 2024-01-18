@@ -34,12 +34,12 @@ using std::rotl;
 static hash_t LUT_fw[256], LUT_rc[256];
 static Timer FMH_time;
 
-void print_sketches(const string &seqID, const Sketch &sks) {
-	cout << seqID << endl;
-	for (const auto& sk : sks) {
-		cout << "  " << sk.r << ", " << sk.kmer << endl;
-	}
-}
+//void print_sketches(const string &seqID, const Sketch &sks) {
+//	cout << seqID << endl;
+//	for (const auto& sk : sks) {
+//		cout << "  " << sk.r << ", " << sk.kmer << endl;
+//	}
+//}
 
 void initialize_LUT() {
 	LUT_fw['a'] = LUT_fw['A'] = 0x3c8b'fbb3'95c6'0474; // Daniel's
@@ -118,7 +118,8 @@ struct kmer_hits_t {
 
 struct SketchIndex {
 	pos_t T_sz;
-		string name;
+	string name;
+	const params_t &params;
 	//unordered_map<hash_t, vector<abs_ord_t>> h2pos;
 	ankerl::unordered_dense::map<hash_t, vector<abs_ord_t>> h2pos;
 	//gtl::flat_hash_map<hash_t, vector<abs_ord_t>> h2pos;
@@ -126,22 +127,24 @@ struct SketchIndex {
 	//ankerl::unordered_dense::map<hash_t, abs_ord_t> h2singlepos;
 
 	void print_hist() {
-		vector<int> hist(30, 0);
-		int inf_bucket = 0;
-		int kmers = 0;
+		vector<int> hist(10, 0);
+		int kmers = 0, different_kmers = 0;
 		for (const auto& h2p : h2pos) {
-			kmers++;
-			if (h2p.second.size() >= hist.size())
-				++inf_bucket;
+			kmers += h2p.second.size();
+			++different_kmers;
+			if (h2p.second.size() >= hist.size()-1)
+				++hist.back();
 			else 
 				++hist[h2p.second.size()];
 		}
-		cerr << "Histogram of " << kmers << " kmers from index " << name << " of length " << T_sz << endl;
-		int i;
-		for (i=0; i<(int)hist.size(); ++i)
+
+		cerr << fixed << setprecision(2);
+		cerr << "Histogram of " << kmers << " kmers ("
+			<< 100.0*double(different_kmers)/double(kmers) << "\% different) covering "
+			<< 100.0*double(params.k*kmers)/double(T_sz) << "\% of the " << T_sz << "nb index" << endl;
+		for (size_t i=0; i<hist.size(); ++i)
 			if (hist[i] > 0)
-				cerr << setw(5) << right << i << " occ: " << hist[i] << " kmers" << endl;
-		cerr << setw(4) << right << i << "+ occ: " << hist[i] << " kmers" << endl;	
+				cerr << setw(5) << right << i << (i<hist.size()-1?"":"+") << " occ: " << setw(9) << right << hist[i] << " kmers (" << 100.0*double(hist[i])/double(kmers) << "\%)" << endl;
 	}
 
 	void populate_h2pos(const Sketch& sketch) {
@@ -152,13 +155,13 @@ struct SketchIndex {
 		}
 	}
 
-	SketchIndex(const Sketch& sketch, pos_t T_sz, const string &name)
-		: T_sz(T_sz), name(name) {
+	SketchIndex(const Sketch& sketch, pos_t T_sz, const string &name, const params_t &params)
+		: T_sz(T_sz), name(name), params(params) {
 		populate_h2pos(sketch);
 	}
 
 	SketchIndex(const string &name, const string &ref, const params_t &params, const blmers_t &bLstmers)
-		: T_sz((pos_t)ref.size()), name(name) {
+		: T_sz((pos_t)ref.size()), name(name), params(params) {
 		Sketch sketch = buildFMHSketch(ref, params.k, params.hFrac, bLstmers);
 		populate_h2pos(sketch);
 	}

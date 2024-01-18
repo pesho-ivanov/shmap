@@ -10,12 +10,11 @@
 using std::string;
 
 class Timer {
-private:
+public:
     std::chrono::time_point<std::chrono::high_resolution_clock> start_time_point_, end_time_point_;
     double accumulated_time_;
     bool running_;
 
-public:
     Timer() : accumulated_time_(0.0), running_(false) {}
 
     void start() {
@@ -41,10 +40,9 @@ public:
 };
 
 class Timers {
-private:
+public:
     std::unordered_map<std::string, Timer> timers_;
 
-public:
     void start(const std::string& name) {
         timers_[name].start();
     }
@@ -62,6 +60,7 @@ public:
         if (it != timers_.end()) {
             return it->second.secs();
         }
+        assert(false);
         return 0.0;
     }
 

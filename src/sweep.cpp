@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
 	T.stop("index_reading");
 
 	T.start("index_initializing");
-	SketchIndex tidx(t, T_sz, ref_name);
+	SketchIndex tidx(t, T_sz, ref_name, params);
 	T.stop("index_initializing");
 	T.stop("indexing");
 
