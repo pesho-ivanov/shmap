@@ -1,22 +1,17 @@
 #ifndef SKETCH_HPP
 #define SKETCH_HPP
 
-#include <bit>
-#include <cstdint>
-#include <utility>
-#include <list>
+#include <climits>
 #include <string>
 #include <iostream>
 #include <vector>
 #include <unordered_map>
-#include <math.h>
 
 #include <ankerl/unordered_dense.h>
 //#include "phmap.hpp"
 
 #include "utils.h"
 #include "io.h"
-#include <climits>
 
 using namespace std;
 

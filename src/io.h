@@ -5,9 +5,7 @@
 #include <functional>
 #include <getopt.h>
 #include <iomanip>
-#include <map>
 #include <string>
-#include <tuple>
 #include <vector>
 
 #include <zlib.h>  
@@ -19,9 +17,8 @@ using std::cout;
 using std::vector;
 using std::string;
 using std::pair;
-using std::endl;
 using std::ifstream;
-using std::unordered_map;
+using std::endl;
 
 #define INDEX_DEFAULT_DUMP_FILE "indexDump.idx"
 #define DEFAULT_WEIGHT 1

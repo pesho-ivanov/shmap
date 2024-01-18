@@ -5,7 +5,6 @@
 #include <cassert>
 #include <deque>
 #include <iomanip>
-#include <set>
 
 #include "io.h"
 #include "sketch.h"
