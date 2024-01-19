@@ -125,13 +125,15 @@ struct SketchIndex {
 
 	void print_hist() {
 		vector<int> hist(10, 0);
-		int kmers = 0, different_kmers = 0;
+		int kmers = 0, different_kmers = 0, max_occ = 0;
 		for (const auto& h2p : h2pos) {
 			kmers += h2p.second.size();
 			++different_kmers;
-			if (h2p.second.size() >= hist.size()-1)
+			if (h2p.second.size() >= hist.size()-1) {
+				if ((int)h2p.second.size() > max_occ)
+					max_occ = (int)h2p.second.size();
 				++hist.back();
-			else 
+			} else 
 				++hist[h2p.second.size()];
 		}
 
@@ -142,6 +144,7 @@ struct SketchIndex {
 		for (size_t i=0; i<hist.size(); ++i)
 			if (hist[i] > 0)
 				cerr << setw(5) << right << i << (i<hist.size()-1?" ":"+") << "occ: " << setw(9) << right << hist[i] << " different kmers (" << 100.0*double(hist[i])/double(different_kmers) << "\%)" << endl;
+		cerr << "Most frequent kmer occurs " << max_occ << " times." << endl;
 	}
 
 	void populate_h2pos(const Sketch& sketch) {

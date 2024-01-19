@@ -53,11 +53,11 @@ struct Mapping {
 			<< "\t" << 60  // Mapping quality (0-255; 255 for missing)
 		// ----- end of required PAF fields -----
 			<< "\t" << "k:i:" << k
-			<< "\t" << "M:i:" << matches // matches of `p` in `s` [kmers]
+			<< "\t" << "M:i:" << matches // kmer matches in T
 			<< "\t" << "p:i:" << p_sz 
 			<< "\t" << "s:i:" << s_sz
 			<< "\t" << "I:i:" << xmin  // intersection of `p` and `s` [kmers]
-			<< "\t" << "S:f:" << sim   // similarity [0; 1]
+			<< "\t" << "J:f:" << sim   // similarity [0; 1]
 			<< "\t" << "t:f:" << map_time
 			<< endl;
 	}
