@@ -11,6 +11,7 @@ SRCS = src/sweep.cpp src/sweep.h src/io.h src/sketch.h src/utils.h src/kseq.h
 SWEEP_BIN = ./sweep
 MINIMAP_BIN = minimap2
 BLEND_BIN = ~/libs/blend/bin/blend
+VERITYMAP_BIN = ~/libs/VerityMap/veritymap/main.py
 MAPQUIK_BIN = mapquik
 ESKEMAP_BIN = eskemap
 MERYL_BIN = ~/libs/Winnowmap/bin/meryl
@@ -135,6 +136,12 @@ eval_blend: gen_reads
 	mkdir -p $(OUTDIR)
 	$(TIME_CMD) -o $(OUTDIR)/blend.time $(BLEND_BIN) -x map-hifi -t 1 -N 0 $(REF) $(READS) 2> >(tee $(OUTDIR)/blend.log) >$(OUTDIR)/blend.paf 
 	paftools.js mapeval $(OUTDIR)/blend.paf | tee $(OUTDIR)/blend.eval
+
+eval_veritymap:
+	mkdir -p $(OUTDIR)
+	$(TIME_CMD) -o $(OUTDIR)/veritymap.time $(VERITYMAP_BIN) -d hifi -t 1 --reads $(READS) $(REF) -o $(OUTDIR)/veritymap 2> >(tee $(OUTDIR)/veritymap.log) >$(OUTDIR)/veritymap.paf 
+	paftools.js mapeval $(OUTDIR)/veritymap.paf | tee $(OUTDIR)/veritymap.eval
+
 
 eval_mapquik: gen_reads
 	mkdir -p $(OUTDIR)
