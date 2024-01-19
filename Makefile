@@ -10,6 +10,7 @@ TIME_CMD = /usr/bin/time -f "%U\t%M"
 SRCS = src/sweep.cpp src/sweep.h src/io.h src/sketch.h src/utils.h src/kseq.h
 SWEEP_BIN = ./sweep
 MINIMAP_BIN = minimap2
+BLEND_BIN = ~/libs/blend/bin/blend
 MAPQUIK_BIN = mapquik
 ESKEMAP_BIN = eskemap
 MERYL_BIN = ~/libs/Winnowmap/bin/meryl
@@ -129,6 +130,11 @@ eval_minimap: gen_reads
 	mkdir -p $(OUTDIR)
 	$(TIME_CMD) -o $(OUTDIR)/minimap.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(READS) 2> >(tee $(OUTDIR)/minimap.log) >$(OUTDIR)/minimap.paf 
 	paftools.js mapeval $(OUTDIR)/minimap.paf | tee $(OUTDIR)/minimap.eval
+
+eval_blend: gen_reads
+	mkdir -p $(OUTDIR)
+	$(TIME_CMD) -o $(OUTDIR)/blend.time $(BLEND_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(READS) 2> >(tee $(OUTDIR)/blend.log) >$(OUTDIR)/blend.paf 
+	paftools.js mapeval $(OUTDIR)/blend.paf | tee $(OUTDIR)/blend.eval
 
 eval_mapquik: gen_reads
 	mkdir -p $(OUTDIR)
