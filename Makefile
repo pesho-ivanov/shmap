@@ -133,7 +133,7 @@ eval_minimap: gen_reads
 
 eval_blend: gen_reads
 	mkdir -p $(OUTDIR)
-	$(TIME_CMD) -o $(OUTDIR)/blend.time $(BLEND_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(READS) 2> >(tee $(OUTDIR)/blend.log) >$(OUTDIR)/blend.paf 
+	$(TIME_CMD) -o $(OUTDIR)/blend.time $(BLEND_BIN) -x map-hifi -t 1 -N 0 $(REF) $(READS) 2> >(tee $(OUTDIR)/blend.log) >$(OUTDIR)/blend.paf 
 	paftools.js mapeval $(OUTDIR)/blend.paf | tee $(OUTDIR)/blend.eval
 
 eval_mapquik: gen_reads
