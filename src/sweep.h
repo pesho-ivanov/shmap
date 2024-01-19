@@ -324,23 +324,24 @@ class SweepMap {
 		cerr << " | Matches limit reached: " << C.count("matches_limit_reached") << " (" << C.perc("matches_limit_reached", "reads") << "%)" << endl;
 		cerr << " | Unmapped reads:        " << C.count("unmapped_reads") << " (" << C.perc("unmapped_reads", "reads") << "%)" << endl;
 		cerr << " | Average similarity:    " << C.frac("similarity", "mappings") / 10000.0 << endl;
-		cerr << "Total time [sec]:         " << setw(5) << right << T.secs("total")     << " (" << setw(4) << right << C.count("reads") / T.secs("total")  << " reads per sec)" << endl;
-		cerr << " | Index:                 " << setw(5) << right << T.secs("indexing")  << " (" << setw(4) << right << T.perc("indexing", "total") << "\% of total)" << endl;
-		cerr << " |  | loading:                " << setw(5) << right << T.secs("index_reading")  << " (" << setw(4) << right << T.perc("index_reading", "indexing") << "\% of indexing)" << endl;
-		cerr << " |  | sketch:                 " << setw(5) << right << T.secs("index_sketching")<< " (" << setw(4) << right << T.perc("index_sketching", "indexing") << "\%)" << endl;
-		cerr << " |  | initialize:             " << setw(5) << right << T.secs("index_initializing")<< " (" << setw(4) << right << T.perc("index_initializing", "indexing") << "\%)" << endl;
-		cerr << " | Map:                   " << setw(5) << right << T.secs("mapping")   << " (" << setw(4) << right << T.perc("mapping", "total") << "\% of total, " << T.range_ratio("query_mapping") << "x range)" << endl;
-		cerr << " |  | load queries:           " << setw(5) << right << T.secs("query_reading")  << " (" << setw(4) << right << T.perc("query_reading", "mapping") << "\% of mapping, " << T.range_ratio("query_reading") << "x)" << endl;
-		cerr << " |  | sketch reads:           " << setw(5) << right << T.secs("sketching") << " (" << setw(4) << right << T.perc("sketching", "mapping") << "\%, " << T.range_ratio("sketching") << "x)" << endl;
-		cerr << " |  | seeding:                " << setw(5) << right << T.secs("seeding")  << " (" << setw(4) << right << T.perc("seeding", "mapping") << "\%), " << T.range_ratio("seeding") << "x" << endl;
-		cerr << " |  |  | collect seed info:       " << setw(5) << right << T.secs("collect_seed_info")   << " (" << setw(4) << right << T.perc("collect_seed_info", "seeding") << "\% of seeding, " << T.range_ratio("collect_seed_info") << "x)" << endl;
-		cerr << " |  |  | sort seeds by #matches:  " << setw(5) << right << T.secs("sort_seeds")   << " (" << setw(4) << right << T.perc("sort_seeds", "seeding") << "\%, " << T.range_ratio("sort_seeds") << "x)" << endl;
-		cerr << " |  | matching seeds:         " << setw(5) << right << T.secs("matching")  << " (" << setw(4) << right << T.perc("matching", "mapping") << "\%, " << T.range_ratio("matching") << "x)" << endl;
-		cerr << " |  |  | collect matches:         " << setw(5) << right << T.secs("collect_matches")   << " (" << setw(4) << right << T.perc("collect_matches", "matching") << "\% of matching, " << T.range_ratio("collect_matches") << "x)" << endl;
-		cerr << " |  |  | sort matches:            " << setw(5) << right << T.secs("sort_matches")   << " (" << setw(4) << right << T.perc("sort_matches", "matching") << "\%, " << T.range_ratio("sort_matches") << "x)" << endl;
-		cerr << " |  | sweep:                  " << setw(5) << right << T.secs("sweep")     << " (" << setw(4) << right << T.perc("sweep", "mapping") << "\%, " << T.range_ratio("sweep") << "x)" << endl;
-		cerr << " |  | post proc:              " << setw(5) << right << T.secs("postproc")  << " (" << setw(4) << right << T.perc("postproc", "mapping") << "\%, " << T.range_ratio("postproc") << "x)" << endl;
+		cerr << "Total time [sec]:         "         << setw(5) << right << T.secs("total")             << " (" << setw(4) << right << C.count("reads") / T.secs("total")       << " reads per sec)" << endl;
+		cerr << " | Index:                 "         << setw(5) << right << T.secs("indexing")          << " (" << setw(4) << right << T.perc("indexing", "total")              << "\%)" << endl;
+		cerr << " |  | loading:                "     << setw(5) << right << T.secs("index_reading")     << " (" << setw(4) << right << T.perc("index_reading", "indexing")      << "\%)" << endl;
+		cerr << " |  | sketch:                 "     << setw(5) << right << T.secs("index_sketching")   << " (" << setw(4) << right << T.perc("index_sketching", "indexing")    << "\%)" << endl;
+		cerr << " |  | initialize:             "     << setw(5) << right << T.secs("index_initializing")<< " (" << setw(4) << right << T.perc("index_initializing", "indexing") << "\%)" << endl;
+		cerr << " | Map:                   "         << setw(5) << right << T.secs("mapping")           << " (" << setw(4) << right << T.perc("mapping", "total")               << "\%, " << setw(5) << right << T.range_ratio("query_mapping") << "x)" << endl;
+		cerr << " |  | load queries:           "     << setw(5) << right << T.secs("query_reading")     << " (" << setw(4) << right << T.perc("query_reading", "mapping")       << "\%, " << setw(5) << right << T.range_ratio("query_reading") << "x)" << endl;
+		cerr << " |  | sketch reads:           "     << setw(5) << right << T.secs("sketching")         << " (" << setw(4) << right << T.perc("sketching", "mapping")           << "\%, " << setw(5) << right << T.range_ratio("sketching") << "x)" << endl;
+		cerr << " |  | seeding:                "     << setw(5) << right << T.secs("seeding")           << " (" << setw(4) << right << T.perc("seeding", "mapping")             << "\%, " << setw(5) << right << T.range_ratio("seeding") << "x)" << endl;
+		cerr << " |  |  | collect seed info:       " << setw(5) << right << T.secs("collect_seed_info") << " (" << setw(4) << right << T.perc("collect_seed_info", "seeding")   << "\%, " << setw(5) << right << T.range_ratio("collect_seed_info") << "x)" << endl;
+		cerr << " |  |  | sort seeds by #matches:  " << setw(5) << right << T.secs("sort_seeds")        << " (" << setw(4) << right << T.perc("sort_seeds", "seeding")          << "\%, " << setw(5) << right << T.range_ratio("sort_seeds") << "x)" << endl;
+		cerr << " |  | matching seeds:         "     << setw(5) << right << T.secs("matching")          << " (" << setw(4) << right << T.perc("matching", "mapping")            << "\%, " << setw(5) << right << T.range_ratio("matching") << "x)" << endl;
+		cerr << " |  |  | collect matches:         " << setw(5) << right << T.secs("collect_matches")   << " (" << setw(4) << right << T.perc("collect_matches", "matching")    << "\%, " << setw(5) << right << T.range_ratio("collect_matches") << "x)" << endl;
+		cerr << " |  |  | sort matches:            " << setw(5) << right << T.secs("sort_matches")      << " (" << setw(4) << right << T.perc("sort_matches", "matching")       << "\%, " << setw(5) << right << T.range_ratio("sort_matches") << "x)" << endl;
+		cerr << " |  | sweep:                  "     << setw(5) << right << T.secs("sweep")             << " (" << setw(4) << right << T.perc("sweep", "mapping")               << "\%, " << setw(5) << right << T.range_ratio("sweep") << "x)" << endl;
+		cerr << " |  | post proc:              "     << setw(5) << right << T.secs("postproc")          << " (" << setw(4) << right << T.perc("postproc", "mapping")            << "\%, " << setw(5) << right << T.range_ratio("postproc") << "x)" << endl;
 	}
-};
-
-#endif
+};                                                                                                                                                                              
+                                                                                                                                                                                
+#endif                                                                                                                                                                          
+                                                                                                                                                                                

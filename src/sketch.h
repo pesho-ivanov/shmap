@@ -61,42 +61,39 @@ void initialize_LUT() {
 //Sketch sk2 = buildFMHSketch(revComp(s), 5, 1.0, blmers);
 //return 0;
 const Sketch buildFMHSketch(const string& s, int k, double hFrac, const blmers_t& blmers) {
-	//FMH_time.start();
-
 	Sketch sk;
 	sk.reserve((int)(1.1 * (double)s.size() * hFrac));
 
 	if ((int)s.size() < k) return sk;
 
-	//hash_t h, h_fw = 0, h_rc = 0;
-	hash_t h_fw = 0;
+	hash_t h, h_fw = 0, h_rc = 0;
+	//hash_t h_fw = 0;
 	hash_t hThres = hash_t(hFrac * double(std::numeric_limits<hash_t>::max()));
 	int r;
 
 	for (r=0; r<k; r++) {
 		h_fw ^= rotl(LUT_fw[(int)s[r]], k-r-1);
-		//h_rc ^= rotl(LUT_rc[(int)s[r]], r);
+		h_rc ^= rotl(LUT_rc[(int)s[r]], r);
 	}
 
 	while(true) {
-		//h = h_fw ^ h_rc;
+		h = h_fw ^ h_rc;
 //		cerr << s << " " << r << " " << std::hex << std::setfill('0') << std::setw(16) << h
 //							<< " = " << std::hex << std::setfill('0') << std::setw(16) << h_fw
 //							<< " ^ " << std::hex << std::setfill('0') << std::setw(16) << h_rc << endl;
-		if (h_fw < hThres)  // optimize to only look at specific bits
+		if (h < hThres)  // optimize to only look at specific bits
+		//if (h_fw < hThres)  // optimize to only look at specific bits
 			//sk.emplace_back(r, h);
-			//sk.emplace_back(r, encode32(s.c_str()+r-k, k));
 			sk.emplace_back(r, h_fw);
 					
 		if (r >= (int)s.size()) break;
 
 		h_fw = rotl(h_fw, 1) ^ rotl(LUT_fw[(int)s[r-k]], k) ^ LUT_fw[(int)s[r]];
-		//h_rc = rotr(h_rc, 1) ^ rotr(LUT_rc[(int)s[r-k]], 1) ^ rotl(LUT_rc[(int)s[r]], k-1);
+		h_rc = rotr(h_rc, 1) ^ rotr(LUT_rc[(int)s[r-k]], 1) ^ rotl(LUT_rc[(int)s[r]], k-1);
 
 		++r;
 	}
 
-	//FMH_time.stop();
 	return sk;
 }
 
