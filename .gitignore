@@ -25,4 +25,4 @@ winnowmap_repetitive_k15.txt
 callgrind.out.*
 gtl/
 .vscode/c_cpp_properties.json
-evals/refs/t2tChrY.fa.fai
+simulations/
