@@ -26,3 +26,5 @@ callgrind.out.*
 gtl/
 .vscode/c_cpp_properties.json
 simulations/
+*.fai
+sweepmap

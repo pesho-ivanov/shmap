@@ -1,4 +1,4 @@
-#include "sweep.h"
+#include "sweepmap.h"
 
 int main(int argc, char **argv) {
 	initialize_LUT();
