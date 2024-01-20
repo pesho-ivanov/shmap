@@ -36,12 +36,12 @@ S_SLOW ?= 1000
 M_SLOW ?= 10000
 T_SLOW ?= 0.0
 
-DIR = newevals
-REF = $(DIR)/$(REFNAME).fa
+DIR = evals
+REF = $(DIR)/refs/$(REFNAME).fa
 READS_PARAMS = $(REFNAME)-a$(ACCURACY)-d$(DEPTH)-l$(MEANLEN)
 READS_PREFIX = reads-$(READS_PARAMS)
-READS = $(DIR)/$(READS_PREFIX).fa
-OUTDIR = $(DIR)/$(READS_PARAMS)
+READS = $(DIR)/reads/$(READS_PREFIX).fa
+OUTDIR = $(DIR)/out/$(READS_PARAMS)
 
 MAX_SEEDS = 10000
 MAX_MATCHES = 100 300 1000 3000 10000 30000 100000
@@ -53,6 +53,7 @@ $(SWEEP_BIN): $(SRCS)
 
 gen_reads:
 ifeq ($(wildcard $(READS)),)
+	mkdir -p $(DIR)/reads
 	pbsim \
 		   $(REF) \
 		   --model_qc $(DIR)/model_qc_clr \
@@ -94,7 +95,7 @@ debug: sweep gen_reads
 	$(SWEEP_BIN) -s $(REF) -p simulations/reads/1.fasta $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-1.params >out/sweep-1.out 2>out/sweep-1.cerr
 
 eval_sweep_max_seeds: sweep gen_reads
-	@DIR=newevals/eval_sweep-K22; \
+	@DIR=evals/eval_sweep-K22; \
 	mkdir -p $${DIR}; \
 	for maxseeds in $(MAX_SEEDS); do \
 		for maxmatches in $(MAX_MATCHES); do \
