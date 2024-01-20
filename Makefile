@@ -8,7 +8,7 @@ DEPFLAGS = -MMD -MP
 TIME_CMD = /usr/bin/time -f "%U\t%M"
 
 SRCS = src/sweepmap.cpp src/sweepmap.h src/io.h src/sketch.h src/utils.h src/kseq.h
-SWEEP_BIN = sweepmap
+SWEEPMAP_BIN = ./sweepmap
 MINIMAP_BIN = minimap2
 BLEND_BIN = ~/libs/blend/bin/blend
 VERITYMAP_BIN = ~/libs/VerityMap/veritymap/main.py
@@ -50,7 +50,7 @@ MAX_MATCHES = 100 300 1000 3000 10000 30000 100000
 
 all: sweepmap
 
-$(SWEEP_BIN): $(SRCS)
+$(SWEEPMAP_BIN): $(SRCS)
 	$(CC) $(CXX_STANDARD) $(CFLAGS) $< -o $@ $(LIBS)
 
 gen_reads:
@@ -74,27 +74,27 @@ endif
 
 eval_abe: sweep gen_reads
 	mkdir -p ../out
-#	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 >out/sweep.out
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 >out/sweep.out
 
-	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -z $(DIR)/out/sweep-b.params >out/sweep-b.out
-	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out
-	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -z $(DIR)/out/sweep-b-e.params >out/sweep-b-e.out
-	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -a extend_equally -z $(DIR)/out/sweep-b-e-a.params >out/sweep-b-e-a.out
+	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -z $(DIR)/out/sweep-b.params >out/sweep-b.out
+	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out
+	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -z $(DIR)/out/sweep-b-e.params >out/sweep-b-e.out
+	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -a extend_equally -z $(DIR)/out/sweep-b-e-a.params >out/sweep-b-e-a.out
 
-	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -z $(DIR)/out/sweep.params >out/sweep.out
-	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -a extend_equally -z $(DIR)/out/sweep-a.params >out/sweep-a.out
-	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -z $(DIR)/out/sweep-e.params >out/sweep-e.out
-	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -a extend_equally -z $(DIR)/out/sweep-e-a.params >out/sweep-e-a.out
+	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -z $(DIR)/out/sweep.params >out/sweep.out
+	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -a extend_equally -z $(DIR)/out/sweep-a.params >out/sweep-a.out
+	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -z $(DIR)/out/sweep-e.params >out/sweep-e.out
+	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -a extend_equally -z $(DIR)/out/sweep-e-a.params >out/sweep-e-a.out
 
 eval_multiple_alignments: sweep gen_reads
-#	time $(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -a fine 		     -z $(DIR)/out/sweep.params >out/sweep.out
-	time $(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -a fine -x		     -z $(DIR)/out/sweep-x.params >out/sweep-x.out
-#	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -x -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a-x.out
-#	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out 2>out/sweep-b-a.cerr
-#	$(SWEEP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -o -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a-o.out 2>out/sweep-b-a-o.cerr
+#	time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -a fine 		     -z $(DIR)/out/sweep.params >out/sweep.out
+	time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -a fine -x		     -z $(DIR)/out/sweep-x.params >out/sweep-x.out
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -x -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a-x.out
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out 2>out/sweep-b-a.cerr
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -o -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a-o.out 2>out/sweep-b-a-o.cerr
 
 #debug: sweep gen_reads
-#	$(SWEEP_BIN) -s $(REF) -p simulations/reads/1.fasta $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-1.params >out/sweep-1.out 2>out/sweep-1.cerr
+#	$(SWEEPMAP_BIN) -s $(REF) -p simulations/reads/1.fasta $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-1.params >out/sweep-1.out 2>out/sweep-1.cerr
 
 eval_sweep_max_seeds: sweep gen_reads
 	@DIR=evals/eval_sweep-K22; \
@@ -103,20 +103,21 @@ eval_sweep_max_seeds: sweep gen_reads
 		for maxmatches in $(MAX_MATCHES); do \
 			f=$${DIR}/"sweep-S$${maxseeds}-M$${maxmatches}"; \
 			echo "Processing $${f}"; \
-			time $(SWEEP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 22 -z sweep.params -S $${maxseeds} -M $${maxmatches} $${f}.params >$${f}.paf 2>$${f}.log; \
+			time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 22 -z sweep.params -S $${maxseeds} -M $${maxmatches} $${f}.params >$${f}.paf 2>$${f}.log; \
 			paftools.js mapeval $${f}.paf | tee $${f}.eval; \
 		done \
     done
 
-eval_sweep: sweepmap gen_reads
+eval_sweepmap: sweepmap gen_reads
 	mkdir -p $(OUTDIR)
-	$(TIME_CMD) -o $(OUTDIR)/sweep.time ./$(SWEEP_BIN) -s $(REF) -p $(READS)_ -z $(OUTDIR)/sweep.params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2> >(tee $(OUTDIR)/sweep.log) >$(OUTDIR)/sweep.paf 
-	paftools.js mapeval $(OUTDIR)/sweep.paf | tee $(OUTDIR)/sweep.eval
-	paftools.js mapeval -Q 0 $(OUTDIR)/sweep.paf >$(OUTDIR)/sweep.wrong
+	@MAPPER="sweepmap"; \
+	$(TIME_CMD) -o $(OUTDIR)/$$MAPPER.time $(SWEEPMAP_BIN) -s $(REF) -p $(READS)_ -z $(OUTDIR)/$$MAPPER.params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2> >(tee $(OUTDIR)/$$MAPPER.log) >$(OUTDIR)/$$MAPPER.paf; \
+	paftools.js mapeval $(OUTDIR)/$$MAPPER.paf | tee $(OUTDIR)/$$MAPPER.eval; \
+	paftools.js mapeval -Q 0 $(OUTDIR)/$$MAPPER.paf >$(OUTDIR)/$$MAPPER.wrong
 
-eval_sweep_slow: sweepmap gen_reads
+eval_sweepmap_slow: sweepmap gen_reads
 	mkdir -p $(OUTDIR)
-	$(TIME_CMD) -o $(OUTDIR)/sweep-slow.time ./$(SWEEP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep-slow.params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) 2> >(tee $(OUTDIR)/sweep-slow.log) >$(OUTDIR)/sweep-slow.paf 
+	$(TIME_CMD) -o $(OUTDIR)/sweep-slow.time ./$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep-slow.params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) 2> >(tee $(OUTDIR)/sweep-slow.log) >$(OUTDIR)/sweep-slow.paf 
 	paftools.js mapeval $(OUTDIR)/sweep-slow.paf | tee $(OUTDIR)/sweep-slow.eval
 	paftools.js mapeval -Q 0 $(OUTDIR)/sweep-slow.paf >$(OUTDIR)/sweep-slow.wrong
 
@@ -157,7 +158,7 @@ eval_eskemap: gen_reads
 eval: eval_sweep eval_minimap eval_mapquik eval_winnowmap
 
 clean:
-	rm -r $(SWEEP_BIN)
+	rm -r $(SWEEPMAP_BIN)
 
 clean_evals:
 	rm -r $(ALLREADS_DIR)

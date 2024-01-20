@@ -54,11 +54,11 @@ int main(int argc, char **argv) {
 	}
 
 	cerr << "Mapping reads " << params.pFile << "..." << endl;
-	SweepMap mapper(tidx, params, &T, &C);
-	mapper.map(params.pFile, bLstmers);
+	SweepMap sweepmap(tidx, params, &T, &C);
+	sweepmap.map(params.pFile, bLstmers);
 
 	T.stop("total");
-	mapper.print_report(C, T);
+	sweepmap.print_report(C, T);
 
 	return 0;
 }
