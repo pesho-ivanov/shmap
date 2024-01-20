@@ -88,7 +88,7 @@ class SweepMap {
 				(*hist)[curr.kmer] = 1;
 				auto t_it = tidx.h2pos.find(curr.kmer);
 				if (t_it != tidx.h2pos.end())
-					seeds.emplace_back(curr.r, curr.kmer, &t_it->second); // TODO: remove kmer_hash
+					seeds.push_back(kmer_hits_t(curr.r, curr.kmer, &t_it->second));
 			}
 		}
 		T->stop("collect_seed_info");
@@ -116,7 +116,7 @@ class SweepMap {
 		int total_hits = 0;
 		for (const auto &res : seeds) {
 			for (const auto &hit: *(res.kmers_in_T))
-				L.emplace_back(res.kmer, res.P_l, hit.first, hit.second);
+				L.push_back(Match(res.kmer, res.P_l, hit.first, hit.second));
 			if ((total_hits += (int)res.kmers_in_T->size()) > (int)params.max_matches) {
 				C->inc("matches_limit_reached");
 				break;

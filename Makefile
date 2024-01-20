@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 CC = g++
-CXX_STANDARD = -std=c++2a
+CXX_STANDARD = -std=c++20
 CFLAGS = -O2 -g -march=native -lm -lpthread -Igtl/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive #-Wconversion 
 LIBS = minimap2/libminimap2.a -lz
 DEPFLAGS = -MMD -MP
@@ -107,7 +107,7 @@ eval_sweep_max_seeds: sweep gen_reads
 
 eval_sweep: sweep gen_reads
 	mkdir -p $(OUTDIR)
-	$(TIME_CMD) -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep.params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2> >(tee $(OUTDIR)/sweep.log) >$(OUTDIR)/sweep.paf 
+	$(TIME_CMD) -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS)_ -z $(OUTDIR)/sweep.params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2> >(tee $(OUTDIR)/sweep.log) >$(OUTDIR)/sweep.paf 
 #$(TIME_CMD) -o $(OUTDIR)/sweep.time $(SWEEP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep.params -b blacklist_chm13-1Bk15w10n100.txt -x -t $(T) -k $(K) -w $(W) -S $(S) -M $(M) 2> >(tee $(OUTDIR)/sweep.log) >$(OUTDIR)/sweep.paf 
 	paftools.js mapeval $(OUTDIR)/sweep.paf | tee $(OUTDIR)/sweep.eval
 	paftools.js mapeval -Q 0 $(OUTDIR)/sweep.paf >$(OUTDIR)/sweep.wrong
