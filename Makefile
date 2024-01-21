@@ -37,7 +37,8 @@ M_SLOW ?= 10000
 T_SLOW ?= 0.0
 
 DIR = evals
-REF = $(DIR)/refs/$(REFNAME).fa
+REF_DIR = $(DIR)/refs
+REF = $(REF_DIR)/$(REFNAME).fa
 READS_PARAMS = $(REFNAME)-a$(ACCURACY)-d$(DEPTH)-l$(MEANLEN)
 READS_PREFIX = reads-$(READS_PARAMS)
 ALLREADS_DIR = $(DIR)/reads
@@ -123,11 +124,11 @@ eval_sweepmap_slow: sweepmap gen_reads
 
 eval_winnowmap: gen_reads
 	mkdir -p $(OUTDIR)
-	if [ ! -f winnowmap_$(REF)_repetitive_k15.txt ]; then \
+	if [ ! -f $(REF_DIR)/winnowmap_$(REF)_repetitive_k15.txt ]; then \
 		$(MERYL_BIN) count k=15 output merylDB $(REF); \
-		$(MERYL_BIN) print greater-than distinct=0.9998 merylDB > winnowmap_$(REF)_repetitive_k15.txt; \
+		$(MERYL_BIN) print greater-than distinct=0.9998 merylDB > $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt; \
 	fi
-	$(TIME_CMD) -o $(OUTDIR)/winnowmap.time $(WINNOWMAP_BIN) -W winnowmap_$(REF)_repetitive_k15.txt -x map-pb -t 1 $(REF) $(READS) 2> >(tee $(OUTDIR)/winnowmap.log) >$(OUTDIR)/winnowmap.paf 
+	$(TIME_CMD) -o $(OUTDIR)/winnowmap.time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 $(REF) $(READS) 2> >(tee $(OUTDIR)/winnowmap.log) >$(OUTDIR)/winnowmap.paf 
 	paftools.js mapeval $(OUTDIR)/winnowmap.paf | tee $(OUTDIR)/winnowmap.eval
 
 eval_minimap: gen_reads
@@ -140,22 +141,21 @@ eval_blend: gen_reads
 	$(TIME_CMD) -o $(OUTDIR)/blend.time $(BLEND_BIN) -x map-hifi -t 1 -N 0 $(REF) $(READS) 2> >(tee $(OUTDIR)/blend.log) >$(OUTDIR)/blend.paf 
 	paftools.js mapeval $(OUTDIR)/blend.paf | tee $(OUTDIR)/blend.eval
 
-eval_veritymap:
-	mkdir -p $(OUTDIR)
-	$(TIME_CMD) -o $(OUTDIR)/veritymap.time $(VERITYMAP_BIN) -d hifi -t 1 --reads $(READS) $(REF) -o $(OUTDIR)/veritymap 2> >(tee $(OUTDIR)/veritymap.log) >$(OUTDIR)/veritymap.paf 
-	paftools.js mapeval $(OUTDIR)/veritymap.paf | tee $(OUTDIR)/veritymap.eval
-
-
 eval_mapquik: gen_reads
 	mkdir -p $(OUTDIR)
 	$(TIME_CMD) -o $(OUTDIR)/mapquik.time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(OUTDIR)/mapquik | tee $(OUTDIR)/mapquik.log
 	paftools.js mapeval $(OUTDIR)/mapquik.paf | tee $(OUTDIR)/mapquik.eval
 
-eval_eskemap: gen_reads
-	mkdir -p $(OUTDIR)
-	$(TIME_CMD) -o $(OUTDIR)/eskemap.time $(ESKEMAP_BIN) -p $(READS) -s $(REF) -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -N >$(OUTDIR)/eskemap.out 2>$(OUTDIR)/eskemap.log
+#eval_veritymap:
+#	mkdir -p $(OUTDIR)
+#	$(TIME_CMD) -o $(OUTDIR)/veritymap.time $(VERITYMAP_BIN) -d hifi -t 1 --reads $(READS) $(REF) -o $(OUTDIR)/veritymap 2> >(tee $(OUTDIR)/veritymap.log) >$(OUTDIR)/veritymap.paf 
+#	paftools.js mapeval $(OUTDIR)/veritymap.paf | tee $(OUTDIR)/veritymap.eval
 
-eval: eval_sweep eval_minimap eval_mapquik eval_winnowmap
+#eval_eskemap: gen_reads
+#	mkdir -p $(OUTDIR)
+#	$(TIME_CMD) -o $(OUTDIR)/eskemap.time $(ESKEMAP_BIN) -p $(READS) -s $(REF) -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -N >$(OUTDIR)/eskemap.out 2>$(OUTDIR)/eskemap.log
+
+eval: eval_sweepmap eval_minimap eval_mapquik eval_winnowmap eval_blend
 
 clean:
 	rm -r $(SWEEPMAP_BIN)

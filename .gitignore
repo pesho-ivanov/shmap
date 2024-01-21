@@ -28,3 +28,4 @@ gtl/
 simulations/
 *.fai
 sweepmap
+evals/refs/
