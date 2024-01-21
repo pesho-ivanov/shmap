@@ -18,7 +18,7 @@ MERYL_BIN = ~/libs/Winnowmap/bin/meryl
 WINNOWMAP_BIN = ~/libs/Winnowmap/bin/winnowmap
 EDLIB_BIN = ~/libs/edlib/build/bin/edlib-aligner
 
-REFNAME ?= chm13-1B
+REFNAME ?= chm13
 ACCURACY ?= 0.99
 DEPTH ?= 1
 MEANLEN ?= 10000

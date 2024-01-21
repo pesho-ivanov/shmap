@@ -24,43 +24,33 @@ struct Match {
 	hash_t kmer;
 	pos_t P_r;
 	Hit hit;
-	//pos_t T_r;
-	//pos_t t_pos;
-	//bool strand;  // 0 - forward, 1 - reverse
 
-	//char get_strand() const {
-	//	return strand ? '-' : '+';
-	//}
-
-	//Match() {}
 	Match(hash_t kmer, pos_t P_r, const Hit &hit) :
 		kmer(kmer), P_r(P_r), hit(hit) {}
-
-	//void print() const {
-	//	cout << "Match: " << kmer << " " << P_r << " " << T_r << " " << t_pos << endl;
-	//}
 };
 
 struct Mapping {
 	int k; 	   // kmer size
 	pos_t P_sz;     // pattern size |P| bp 
 	pos_t seeds;     // number of seeds (subset of the sketch kmers)
-	int matches;  // M.size() -- total number of matches in `t' 
 	pos_t T_l;      // the position of the leftmost nucleotide of the mapping
 	pos_t T_r;      // the position of the rightmost nucleotide of the mapping
 	int segm_id;
 	pos_t s_sz;      // the position of the rightmost nucleotide of the mapping
 	int xmin;     // the number of kmers in the intersection between the pattern and its mapping in `t'
-	double sim;     // the number of kmers in the intersection between the pattern and its mapping in `t'
+	double J;     // the number of kmers in the intersection between the pattern and its mapping in `t'
 	double map_time;
 	char strand;    // '+' or '-'
 
+	bool unreasonable;  // reserved for filtering matches
+
     Mapping() {}
 	Mapping(int k, pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, int segm_id, pos_t s_sz, int xmin)
-		: k(k), P_sz(P_sz), seeds(seeds), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), xmin(xmin), sim(double(xmin) / std::max(seeds, s_sz)) {}
+		: k(k), P_sz(P_sz), seeds(seeds), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), xmin(xmin), J(double(xmin) / std::max(seeds, s_sz)), unreasonable(false) {}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
     void print_paf(const string &query_id, const RefSegment &segm, const int matches) const {
+		int mapq = J > 0.5 ? 60 : 0;
 		cout << query_id  			// Query sequence name
 			<< "\t" << P_sz     // query sequence length
 			<< "\t" << 0   // query start (0-based; closed)
@@ -72,14 +62,14 @@ struct Mapping {
 			<< "\t" << T_r  // target start on original strand (0-based)
 			<< "\t" << P_sz  // TODO: fix; Number of residue matches (number of nucleotide matches)
 			<< "\t" << P_sz  // TODO: fix; Alignment block length: total number of sequence matches, mismatches, insertions and deletions in the alignment
-			<< "\t" << 60  // Mapping quality (0-255; 255 for missing)
+			<< "\t" << mapq  // Mapping quality (0-255; 255 for missing)
 // ----- end of required PAF fields -----
 			<< "\t" << "k:i:" << k
 			<< "\t" << "p:i:" << seeds  // sketches
 			<< "\t" << "M:i:" << matches // kmer matches in T
 			<< "\t" << "s:i:" << s_sz
 			<< "\t" << "I:i:" << xmin  // intersection of `p` and `s` [kmers]
-			<< "\t" << "J:f:" << sim   // similarity [0; 1]
+			<< "\t" << "J:f:" << J   // similarity [0; 1]
 			<< "\t" << "t:f:" << map_time
 			<< endl;
 	}
@@ -98,8 +88,6 @@ class SweepMap {
 		seeds.reserve(p.size());
 
 		// TODO: limit the number of kmers in the pattern p
-		// TODO: Add pattern kmers from the pattern to p_hist 
-		// TODO: make p_hist smaller since we don't use all seeds
 		T->start("collect_seed_info");
 		for (const auto &curr: p) {
 			auto hist_it = hist->find(curr.kmer);
@@ -166,11 +154,6 @@ class SweepMap {
 
 		int xmin = 0;
 		Mapping best(params.k, P_len, 0, -1, -1, -1, -1, -1);
-		//best.k = params.k;
-		//best.P_sz = P_len;
-		//best.p_sz = p_len;
-		//best.xmin = 0;
-		//best.sim = 0.0;
 
 		// Increase the left point end of the window [l,r) one by one. O(matches)
 		int i = 0, j = 0;
@@ -189,11 +172,11 @@ class SweepMap {
 			auto m = Mapping(params.k, P_len, seeds, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), xmin);
 			if (params.onlybest) {
 				//if (xmin > best.xmin) {
-				if (m.sim > best.sim) {
+				if (m.J > best.J) {
 					best = m;
 				}
 			} else {
-				if (m.sim > params.tThres) {
+				if (m.J > params.tThres) {
 					mappings.push_back(m);
 				}
 			}
@@ -234,12 +217,12 @@ class SweepMap {
 			//    only after getting removed.
 			while(!recent.empty() && next.T_l - recent.back().T_l > sep) {
 				// If the mapping is not marked as unreasonable (coverted by a preivous better mapping)
-				if (recent.back().matches != -1) {
+				if (!recent.back().unreasonable) {
 					// Take the leftmost mapping.
 					reasonable.push_back(recent.back());
 					// Mark the next closeby mappings as not reasonable
 					for (auto it=recent.rbegin(); it!=recent.rend() && it->T_l - recent.back().T_l < sep; ++it)
-						it->matches = -1;
+						it->unreasonable = true;
 				}
 				// Remove the mapping that is already too much behind.
 				recent.pop_back();
@@ -259,11 +242,11 @@ class SweepMap {
 
 			// 4. If there is another mapping in the deque, it is near and better.
 			if (recent.size() > 1)
-				recent.front().matches = -1;
+				recent.front().unreasonable = true;
 		}
 
 		// 5. Add the last mapping if it is reasonable
-		if (!recent.empty() && recent.back().matches != -1)
+		if (!recent.empty() && !recent.back().unreasonable)
 			reasonable.push_back(recent.back());
 
 		return reasonable;
@@ -318,34 +301,25 @@ class SweepMap {
 			vector<Match> matches = match_seeds(p.size(), seeds);
 			T->stop("matching");
 
-			//cout << "matches: " << matches.size() << endl;
-
-//			for(auto m: matches) {
-//				//m.print();
-//				string P_kmer = string(seq->seq.s).substr(m.P_r-params.k, params.k);
-//				string T_kmer = tidx.T.substr(m.T_r-params.k, params.k);
-//				cout << P_kmer << " " << T_kmer << " " << revCompl(T_kmer) << endl;
-//			}
-
 			T->start("sweep");
 			vector<Mapping> mappings = sweep(p_hist, matches, P_sz, seeds.size());
 			T->stop("sweep");
 
 			T->start("postproc");
-			auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(mappings, P_sz);
-			for (auto &m: reasonable_mappings) {
+			if (!params.overlaps)
+				mappings = filter_reasonable(mappings, P_sz);
+			for (auto &m: mappings) {
 				const auto &segm = tidx.T[m.segm_id];
-				//cout << m.T_l << " " << m.T_r << " " << m.segm_id << " " << segm.seq.size() << endl;
 				m.strand = is_same_strand(seq->seq.s, segm.seq.substr(m.T_l, m.T_r-m.T_l)) ? '+' : '-';
-				m.map_time = (T->secs("sketching") + T->secs("seeding") + T->secs("matching") + T->secs("sweep")) / (double)reasonable_mappings.size();
+				m.map_time = (T->secs("sketching") + T->secs("seeding") + T->secs("matching") + T->secs("sweep")) / (double)mappings.size();
 				m.print_paf(query_id, segm, (int)matches.size());
-				C->inc("similarity", int(10000.0*m.sim));
+				C->inc("J", int(10000.0*m.J));
 				C->inc("mappings");
 				C->inc("sketched_kmers", m.seeds);
-				C->inc("matches", m.matches);
 			}
+			C->inc("matches", matches.size());
 			C->inc("reads");
-			if (reasonable_mappings.empty())
+			if (mappings.empty())
 				C->inc("unmapped_reads");
 
 			T->stop("postproc");
@@ -372,7 +346,6 @@ class SweepMap {
 
 	void print_report(const Counters &C, const Timers &T) {
 		cerr << fixed << setprecision(1);
-		// TODO: report average Jaccard similarity
 		cerr << "Stats:" << endl;
 		cerr << " | Total reads:           " << C.count("reads") << " (~" << 1.0*C.count("read_len") / C.count("reads") << " nb per read)" << endl;
 		cerr << " | Sketched read kmers:   " << C.count("sketched_kmers") << " (" << C.frac("sketched_kmers", "reads") << " per read)" << endl;
@@ -380,7 +353,7 @@ class SweepMap {
 		//cerr << " | Seed limit reached:    " << C.count("seeds_limit_reached") << " (" << C.perc("seeds_limit_reached", "reads") << "%)" << endl;
 		cerr << " | Matches limit reached: " << C.count("matches_limit_reached") << " (" << C.perc("matches_limit_reached", "reads") << "%)" << endl;
 		cerr << " | Unmapped reads:        " << C.count("unmapped_reads") << " (" << C.perc("unmapped_reads", "reads") << "%)" << endl;
-		cerr << " | Average similarity:    " << C.frac("similarity", "mappings") / 10000.0 << endl;
+		cerr << " | Average Jaccard:       " << C.frac("J", "mappings") / 10000.0 << endl;
 		cerr << "Total time [sec]:         "         << setw(5) << right << T.secs("total")             << " (" << setw(4) << right << C.count("reads") / T.secs("total")       << " reads per sec)" << endl;
 		cerr << " | Index:                 "         << setw(5) << right << T.secs("indexing")          << " (" << setw(4) << right << T.perc("indexing", "total")              << "\%)" << endl;
 		cerr << " |  | loading:                "     << setw(5) << right << T.secs("index_reading")     << " (" << setw(4) << right << T.perc("index_reading", "indexing")      << "\%)" << endl;
