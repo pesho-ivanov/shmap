@@ -13,36 +13,42 @@
 struct Seed {
 	pos_t P_r;
 	hash_t kmer;
-	const vector<abs_ord_t> *hits_in_T;
+	const vector<Hit> *hits_in_T;
 
 	Seed() {}
-	Seed(pos_t P_r, hash_t kmer, const vector<abs_ord_t> *hits_in_T) :
+	Seed(pos_t P_r, hash_t kmer, const vector<Hit> *hits_in_T) :
 		P_r(P_r), kmer(kmer), hits_in_T(hits_in_T) {}
 };
 
 struct Match {
 	hash_t kmer;
 	pos_t P_r;
-	pos_t T_r;
-	pos_t t_pos;
+	Hit hit;
+	//pos_t T_r;
+	//pos_t t_pos;
 	//bool strand;  // 0 - forward, 1 - reverse
 
 	//char get_strand() const {
 	//	return strand ? '-' : '+';
 	//}
 
-	void print() const {
-		cout << "Match: " << kmer << " " << P_r << " " << T_r << " " << t_pos << endl;
-	}
+	//Match() {}
+	Match(hash_t kmer, pos_t P_r, const Hit &hit) :
+		kmer(kmer), P_r(P_r), hit(hit) {}
+
+	//void print() const {
+	//	cout << "Match: " << kmer << " " << P_r << " " << T_r << " " << t_pos << endl;
+	//}
 };
 
 struct Mapping {
 	int k; 	   // kmer size
 	pos_t P_sz;     // pattern size |P| bp 
-	pos_t p_sz;     // pattern sketch size |p| kmers
-	int matches;  // L.size() -- total number of matches in `t' 
+	pos_t seeds;     // number of seeds (subset of the sketch kmers)
+	int matches;  // M.size() -- total number of matches in `t' 
 	pos_t T_l;      // the position of the leftmost nucleotide of the mapping
 	pos_t T_r;      // the position of the rightmost nucleotide of the mapping
+	int segm_id;
 	pos_t s_sz;      // the position of the rightmost nucleotide of the mapping
 	int xmin;     // the number of kmers in the intersection between the pattern and its mapping in `t'
 	double sim;     // the number of kmers in the intersection between the pattern and its mapping in `t'
@@ -50,27 +56,27 @@ struct Mapping {
 	char strand;    // '+' or '-'
 
     Mapping() {}
-	Mapping(int k, pos_t P_sz, pos_t p_sz, int matches, pos_t T_l, pos_t T_r, pos_t s_sz, int xmin)
-		: k(k), P_sz(P_sz), p_sz(p_sz), matches(matches), T_l(T_l), T_r(T_r), s_sz(s_sz), xmin(xmin), sim(double(xmin) / std::max(p_sz, s_sz)) {}
+	Mapping(int k, pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, int segm_id, pos_t s_sz, int xmin)
+		: k(k), P_sz(P_sz), seeds(seeds), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), xmin(xmin), sim(double(xmin) / std::max(seeds, s_sz)) {}
 
-    void print_paf(const params_t &params, const string &seqID, const pos_t T_sz, const string &T_name) const {
-		// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
-		cout << seqID  			// Query sequence name
+	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
+    void print_paf(const string &query_id, const RefSegment &segm, const int matches) const {
+		cout << query_id  			// Query sequence name
 			<< "\t" << P_sz     // query sequence length
 			<< "\t" << 0   // query start (0-based; closed)
 			<< "\t" << P_sz  // query end (0-based; open)
-			<< "\t" << strand   // m.get_strand() //strand; TODO
-			<< "\t" << T_name    // reference name
-			<< "\t" << T_sz  // target sequence length
+			<< "\t" << strand   // '+' or '-'
+			<< "\t" << segm.name // reference segment name
+			<< "\t" << segm.seq.size() // T_sz -- target sequence length
 			<< "\t" << T_l  // target start on original strand (0-based)
 			<< "\t" << T_r  // target start on original strand (0-based)
 			<< "\t" << P_sz  // TODO: fix; Number of residue matches (number of nucleotide matches)
 			<< "\t" << P_sz  // TODO: fix; Alignment block length: total number of sequence matches, mismatches, insertions and deletions in the alignment
 			<< "\t" << 60  // Mapping quality (0-255; 255 for missing)
-		// ----- end of required PAF fields -----
+// ----- end of required PAF fields -----
 			<< "\t" << "k:i:" << k
+			<< "\t" << "p:i:" << seeds  // sketches
 			<< "\t" << "M:i:" << matches // kmer matches in T
-			<< "\t" << "p:i:" << p_sz 
 			<< "\t" << "s:i:" << s_sz
 			<< "\t" << "I:i:" << xmin  // intersection of `p` and `s` [kmers]
 			<< "\t" << "J:f:" << sim   // similarity [0; 1]
@@ -129,10 +135,12 @@ class SweepMap {
 		matches.reserve(P_MULTIPLICITY * p_sz);
 
 		int total_hits = 0;
-		for (const auto &res : seeds) {
-			for (const auto &hit: *(res.hits_in_T))
-				matches.push_back(Match(res.kmer, res.P_r, hit.first, hit.second));
-			if ((total_hits += (int)res.hits_in_T->size()) > (int)params.max_matches) {
+		for (const auto &seed: seeds) {
+			for (const auto &hit: *(seed.hits_in_T)) {
+				assert(hit.segm_id >= 0 && (size_t)hit.segm_id < tidx.T.size());
+				matches.push_back(Match(seed.kmer, seed.P_r, hit));
+			}
+			if ((total_hits += (int)seed.hits_in_T->size()) > (int)params.max_matches) {
 				C->inc("matches_limit_reached");
 				break;
 			}
@@ -141,8 +149,10 @@ class SweepMap {
 
 		T->start("sort_matches");
 		sort(matches.begin(), matches.end(), [](const Match &a, const Match &b) {
-			// Sort L by ascending positions in reference so that we can next sweep through it.
-			return a.T_r < b.T_r;
+			// Preparation for sweeping: sort M by ascending positions within one reference segment.
+			if (a.hit.segm_id != b.hit.segm_id)
+				return a.hit.segm_id < b.hit.segm_id;
+			return a.hit.r < b.hit.r;
 		});
 		T->stop("sort_matches");
 
@@ -150,31 +160,33 @@ class SweepMap {
 	}
 
 	// vector<hash_t> diff_hist;  // diff_hist[kmer_hash] = #occurences in `p` - #occurences in `s`
-	// vector<Match> L;   	   // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
-	const vector<Mapping> sweep(hist_t &diff_hist, const vector<Match> &L, const pos_t p_len, const pos_t P_len) {
+	// vector<Match> M;   	   // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
+	const vector<Mapping> sweep(hist_t &diff_hist, const vector<Match> &M, const pos_t P_len, const int seeds) {
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
 
 		int xmin = 0;
-		Mapping best;
-		best.k = params.k;
-		best.P_sz = P_len;
-		best.p_sz = p_len;
-		best.xmin = 0;
-		best.sim = 0.0;
+		Mapping best(params.k, P_len, 0, -1, -1, -1, -1, -1);
+		//best.k = params.k;
+		//best.P_sz = P_len;
+		//best.p_sz = p_len;
+		//best.xmin = 0;
+		//best.sim = 0.0;
 
 		// Increase the left point end of the window [l,r) one by one. O(matches)
 		int i = 0, j = 0;
-		for(auto l = L.begin(), r = L.begin(); l != L.end(); ++l, ++i) {
+		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l, ++i) {
 			// Increase the right end of the window [l,r) until it gets out.
-			//for(; should_extend_right(diff_hist, L, l, r, xmin, P_len, params.k); ++r, ++j) {
-			for(; r != L.end() && r->T_r + params.k <= l->T_r + P_len; ++r, ++j) {
+			for(;  r != M.end()
+				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
+				&& r->hit.r + params.k <= l->hit.r + P_len
+				; ++r, ++j) {
 				// If taking this kmer from T increases the intersection with P.
 				if (--diff_hist[r->kmer] >= 0)
 					++xmin;
-				assert (l->T_r <= r->T_r);
+				assert (l->hit.r <= r->hit.r);
 			}
 
-			auto m = Mapping(params.k, P_len, p_len, (int)L.size(), l->T_r, prev(r)->T_r, pos_t(r-l), xmin);
+			auto m = Mapping(params.k, P_len, seeds, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), xmin);
 			if (params.onlybest) {
 				//if (xmin > best.xmin) {
 				if (m.sim > best.sim) {
@@ -194,7 +206,7 @@ class SweepMap {
 		}
 		assert (xmin == 0);
 
-		if (params.onlybest) { // && best.J > params.tThres)
+		if (params.onlybest && best.xmin != -1) { // && best.J > params.tThres)
 			mappings.push_back(best);
 		}
 
@@ -292,7 +304,7 @@ class SweepMap {
 			Sketch p = buildFMHSketch(seq->seq.s, params.k, params.hFrac, bLstmers);
 			T->stop("sketching");
 
-			string seqID = seq->name.s;
+			string query_id = seq->name.s;
 			pos_t P_sz = (pos_t)seq->seq.l;
 
 			C->inc("read_len", P_sz);
@@ -306,6 +318,8 @@ class SweepMap {
 			vector<Match> matches = match_seeds(p.size(), seeds);
 			T->stop("matching");
 
+			//cout << "matches: " << matches.size() << endl;
+
 //			for(auto m: matches) {
 //				//m.print();
 //				string P_kmer = string(seq->seq.s).substr(m.P_r-params.k, params.k);
@@ -314,19 +328,20 @@ class SweepMap {
 //			}
 
 			T->start("sweep");
-			vector<Mapping> mappings = sweep(p_hist, matches, (pos_t)p.size(), P_sz);
+			vector<Mapping> mappings = sweep(p_hist, matches, P_sz, seeds.size());
 			T->stop("sweep");
 
 			T->start("postproc");
 			auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(mappings, P_sz);
-
 			for (auto &m: reasonable_mappings) {
-				m.strand = is_same_strand(seq->seq.s, tidx.T.substr(m.T_l, m.T_r-m.T_l)) ? '+' : '-';
-				m.print_paf(params, seqID, tidx.T_sz, tidx.name);
-				m.map_time = T->secs("sweep") / (double)mappings.size();
+				const auto &segm = tidx.T[m.segm_id];
+				//cout << m.T_l << " " << m.T_r << " " << m.segm_id << " " << segm.seq.size() << endl;
+				m.strand = is_same_strand(seq->seq.s, segm.seq.substr(m.T_l, m.T_r-m.T_l)) ? '+' : '-';
+				m.map_time = (T->secs("sketching") + T->secs("seeding") + T->secs("matching") + T->secs("sweep")) / (double)reasonable_mappings.size();
+				m.print_paf(query_id, segm, (int)matches.size());
 				C->inc("similarity", int(10000.0*m.sim));
 				C->inc("mappings");
-				C->inc("sketched_kmers", m.p_sz);
+				C->inc("sketched_kmers", m.seeds);
 				C->inc("matches", m.matches);
 			}
 			C->inc("reads");
@@ -341,20 +356,23 @@ class SweepMap {
 		T->stop("mapping");
 	}
 
-	void print_report(const Counters &C, const Timers &T) {
-		cerr << fixed << setprecision(1);
-		// TODO: report average Jaccard similarity
+	static void print_params(const params_t &params) {
 		cerr << "Params:" << endl;
-		cerr << " | reference:             " << params.tFile << " (" << C.count("T_sz") << " nb)" << endl;
+		cerr << " | reference:             " << params.tFile << endl;
 		cerr << " | queries:               " << params.pFile << endl;
 		cerr << " | k:                     " << params.k << endl;
-		cerr << " | w:                     " << params.w << endl;
-		cerr << " | blacklist file:        " << (params.bLstFl.size() ? params.bLstFl : "-") << endl;
-		//cerr << " | hFrac:                 " << params.hFrac << endl;
+		//cerr << " | w:                     " << params.w << endl;
+		//cerr << " | blacklist file:        " << (params.bLstFl.size() ? params.bLstFl : "-") << endl;
+		cerr << " | hFrac:                 " << params.hFrac << endl;
 		cerr << " | max_seeds (S):         " << params.max_seeds << endl;
 		cerr << " | max_matches (M):       " << params.max_matches << endl;
 		cerr << " | onlybest:              " << params.onlybest << endl;
 		cerr << " | tThres:                " << params.tThres << endl;
+	}
+
+	void print_report(const Counters &C, const Timers &T) {
+		cerr << fixed << setprecision(1);
+		// TODO: report average Jaccard similarity
 		cerr << "Stats:" << endl;
 		cerr << " | Total reads:           " << C.count("reads") << " (~" << 1.0*C.count("read_len") / C.count("reads") << " nb per read)" << endl;
 		cerr << " | Sketched read kmers:   " << C.count("sketched_kmers") << " (" << C.frac("sketched_kmers", "reads") << " per read)" << endl;
@@ -380,7 +398,6 @@ class SweepMap {
 		cerr << " |  | sweep:                  "     << setw(5) << right << T.secs("sweep")             << " (" << setw(4) << right << T.perc("sweep", "mapping")               << "\%, " << setw(5) << right << T.range_ratio("sweep") << "x)" << endl;
 		cerr << " |  | post proc:              "     << setw(5) << right << T.secs("postproc")          << " (" << setw(4) << right << T.perc("postproc", "mapping")            << "\%, " << setw(5) << right << T.range_ratio("postproc") << "x)" << endl;
 	}
-};                                                                                                                                                                              
-                                                                                                                                                                                
-#endif                                                                                                                                                                          
-                                                                                                                                                                                
+};
+
+#endif

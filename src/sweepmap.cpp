@@ -16,38 +16,32 @@ int main(int argc, char **argv) {
 		dsHlp();
 		return 1;
 	}
+	SweepMap::print_params(params);
 
 	blmers_t bLstmers;  // TODO: not used
 
 	T.start("indexing");
 	cerr << "Indexing " << params.tFile << "..." << endl;
-	string ref_name;
-	pos_t T_sz;
-	Sketch t;
-	SketchIndex tidx;
+	SketchIndex tidx(params, bLstmers);
 
 	T.start("index_reading");
-	read_fasta_klib(params.tFile, [&t, &tidx, &params, &bLstmers, &ref_name, &T_sz, &T](kseq_t *seq) {
+	read_fasta_klib(params.tFile, [&tidx, &params, &bLstmers, &T](kseq_t *seq) {
 		T.stop("index_reading");
-		assert(ref_name.empty());  // TODO: support multi-sequence files
 		T.start("index_sketching");
-		t = buildFMHSketch(seq->seq.s, params.k, params.hFrac, bLstmers);
+		Sketch t = buildFMHSketch(seq->seq.s, params.k, params.hFrac, bLstmers);
 		T.stop("index_sketching");
-		T_sz = (pos_t)seq->seq.l;
-		ref_name = seq->name.s;
 
 		T.start("index_initializing");
-		tidx.add(t, seq->seq.s, ref_name, params);
+		tidx.add_segment(t, seq->name.s, seq->seq.s);
 		tidx.print_hist();
 		T.stop("index_initializing");
 
 		T.start("index_reading");
 	});
 	T.stop("index_reading");
-
 	T.stop("indexing");
 
-	C.inc("T_sz", tidx.T_sz);
+	C.inc("T_sz", tidx.total_size);
 
 	if (!params.paramsFile.empty()) {
 		cerr << "Writing parameters to " << params.paramsFile << "..." << endl;

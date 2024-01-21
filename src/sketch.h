@@ -29,7 +29,15 @@ struct kmer_with_pos_t {
 };
 
 //using abs_hash_t = pair<pos_t, hash_t>;
-using abs_ord_t  = pair<pos_t, pos_t>; 
+//using Hit  = pair<pos_t, pos_t>; 
+
+struct Hit {
+	pos_t r;
+	pos_t pos;
+	int segm_id;
+
+	Hit(pos_t r, pos_t pos, int segm_id) : r(r), pos(pos), segm_id(segm_id) {}
+};
 
 using Sketch     = vector<kmer_with_pos_t>;  // (kmer hash, kmer's left 0-based position)
 
@@ -141,55 +149,63 @@ const Sketch buildFMHSketch_onlyfw(const string& s, int k, double hFrac) {
 //    }
 //};
 
-struct SketchIndex {
-	string T;
-	pos_t T_sz;
+struct RefSegment {
 	string name;
-	params_t params;
-	//unordered_map<hash_t, vector<abs_ord_t>> h2pos;
-	ankerl::unordered_dense::map<hash_t, vector<abs_ord_t>> h2pos;
-	//gtl::flat_hash_map<hash_t, vector<abs_ord_t>> h2pos;
-	//gtl::node_hash_map<hash_t, vector<abs_ord_t>> h2pos;
-	//ankerl::unordered_dense::map<hash_t, abs_ord_t> h2singlepos;
+	string seq;
+	RefSegment(const string &name, const string &seq) : name(name), seq(seq) {}
+};
+
+struct SketchIndex {
+	vector<RefSegment> T;
+	pos_t total_size;  // total size of all segments // TODO: change type to size_t
+	const params_t &params;
+	//unordered_map<hash_t, vector<Hit>> h2pos;
+	ankerl::unordered_dense::map<hash_t, vector<Hit>> h2pos;
+	//gtl::flat_hash_map<hash_t, vector<Hit>> h2pos;
+	//gtl::node_hash_map<hash_t, vector<Hit>> h2pos;
+	//ankerl::unordered_dense::map<hash_t, Hit> h2singlepos;
 
 	void print_hist() {
 		vector<int> hist(10, 0);
 		int kmers = 0, different_kmers = 0, max_occ = 0;
 		for (const auto& h2p : h2pos) {
-			kmers += h2p.second.size();
+			int occ = h2p.second.size();
+			kmers += occ;
 			++different_kmers;
-			if (h2p.second.size() >= hist.size()-1) {
-				if ((int)h2p.second.size() > max_occ)
-					max_occ = (int)h2p.second.size();
-				++hist.back();
+			if (occ >= (int)hist.size()-1) {
+				hist.back() += occ;
+				if (occ > max_occ)
+					max_occ = occ;
 			} else 
-				++hist[h2p.second.size()];
+				hist[occ] += occ;
 		}
 
 		cerr << fixed << setprecision(2);
-		cerr << "Histogram of " << kmers << " different kmers ("
+		cerr << "Histogram of " << kmers << " kmers ("
 			<< 100.0*double(different_kmers)/double(kmers) << "\% different) covering "
-			<< 100.0*double(params.k)*double(kmers)/double(T_sz) << "\% of the " << T_sz << "nb index" << endl;
+			<< 100.0*double(params.k)*double(kmers)/double(total_size) << "\% of the " << total_size << "nb index" << endl;
 		for (size_t i=0; i<hist.size(); ++i)
 			if (hist[i] > 0)
-				cerr << setw(5) << right << i << (i<hist.size()-1?" ":"+") << "occ: " << setw(9) << right << hist[i] << " different kmers (" << 100.0*double(hist[i])/double(different_kmers) << "\%)" << endl;
-		cerr << "Most frequent kmer occurs " << max_occ << " times." << endl;
+				cerr << setw(5) << right << i << (i<hist.size()-1?" ":"+") << "occ: " << setw(9) << right << hist[i] << " kmers (" << 100.0*double(hist[i])/double(kmers) << "\%)" << endl;
+		cerr << "The most frequent kmer occurs " << max_occ << " times." << endl;
 	}
 
-	void populate_h2pos(const Sketch& sketch) {
+	void populate_h2pos(const Sketch& sketch, int segm_id) {
 		//print_sketches(name, sketch);
 		for (size_t tpos = 0; tpos < sketch.size(); ++tpos) {
 			const kmer_with_pos_t& abs_hash = sketch[tpos];
-			h2pos[abs_hash.kmer].push_back(abs_ord_t(abs_hash.r, tpos));
+			h2pos[abs_hash.kmer].push_back(Hit(abs_hash.r, tpos, segm_id));
 		}
 	}
 
-	void add(const Sketch& sketch, char *T, const string &name, const params_t &params) {
-		this->T = T;
-		this->name = name;
-		this->params = params;
-		T_sz = this->T.size();
-		populate_h2pos(sketch);
+	void add_segment(const Sketch& sketch, const string &name, char *T_segm) {
+		T.push_back(RefSegment(name, T_segm));
+		total_size += this->T.back().seq.size();
+		populate_h2pos(sketch, T.size()-1);
+	}
+
+	SketchIndex(const params_t &params, const blmers_t &bLstmers)
+		: total_size(0), params(params) {
 	}
 
 	//SketchIndex(const string &name, const string &ref, const params_t &params, const blmers_t &bLstmers)
