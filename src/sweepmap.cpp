@@ -2,7 +2,7 @@
 
 int main(int argc, char **argv) {
 	initialize_LUT();
-
+	
 	Counters C;
 	Timers T;
 
@@ -20,12 +20,14 @@ int main(int argc, char **argv) {
 	blmers_t bLstmers;  // TODO: not used
 
 	T.start("indexing");
-	T.start("index_reading");
 	cerr << "Indexing " << params.tFile << "..." << endl;
 	string ref_name;
 	pos_t T_sz;
 	Sketch t;
-	read_fasta_klib(params.tFile, [&t, &params, &bLstmers, &ref_name, &T_sz, &T](kseq_t *seq) {
+	SketchIndex tidx;
+
+	T.start("index_reading");
+	read_fasta_klib(params.tFile, [&t, &tidx, &params, &bLstmers, &ref_name, &T_sz, &T](kseq_t *seq) {
 		T.stop("index_reading");
 		assert(ref_name.empty());  // TODO: support multi-sequence files
 		T.start("index_sketching");
@@ -33,14 +35,16 @@ int main(int argc, char **argv) {
 		T.stop("index_sketching");
 		T_sz = (pos_t)seq->seq.l;
 		ref_name = seq->name.s;
+
+		T.start("index_initializing");
+		tidx.add(t, seq->seq.s, ref_name, params);
+		tidx.print_hist();
+		T.stop("index_initializing");
+
 		T.start("index_reading");
 	});
 	T.stop("index_reading");
 
-	T.start("index_initializing");
-	SketchIndex tidx(t, T_sz, ref_name, params);
-	tidx.print_hist();
-	T.stop("index_initializing");
 	T.stop("indexing");
 
 	C.inc("T_sz", tidx.T_sz);

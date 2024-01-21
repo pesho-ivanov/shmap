@@ -5,13 +5,24 @@
 #include <cassert>
 #include <deque>
 #include <iomanip>
+#include <set>
 
 #include "io.h"
 #include "sketch.h"
 
+struct Seed {
+	pos_t P_r;
+	hash_t kmer;
+	const vector<abs_ord_t> *hits_in_T;
+
+	Seed() {}
+	Seed(pos_t P_r, hash_t kmer, const vector<abs_ord_t> *hits_in_T) :
+		P_r(P_r), kmer(kmer), hits_in_T(hits_in_T) {}
+};
+
 struct Match {
 	hash_t kmer;
-	pos_t P_l;
+	pos_t P_r;
 	pos_t T_r;
 	pos_t t_pos;
 	//bool strand;  // 0 - forward, 1 - reverse
@@ -19,6 +30,10 @@ struct Match {
 	//char get_strand() const {
 	//	return strand ? '-' : '+';
 	//}
+
+	void print() const {
+		cout << "Match: " << kmer << " " << P_r << " " << T_r << " " << t_pos << endl;
+	}
 };
 
 struct Mapping {
@@ -32,6 +47,7 @@ struct Mapping {
 	int xmin;     // the number of kmers in the intersection between the pattern and its mapping in `t'
 	double sim;     // the number of kmers in the intersection between the pattern and its mapping in `t'
 	double map_time;
+	char strand;    // '+' or '-'
 
     Mapping() {}
 	Mapping(int k, pos_t P_sz, pos_t p_sz, int matches, pos_t T_l, pos_t T_r, pos_t s_sz, int xmin)
@@ -43,7 +59,7 @@ struct Mapping {
 			<< "\t" << P_sz     // query sequence length
 			<< "\t" << 0   // query start (0-based; closed)
 			<< "\t" << P_sz  // query end (0-based; open)
-			<< "\t" << "+"   // m.get_strand() //strand; TODO
+			<< "\t" << strand   // m.get_strand() //strand; TODO
 			<< "\t" << T_name    // reference name
 			<< "\t" << T_sz  // target sequence length
 			<< "\t" << T_l  // target start on original strand (0-based)
@@ -69,11 +85,10 @@ class SweepMap {
 	Timers *T;
 	Counters *C;
 
-	using seeds_t = vector<kmer_hits_t>;
 	using hist_t = ankerl::unordered_dense::map<hash_t, int>;
 
-	seeds_t choose_seeds(const Sketch& p, int max_seeds, hist_t *hist) {
-		seeds_t seeds;
+	vector<Seed> choose_seeds(const Sketch& p, int max_seeds, hist_t *hist) {
+		vector<Seed> seeds;
 		seeds.reserve(p.size());
 
 		// TODO: limit the number of kmers in the pattern p
@@ -88,15 +103,15 @@ class SweepMap {
 				(*hist)[curr.kmer] = 1;
 				auto t_it = tidx.h2pos.find(curr.kmer);
 				if (t_it != tidx.h2pos.end())
-					seeds.push_back(kmer_hits_t(curr.r, curr.kmer, &t_it->second));
+					seeds.push_back(Seed(curr.r, curr.kmer, &t_it->second));
 			}
 		}
 		T->stop("collect_seed_info");
 
 		T->start("sort_seeds");
-		sort(seeds.begin(), seeds.end(), [](const kmer_hits_t &a, const kmer_hits_t &b) {
+		sort(seeds.begin(), seeds.end(), [](const Seed &a, const Seed &b) {
 			// Sort the matching kmers by number of hits in the reference
-			return a.kmers_in_T->size() < b.kmers_in_T->size();
+			return a.hits_in_T->size() < b.hits_in_T->size();
 		});
 		T->stop("sort_seeds");
 
@@ -107,17 +122,17 @@ class SweepMap {
 	}
 
 	// Initializes the histogram of the pattern and the list of matches
-	vector<Match> match_seeds(pos_t p_sz, const seeds_t &seeds) {
+	vector<Match> match_seeds(pos_t p_sz, const vector<Seed> &seeds) {
 		T->start("collect_matches");
 		// Get MAX_SEEDS of kmers with the lowest number of hits.
-		vector<Match> L;
-		L.reserve(P_MULTIPLICITY * p_sz);
+		vector<Match> matches;
+		matches.reserve(P_MULTIPLICITY * p_sz);
 
 		int total_hits = 0;
 		for (const auto &res : seeds) {
-			for (const auto &hit: *(res.kmers_in_T))
-				L.push_back(Match(res.kmer, res.P_l, hit.first, hit.second));
-			if ((total_hits += (int)res.kmers_in_T->size()) > (int)params.max_matches) {
+			for (const auto &hit: *(res.hits_in_T))
+				matches.push_back(Match(res.kmer, res.P_r, hit.first, hit.second));
+			if ((total_hits += (int)res.hits_in_T->size()) > (int)params.max_matches) {
 				C->inc("matches_limit_reached");
 				break;
 			}
@@ -125,13 +140,13 @@ class SweepMap {
 		T->stop("collect_matches");
 
 		T->start("sort_matches");
-		sort(L.begin(), L.end(), [](const Match &a, const Match &b) {
+		sort(matches.begin(), matches.end(), [](const Match &a, const Match &b) {
 			// Sort L by ascending positions in reference so that we can next sweep through it.
 			return a.T_r < b.T_r;
 		});
 		T->stop("sort_matches");
 
-		return L;
+		return matches;
 	}
 
 	// vector<hash_t> diff_hist;  // diff_hist[kmer_hash] = #occurences in `p` - #occurences in `s`
@@ -251,6 +266,22 @@ class SweepMap {
 			}
 		}
 
+	bool is_same_strand(const string &P, const string &S) {
+		auto p_fw = buildFMHSketch_onlyfw(P, params.k, params.hFrac);
+		auto s_fw = buildFMHSketch_onlyfw(S, params.k, params.hFrac);
+		auto s_rc = buildFMHSketch_onlyfw(revCompl(S), params.k, params.hFrac);
+
+		auto p_fw_ = set<kmer_with_pos_t>(p_fw.begin(), p_fw.end());
+		auto s_fw_ = set<kmer_with_pos_t>(s_fw.begin(), s_fw.end());
+		auto s_rc_ = set<kmer_with_pos_t>(s_rc.begin(), s_rc.end());
+
+		std::set<kmer_with_pos_t> sect_fw, sect_rc;
+		std::set_intersection(p_fw_.begin(), p_fw_.end(), s_fw_.begin(), s_fw_.end(), std::inserter(sect_fw, sect_fw.begin()));
+		std::set_intersection(p_fw_.begin(), p_fw_.end(), s_rc_.begin(), s_rc_.end(), std::inserter(sect_rc, sect_rc.begin()));
+		//cout << "intersection sizes: " << " " << s_fw.size() << " " << s_rc.size() << " " << sect_fw.size() << " " << sect_rc.size() << endl;
+		return sect_fw.size() > sect_rc.size();
+	}
+
 	void map(const string &pFile, const blmers_t &bLstmers) {
 		T->start("mapping");
 		T->start("query_reading");
@@ -268,21 +299,29 @@ class SweepMap {
 			hist_t p_hist;
 
 			T->start("seeding");
-			auto seeds = choose_seeds(p, params.max_seeds, &p_hist);
+			vector<Seed> seeds = choose_seeds(p, params.max_seeds, &p_hist);
 			T->stop("seeding");
 
 			T->start("matching");
-			auto L = match_seeds(p.size(), seeds);
+			vector<Match> matches = match_seeds(p.size(), seeds);
 			T->stop("matching");
 
+//			for(auto m: matches) {
+//				//m.print();
+//				string P_kmer = string(seq->seq.s).substr(m.P_r-params.k, params.k);
+//				string T_kmer = tidx.T.substr(m.T_r-params.k, params.k);
+//				cout << P_kmer << " " << T_kmer << " " << revCompl(T_kmer) << endl;
+//			}
+
 			T->start("sweep");
-			auto mappings = sweep(p_hist, L, (pos_t)p.size(), P_sz);
+			vector<Mapping> mappings = sweep(p_hist, matches, (pos_t)p.size(), P_sz);
 			T->stop("sweep");
 
 			T->start("postproc");
 			auto reasonable_mappings = params.overlaps ? mappings : filter_reasonable(mappings, P_sz);
 
 			for (auto &m: reasonable_mappings) {
+				m.strand = is_same_strand(seq->seq.s, tidx.T.substr(m.T_l, m.T_r-m.T_l)) ? '+' : '-';
 				m.print_paf(params, seqID, tidx.T_sz, tidx.name);
 				m.map_time = T->secs("sweep") / (double)mappings.size();
 				C->inc("similarity", int(10000.0*m.sim));

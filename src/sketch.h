@@ -22,6 +22,10 @@ using blmers_t   = std::unordered_map<hash_t, char>;
 struct kmer_with_pos_t {
 	pos_t r;
 	hash_t kmer;
+
+	bool operator<(const kmer_with_pos_t& rhs) const {
+		return kmer < rhs.kmer;
+	}
 };
 
 //using abs_hash_t = pair<pos_t, hash_t>;
@@ -60,7 +64,9 @@ void initialize_LUT() {
 //Sketch sk1 = buildFMHSketch(s, 5, 1.0, blmers);
 //Sketch sk2 = buildFMHSketch(revComp(s), 5, 1.0, blmers);
 //return 0;
+// TODO: use either only forward or only reverse
 const Sketch buildFMHSketch(const string& s, int k, double hFrac, const blmers_t& blmers) {
+	// TODO: accept char*
 	Sketch sk;
 	sk.reserve((int)(1.1 * (double)s.size() * hFrac));
 
@@ -77,14 +83,15 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac, const blmers_t
 	}
 
 	while(true) {
-		h = h_fw ^ h_rc;
-//		cerr << s << " " << r << " " << std::hex << std::setfill('0') << std::setw(16) << h
-//							<< " = " << std::hex << std::setfill('0') << std::setw(16) << h_fw
-//							<< " ^ " << std::hex << std::setfill('0') << std::setw(16) << h_rc << endl;
-		if (h < hThres)  // optimize to only look at specific bits
-		//if (h_fw < hThres)  // optimize to only look at specific bits
-			//sk.emplace_back(r, h);
-			sk.emplace_back(r, h_fw);
+		// HACK! the least significant bit is quite random and does not correlate with (h < hThres)
+		h = std::countr_zero(h_fw) < std::countr_zero(h_rc) ? h_fw : h_rc;
+
+		//cerr << s << " " << r << " " << std::hex << std::setfill('0') << std::setw(16) << h
+		//					<< " = " << std::hex << std::setfill('0') << std::setw(16) << h_fw
+		//					<< " ^ " << std::hex << std::setfill('0') << std::setw(16) << h_rc << endl;
+		if (h < hThres) { // optimize to only look at specific bits
+			sk.emplace_back(r, h);
+		}
 					
 		if (r >= (int)s.size()) break;
 
@@ -97,15 +104,36 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac, const blmers_t
 	return sk;
 }
 
-struct kmer_hits_t {
-	pos_t P_l;
-	hash_t kmer;
-	const vector<abs_ord_t> *kmers_in_T;
+const Sketch buildFMHSketch_onlyfw(const string& s, int k, double hFrac) {
+	Sketch sk;
+	sk.reserve((int)(1.1 * (double)s.size() * hFrac));
 
-	kmer_hits_t() {}
-	kmer_hits_t(pos_t P_l, hash_t kmer, const vector<abs_ord_t> *kmers_in_T) :
-		P_l(P_l), kmer(kmer), kmers_in_T(kmers_in_T) {}
-};
+	if ((int)s.size() < k) return sk;
+
+	hash_t h_fw = 0, h_rc = 0;
+	hash_t hThres = hash_t(hFrac * double(std::numeric_limits<hash_t>::max()));
+	int r;
+
+	for (r=0; r<k; r++) {
+		h_fw ^= rotl(LUT_fw[(int)s[r]], k-r-1);
+		h_rc ^= rotl(LUT_rc[(int)s[r]], r);
+	}
+
+	while(true) {
+		if (std::countr_zero(h_fw) < std::countr_zero(h_rc))
+			if (h_fw < hThres)
+				sk.emplace_back(r, h_fw);
+					
+		if (r >= (int)s.size()) break;
+
+		h_fw = rotl(h_fw, 1) ^ rotl(LUT_fw[(int)s[r-k]], k) ^ LUT_fw[(int)s[r]];
+		h_rc = rotr(h_rc, 1) ^ rotr(LUT_rc[(int)s[r-k]], 1) ^ rotl(LUT_rc[(int)s[r]], k-1);
+
+		++r;
+	}
+
+	return sk;
+}
 
 //struct EmptyHash {
 //    size_t operator()(hash_t key) const {
@@ -114,9 +142,10 @@ struct kmer_hits_t {
 //};
 
 struct SketchIndex {
+	string T;
 	pos_t T_sz;
 	string name;
-	const params_t &params;
+	params_t params;
 	//unordered_map<hash_t, vector<abs_ord_t>> h2pos;
 	ankerl::unordered_dense::map<hash_t, vector<abs_ord_t>> h2pos;
 	//gtl::flat_hash_map<hash_t, vector<abs_ord_t>> h2pos;
@@ -155,16 +184,19 @@ struct SketchIndex {
 		}
 	}
 
-	SketchIndex(const Sketch& sketch, pos_t T_sz, const string &name, const params_t &params)
-		: T_sz(T_sz), name(name), params(params) {
+	void add(const Sketch& sketch, char *T, const string &name, const params_t &params) {
+		this->T = T;
+		this->name = name;
+		this->params = params;
+		T_sz = this->T.size();
 		populate_h2pos(sketch);
 	}
 
-	SketchIndex(const string &name, const string &ref, const params_t &params, const blmers_t &bLstmers)
-		: T_sz((pos_t)ref.size()), name(name), params(params) {
-		Sketch sketch = buildFMHSketch(ref, params.k, params.hFrac, bLstmers);
-		populate_h2pos(sketch);
-	}
+	//SketchIndex(const string &name, const string &ref, const params_t &params, const blmers_t &bLstmers)
+	//	: T_sz((pos_t)ref.size()), name(name), params(params) {
+	//	Sketch sketch = buildFMHSketch(ref, params.k, params.hFrac, bLstmers);
+	//	populate_h2pos(sketch);
+	//}
 
 	//SketchIndex(const string &tFile, const params_t &params, const blmers_t &bLstmers) {
 	//	read_fasta_klib(tFile, [this, &params, &bLstmers](kseq_t *seq) {
@@ -176,5 +208,19 @@ struct SketchIndex {
 	//	});
 	//}
 };
+
+string revCompl(string s) {
+    for (auto& c : s) {
+		switch (c) {
+			case 'A': c = 'T'; break;
+			case 'C': c = 'G'; break;
+			case 'G': c = 'C'; break;
+			case 'T': c = 'A'; break;
+			default: break;
+		}
+	}
+    std::reverse(s.begin(), s.end());
+    return s;
+}
 
 #endif
