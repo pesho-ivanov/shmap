@@ -274,18 +274,23 @@ class SweepMap {
 
 	bool is_same_strand(const string &P, const string &S) {
 		auto p_fw = buildFMHSketch_onlyfw(P, params.k, params.hFrac);
-		auto s_fw = buildFMHSketch_onlyfw(S, params.k, params.hFrac);
-		auto s_rc = buildFMHSketch_onlyfw(revCompl(S), params.k, params.hFrac);
+		auto s_fw = buildFMHSketch_onlyfw(S, params.k, params.hFrac, 150);
+		auto s_rc = buildFMHSketch_onlyfw(revCompl(S), params.k, params.hFrac, 150);
 
-		auto p_fw_ = set<kmer_with_pos_t>(p_fw.begin(), p_fw.end());
-		auto s_fw_ = set<kmer_with_pos_t>(s_fw.begin(), s_fw.end());
-		auto s_rc_ = set<kmer_with_pos_t>(s_rc.begin(), s_rc.end());
+		auto p_fw_set = ankerl::unordered_dense::set<hash_t>();
+		for (const auto &item: p_fw)
+			p_fw_set.insert(item.kmer);
 
-		std::set<kmer_with_pos_t> sect_fw, sect_rc;
-		std::set_intersection(p_fw_.begin(), p_fw_.end(), s_fw_.begin(), s_fw_.end(), std::inserter(sect_fw, sect_fw.begin()));
-		std::set_intersection(p_fw_.begin(), p_fw_.end(), s_rc_.begin(), s_rc_.end(), std::inserter(sect_rc, sect_rc.begin()));
-		//cout << "intersection sizes: " << " " << s_fw.size() << " " << s_rc.size() << " " << sect_fw.size() << " " << sect_rc.size() << endl;
-		return sect_fw.size() > sect_rc.size();
+		int diff=0;
+		for (const auto &s: s_fw)
+			if (p_fw_set.contains(s.kmer))
+				++diff;
+
+		for (const auto &s: s_rc)
+			if (p_fw_set.contains(s.kmer))
+				--diff;
+
+		return diff > 0;
 	}
 
 	void map(const string &pFile, const blmers_t &bLstmers) {
@@ -321,12 +326,11 @@ class SweepMap {
 			T->start("postproc");
 			if (!params.overlaps)
 				mappings = filter_reasonable(mappings, P_sz);
-			T->stop("postproc");
 			read_mapping_time.stop();
 
 			for (auto &m: mappings) {
 				const auto &segm = tidx.T[m.segm_id];
-				m.strand = is_same_strand(seq->seq.s, segm.seq.substr(m.T_l, m.T_r-m.T_l)) ? '+' : '-';
+				m.strand = is_same_strand(seq->seq.s, segm.seq.substr(m.T_l, m.T_r-m.T_l)) ? '+' : '-';  // TODO: optimize to char*
 				m.map_time = read_mapping_time.secs() / (double)mappings.size();
 				m.print_paf(query_id, segm, (int)matches.size());
 				C->inc("J", int(10000.0*m.J));
@@ -337,6 +341,7 @@ class SweepMap {
 			C->inc("reads");
 			if (mappings.empty())
 				C->inc("unmapped_reads");
+			T->stop("postproc");
 
 			T->stop("query_mapping");
 			T->start("query_reading");
@@ -357,6 +362,7 @@ class SweepMap {
 		cerr << " | max_matches (M):       " << params.max_matches << endl;
 		cerr << " | onlybest:              " << params.onlybest << endl;
 		cerr << " | tThres:                " << params.tThres << endl;
+		cerr << " ----" 					 << endl;
 	}
 
 	void print_report(const Counters &C, const Timers &T) {
@@ -369,6 +375,7 @@ class SweepMap {
 		cerr << " | Matches limit reached: " << C.count("matches_limit_reached") << " (" << C.perc("matches_limit_reached", "reads") << "%)" << endl;
 		cerr << " | Unmapped reads:        " << C.count("unmapped_reads") << " (" << C.perc("unmapped_reads", "reads") << "%)" << endl;
 		cerr << " | Average Jaccard:       " << C.frac("J", "mappings") / 10000.0 << endl;
+		cerr << " ----" 					 << endl;
 		cerr << "Total time [sec]:         "         << setw(5) << right << T.secs("total")             << " (" << setw(4) << right << C.count("reads") / T.secs("total")       << " reads per sec)" << endl;
 		cerr << " | Index:                 "         << setw(5) << right << T.secs("indexing")          << " (" << setw(4) << right << T.perc("indexing", "total")              << "\%)" << endl;
 		cerr << " |  | loading:                "     << setw(5) << right << T.secs("index_reading")     << " (" << setw(4) << right << T.perc("index_reading", "indexing")      << "\%)" << endl;
@@ -385,6 +392,7 @@ class SweepMap {
 		cerr << " |  |  | sort matches:            " << setw(5) << right << T.secs("sort_matches")      << " (" << setw(4) << right << T.perc("sort_matches", "matching")       << "\%, " << setw(5) << right << T.range_ratio("sort_matches") << "x)" << endl;
 		cerr << " |  | sweep:                  "     << setw(5) << right << T.secs("sweep")             << " (" << setw(4) << right << T.perc("sweep", "mapping")               << "\%, " << setw(5) << right << T.range_ratio("sweep") << "x)" << endl;
 		cerr << " |  | post proc:              "     << setw(5) << right << T.secs("postproc")          << " (" << setw(4) << right << T.perc("postproc", "mapping")            << "\%, " << setw(5) << right << T.range_ratio("postproc") << "x)" << endl;
+		cerr << " ----" 							 << endl;
 	}
 };
 

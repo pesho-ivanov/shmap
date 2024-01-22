@@ -54,12 +54,13 @@ static hash_t LUT_fw[256], LUT_rc[256];
 //}
 
 void initialize_LUT() {
+	// https://gist.github.com/Daniel-Liu-c0deb0t/7078ebca04569068f15507aa856be6e8
 	LUT_fw['a'] = LUT_fw['A'] = 0x3c8b'fbb3'95c6'0474; // Daniel's
-	//LUT_fw['a'] = LUT_fw['A'] = 0x3c8bfbb395c60470;  // Ragnar's
+//LUT_fw['a'] = LUT_fw['A'] = 0x3c8bfbb395c60470;  // Ragnar's
 	LUT_fw['c'] = LUT_fw['C'] = 0x3193'c185'62a0'2b4c; // Daniel's
 	LUT_fw['g'] = LUT_fw['G'] = 0x2032'3ed0'8257'2324; // Daniel's
 	LUT_fw['t'] = LUT_fw['T'] = 0x2955'49f5'4be2'4456; // Daniel's
-	//LUT_fw['t'] = LUT_fw['T'] = 0x2d2a04e675310c18;  // Ragnar's
+//LUT_fw['t'] = LUT_fw['T'] = 0x2d2a04e675310c18;  // Ragnar's
 
 	LUT_rc['a'] = LUT_rc['A'] = LUT_fw['T'];
 	LUT_rc['c'] = LUT_rc['C'] = LUT_fw['G'];
@@ -112,7 +113,7 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac, const blmers_t
 	return sk;
 }
 
-const Sketch buildFMHSketch_onlyfw(const string& s, int k, double hFrac) {
+const Sketch buildFMHSketch_onlyfw(const string& s, int k, double hFrac, int max_sketch_size=-1) {
 	Sketch sk;
 	sk.reserve((int)(1.1 * (double)s.size() * hFrac));
 
@@ -129,8 +130,10 @@ const Sketch buildFMHSketch_onlyfw(const string& s, int k, double hFrac) {
 
 	while(true) {
 		if (std::countr_zero(h_fw) < std::countr_zero(h_rc))
-			if (h_fw < hThres)
+			if (h_fw < hThres) {
 				sk.emplace_back(r, h_fw);
+				if (max_sketch_size != -1 && (int)sk.size() >= max_sketch_size) break;
+			}
 					
 		if (r >= (int)s.size()) break;
 
@@ -143,15 +146,9 @@ const Sketch buildFMHSketch_onlyfw(const string& s, int k, double hFrac) {
 	return sk;
 }
 
-//struct EmptyHash {
-//    size_t operator()(hash_t key) const {
-//        return key; // ^ (key >> 32);
-//    }
-//};
-
 struct RefSegment {
 	string name;
-	string seq;
+	string seq;  // TODO: change type to char* and store compressed (2 bits per base)
 	RefSegment(const string &name, const string &seq) : name(name), seq(seq) {}
 };
 
