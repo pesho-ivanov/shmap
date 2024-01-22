@@ -11,12 +11,9 @@ SRCS = src/sweepmap.cpp src/sweepmap.h src/io.h src/sketch.h src/utils.h src/kse
 SWEEPMAP_BIN = ./sweepmap
 MINIMAP_BIN = minimap2
 BLEND_BIN = ~/libs/blend/bin/blend
-VERITYMAP_BIN = ~/libs/VerityMap/veritymap/main.py
 MAPQUIK_BIN = mapquik
-ESKEMAP_BIN = eskemap
 MERYL_BIN = ~/libs/Winnowmap/bin/meryl
 WINNOWMAP_BIN = ~/libs/Winnowmap/bin/winnowmap
-EDLIB_BIN = ~/libs/edlib/build/bin/edlib-aligner
 
 REFNAME ?= chm13
 ACCURACY ?= 0.99
@@ -43,8 +40,15 @@ READS_PARAMS = $(REFNAME)-a$(ACCURACY)-d$(DEPTH)-l$(MEANLEN)
 READS_PREFIX = reads-$(READS_PARAMS)
 ALLREADS_DIR = $(DIR)/reads
 READS = $(ALLREADS_DIR)/$(READS_PREFIX).fa
+ONE_READ = $(ALLREADS_DIR)/$(READS_PREFIX).oneread.fa
 ALLOUT_DIR = $(DIR)/out
 OUTDIR = $(ALLOUT_DIR)/$(READS_PARAMS)
+
+SWEEPMAP_PREF = $(OUTDIR)/sweepmap/sweepmap
+MINIMAP_PREF = $(OUTDIR)/minimap/minimap
+BLEND_PREF = $(OUTDIR)/blend/blend
+MAPQUIK_PREF = $(OUTDIR)/mapquik/mapquik
+WINNOWMAP_PREF = $(OUTDIR)/winnowmap/winnowmap
 
 MAX_SEEDS = 10000
 MAX_MATCHES = 100 300 1000 3000 10000 30000 100000
@@ -70,32 +74,9 @@ ifeq ($(wildcard $(READS)),)
 	paftools.js pbsim2fq $(REF).fai "$(READS_PREFIX)"_*.maf >$(READS)_
 	rm -f "$(READS_PREFIX)"_*.maf "$(READS_PREFIX)"_*.ref "$(READS_PREFIX)"_*.fastq
 #	mv $(READS)_ $(READS)
+	head -n 2 $(READS) >$(ONE_READ)
 	awk '/^>/ {printit = /+$$/} printit' $(READS)_ >$(READS)
 endif
-
-eval_abe: sweep gen_reads
-	mkdir -p ../out
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 >out/sweep.out
-
-	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -z $(DIR)/out/sweep-b.params >out/sweep-b.out
-	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out
-	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -z $(DIR)/out/sweep-b-e.params >out/sweep-b-e.out
-	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -a extend_equally -z $(DIR)/out/sweep-b-e-a.params >out/sweep-b-e-a.out
-
-	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -z $(DIR)/out/sweep.params >out/sweep.out
-	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -a extend_equally -z $(DIR)/out/sweep-a.params >out/sweep-a.out
-	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -z $(DIR)/out/sweep-e.params >out/sweep-e.out
-	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -a extend_equally -z $(DIR)/out/sweep-e-a.params >out/sweep-e-a.out
-
-eval_multiple_alignments: sweep gen_reads
-#	time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -a fine 		     -z $(DIR)/out/sweep.params >out/sweep.out
-	time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -a fine -x		     -z $(DIR)/out/sweep-x.params >out/sweep-x.out
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -x -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a-x.out
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out 2>out/sweep-b-a.cerr
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -o -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a-o.out 2>out/sweep-b-a-o.cerr
-
-#debug: sweep gen_reads
-#	$(SWEEPMAP_BIN) -s $(REF) -p simulations/reads/1.fasta $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-1.params >out/sweep-1.out 2>out/sweep-1.cerr
 
 eval_sweep_max_seeds: sweep gen_reads
 	@DIR=evals/eval_sweep-K22; \
@@ -110,41 +91,58 @@ eval_sweep_max_seeds: sweep gen_reads
     done
 
 eval_sweepmap: sweepmap gen_reads
-	@mkdir -p $(OUTDIR)
-	MAPPER="sweepmap"; \
-	$(TIME_CMD) -o $(OUTDIR)/$$MAPPER.time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/$$MAPPER.params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2> >(tee $(OUTDIR)/$$MAPPER.log) >$(OUTDIR)/$$MAPPER.paf; \
-	paftools.js mapeval $(OUTDIR)/$$MAPPER.paf | tee $(OUTDIR)/$$MAPPER.eval; \
-	paftools.js mapeval -Q 60 $(OUTDIR)/$$MAPPER.paf >$(OUTDIR)/$$MAPPER.wrong
+	@mkdir -p $(shell dirname $(SWEEPMAP_PREF))
+	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>&1 >/dev/null
+	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).paf
+	paftools.js mapeval $(SWEEPMAP_PREF).paf | tee $(SWEEPMAP_PREF).eval
+	paftools.js mapeval -Q 60 $(SWEEPMAP_PREF).paf >$(SWEEPMAP_PREF).wrong
 
-eval_sweepmap_slow: sweepmap gen_reads
-	mkdir -p $(OUTDIR)
-	$(TIME_CMD) -o $(OUTDIR)/sweep-slow.time ./$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep-slow.params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) 2> >(tee $(OUTDIR)/sweep-slow.log) >$(OUTDIR)/sweep-slow.paf 
-	paftools.js mapeval $(OUTDIR)/sweep-slow.paf | tee $(OUTDIR)/sweep-slow.eval
-	paftools.js mapeval -Q 0 $(OUTDIR)/sweep-slow.paf >$(OUTDIR)/sweep-slow.wrong
+#eval_sweepmap_slow: sweepmap gen_reads
+#	mkdir -p $(OUTDIR)
+#	$(TIME_CMD) -o $(OUTDIR)/sweep-slow.time ./$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep-slow.params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) 2> >(tee $(OUTDIR)/sweep-slow.log) >$(OUTDIR)/sweep-slow.paf 
+#	paftools.js mapeval $(OUTDIR)/sweep-slow.paf | tee $(OUTDIR)/sweep-slow.eval
+#	paftools.js mapeval -Q 0 $(OUTDIR)/sweep-slow.paf >$(OUTDIR)/sweep-slow.wrong
 
 eval_winnowmap: gen_reads
-	mkdir -p $(OUTDIR)
+	@mkdir -p $(shell dirname $(WINNOWMAP_PREF))
 	if [ ! -f $(REF_DIR)/winnowmap_$(REF)_repetitive_k15.txt ]; then \
 		$(MERYL_BIN) count k=15 output merylDB $(REF); \
 		$(MERYL_BIN) print greater-than distinct=0.9998 merylDB > $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt; \
 	fi
-	$(TIME_CMD) -o $(OUTDIR)/winnowmap.time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 $(REF) $(READS) 2> >(tee $(OUTDIR)/winnowmap.log) >$(OUTDIR)/winnowmap.paf 
-	paftools.js mapeval $(OUTDIR)/winnowmap.paf | tee $(OUTDIR)/winnowmap.eval
+	$(TIME_CMD) -o $(WINNOWMAP_PREF).index.time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 $(REF) $(ONE_READ) >/dev/null 2>&1 
+	$(TIME_CMD) -o $(WINNOWMAP_PREF).time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 $(REF) $(READS) 2> >(tee $(WINNOWMAP_PREF).log) >$(WINNOWMAP_PREF).paf 
+	paftools.js mapeval $(WINNOWMAP_PREF).paf | tee $(WINNOWMAP_PREF).eval
 
 eval_minimap: gen_reads
-	mkdir -p $(OUTDIR)
-	$(TIME_CMD) -o $(OUTDIR)/minimap.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(READS) 2> >(tee $(OUTDIR)/minimap.log) >$(OUTDIR)/minimap.paf 
-	paftools.js mapeval $(OUTDIR)/minimap.paf | tee $(OUTDIR)/minimap.eval
+	@mkdir -p $(shell dirname $(MINIMAP_PREF))
+	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(ONE_READ) >/dev/null 2>&1
+	$(TIME_CMD) -o $(MINIMAP_PREF).time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).paf 
+	paftools.js mapeval $(MINIMAP_PREF).paf | tee $(MINIMAP_PREF).eval
 
 eval_blend: gen_reads
-	mkdir -p $(OUTDIR)
-	$(TIME_CMD) -o $(OUTDIR)/blend.time $(BLEND_BIN) -x map-hifi -t 1 -N 0 $(REF) $(READS) 2> >(tee $(OUTDIR)/blend.log) >$(OUTDIR)/blend.paf 
-	paftools.js mapeval $(OUTDIR)/blend.paf | tee $(OUTDIR)/blend.eval
+	@mkdir -p $(shell dirname $(BLEND_PREF))
+	$(TIME_CMD) -o $(BLEND_PREF).index.time $(BLEND_BIN) -x map-hifi -t 1 -N 0 $(REF) $(ONE_READ) >/dev/null 2>&1
+	$(TIME_CMD) -o $(BLEND_PREF).time $(BLEND_BIN) -x map-hifi -t 1 -N 0 $(REF) $(READS) 2> >(tee $(BLEND_PREF).log) >$(BLEND_PREF).paf 
+	paftools.js mapeval $(BLEND_PREF).paf | tee $(BLEND_PREF).eval
 
 eval_mapquik: gen_reads
-	mkdir -p $(OUTDIR)
-	$(TIME_CMD) -o $(OUTDIR)/mapquik.time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(OUTDIR)/mapquik | tee $(OUTDIR)/mapquik.log
-	paftools.js mapeval $(OUTDIR)/mapquik.paf | tee $(OUTDIR)/mapquik.eval
+	@mkdir -p $(shell dirname $(MAPQUIK_PREF))
+	$(TIME_CMD) -o $(MAPQUIK_PREF).index.time $(MAPQUIK_BIN) $(ONE_READ) --reference $(REF) --threads 1  >/dev/null
+	$(TIME_CMD) -o $(MAPQUIK_PREF).time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(MAPQUIK_PREF) | tee $(MAPQUIK_PREF).log
+	paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
+
+eval_all: eval_sweepmap eval_mapquik eval_blend eval_minimap eval_winnowmap
+
+clean:
+	rm -r $(SWEEPMAP_BIN)
+
+clean_evals:
+	rm -r $(ALLREADS_DIR)
+	rm -r $(ALLOUT_DIR)
+
+#EDLIB_BIN = ~/libs/edlib/build/bin/edlib-aligner
+#VERITYMAP_BIN = ~/libs/VerityMap/veritymap/main.py
+#ESKEMAP_BIN = eskemap
 
 #eval_veritymap:
 #	mkdir -p $(OUTDIR)
@@ -155,11 +153,26 @@ eval_mapquik: gen_reads
 #	mkdir -p $(OUTDIR)
 #	$(TIME_CMD) -o $(OUTDIR)/eskemap.time $(ESKEMAP_BIN) -p $(READS) -s $(REF) -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -N >$(OUTDIR)/eskemap.out 2>$(OUTDIR)/eskemap.log
 
-eval: eval_sweepmap eval_minimap eval_mapquik eval_winnowmap eval_blend
+#eval_abe: sweep gen_reads
+#	mkdir -p ../out
+##	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 >out/sweep.out
+#
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -z $(DIR)/out/sweep-b.params >out/sweep-b.out
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -z $(DIR)/out/sweep-b-e.params >out/sweep-b-e.out
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -a extend_equally -z $(DIR)/out/sweep-b-e-a.params >out/sweep-b-e-a.out
+#
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -z $(DIR)/out/sweep.params >out/sweep.out
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -a extend_equally -z $(DIR)/out/sweep-a.params >out/sweep-a.out
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -z $(DIR)/out/sweep-e.params >out/sweep-e.out
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -a extend_equally -z $(DIR)/out/sweep-e-a.params >out/sweep-e-a.out
 
-clean:
-	rm -r $(SWEEPMAP_BIN)
+#eval_multiple_alignments: sweep gen_reads
+#	time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -a fine 		     -z $(DIR)/out/sweep.params >out/sweep.out
+#	time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -a fine -x		     -z $(DIR)/out/sweep-x.params >out/sweep-x.out
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -x -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a-x.out
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out 2>out/sweep-b-a.cerr
+#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -o -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a-o.out 2>out/sweep-b-a-o.cerr
 
-clean_evals:
-	rm -r $(ALLREADS_DIR)
-	rm -r $(ALLOUT_DIR)
+#debug: sweep gen_reads
+#	$(SWEEPMAP_BIN) -s $(REF) -p simulations/reads/1.fasta $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-1.params >out/sweep-1.out 2>out/sweep-1.cerr
