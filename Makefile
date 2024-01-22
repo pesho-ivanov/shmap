@@ -114,7 +114,7 @@ eval_sweepmap: sweepmap gen_reads
 	MAPPER="sweepmap"; \
 	$(TIME_CMD) -o $(OUTDIR)/$$MAPPER.time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/$$MAPPER.params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2> >(tee $(OUTDIR)/$$MAPPER.log) >$(OUTDIR)/$$MAPPER.paf; \
 	paftools.js mapeval $(OUTDIR)/$$MAPPER.paf | tee $(OUTDIR)/$$MAPPER.eval; \
-	paftools.js mapeval -Q 0 $(OUTDIR)/$$MAPPER.paf >$(OUTDIR)/$$MAPPER.wrong
+	paftools.js mapeval -Q 60 $(OUTDIR)/$$MAPPER.paf >$(OUTDIR)/$$MAPPER.wrong
 
 eval_sweepmap_slow: sweepmap gen_reads
 	mkdir -p $(OUTDIR)

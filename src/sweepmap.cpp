@@ -33,13 +33,14 @@ int main(int argc, char **argv) {
 
 		T.start("index_initializing");
 		tidx.add_segment(t, seq->name.s, seq->seq.s);
-		tidx.print_hist();
 		T.stop("index_initializing");
 
 		T.start("index_reading");
 	});
 	T.stop("index_reading");
 	T.stop("indexing");
+
+	tidx.print_hist();
 
 	C.inc("T_sz", tidx.total_size);
 

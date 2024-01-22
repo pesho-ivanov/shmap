@@ -38,19 +38,18 @@ struct Mapping {
 	int segm_id;
 	pos_t s_sz;      // the position of the rightmost nucleotide of the mapping
 	int xmin;     // the number of kmers in the intersection between the pattern and its mapping in `t'
-	double J;     // the number of kmers in the intersection between the pattern and its mapping in `t'
+	double J, J2;     // Jaccard similarity in [0;1] for the best and for the second best mapping
 	double map_time;
+	int mapq;
 	char strand;    // '+' or '-'
-
 	bool unreasonable;  // reserved for filtering matches
 
     Mapping() {}
 	Mapping(int k, pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, int segm_id, pos_t s_sz, int xmin)
-		: k(k), P_sz(P_sz), seeds(seeds), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), xmin(xmin), J(double(xmin) / std::max(seeds, s_sz)), unreasonable(false) {}
+		: k(k), P_sz(P_sz), seeds(seeds), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), xmin(xmin), J(double(xmin) / std::max(seeds, s_sz)), mapq(255), unreasonable(false) {}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
     void print_paf(const string &query_id, const RefSegment &segm, const int matches) const {
-		int mapq = J > 0.5 ? 60 : 0;
 		cout << query_id  			// Query sequence name
 			<< "\t" << P_sz     // query sequence length
 			<< "\t" << 0   // query start (0-based; closed)
@@ -69,7 +68,8 @@ struct Mapping {
 			<< "\t" << "M:i:" << matches // kmer matches in T
 			<< "\t" << "s:i:" << s_sz
 			<< "\t" << "I:i:" << xmin  // intersection of `p` and `s` [kmers]
-			<< "\t" << "J:f:" << J   // similarity [0; 1]
+			<< "\t" << "J:f:" << J   // Jaccard similarity [0; 1]
+			<< "\t" << "J2:f:" << J2   // second best mapping Jaccard similarity [0; 1]
 			<< "\t" << "t:f:" << map_time
 			<< endl;
 	}
@@ -154,6 +154,7 @@ class SweepMap {
 
 		int xmin = 0;
 		Mapping best(params.k, P_len, 0, -1, -1, -1, -1, -1);
+		Mapping second = best;
 
 		// Increase the left point end of the window [l,r) one by one. O(matches)
 		int i = 0, j = 0;
@@ -170,16 +171,24 @@ class SweepMap {
 			}
 
 			auto m = Mapping(params.k, P_len, seeds, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), xmin);
+			// second best without guarantees
 			if (params.onlybest) {
-				//if (xmin > best.xmin) {
-				if (m.J > best.J) {
+				if (m.J > best.J) {  // if (xmin > best.xmin)
+					if (best.T_l < m.T_l - 0.9*P_len)
+						second = best;
 					best = m;
+				} else if (m.J > second.J && m.T_l > best.T_l + 0.9*P_len) {
+					second = m;
 				}
 			} else {
 				if (m.J > params.tThres) {
 					mappings.push_back(m);
 				}
 			}
+
+			// Invariant:
+			// best[l,r) -- a mapping best.l<=l with maximal J
+			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
 
 			// Prepare for the next step by moving `l` to the right.
 			if (++diff_hist[l->kmer] > 0)
@@ -190,6 +199,8 @@ class SweepMap {
 		assert (xmin == 0);
 
 		if (params.onlybest && best.xmin != -1) { // && best.J > params.tThres)
+			best.mapq = (best.xmin > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
+			best.J2 = second.J;
 			mappings.push_back(best);
 		}
 
@@ -293,6 +304,8 @@ class SweepMap {
 			C->inc("read_len", P_sz);
 			hist_t p_hist;
 
+			Timer read_mapping_time;
+			read_mapping_time.start();
 			T->start("seeding");
 			vector<Seed> seeds = choose_seeds(p, params.max_seeds, &p_hist);
 			T->stop("seeding");
@@ -308,10 +321,13 @@ class SweepMap {
 			T->start("postproc");
 			if (!params.overlaps)
 				mappings = filter_reasonable(mappings, P_sz);
+			T->stop("postproc");
+			read_mapping_time.stop();
+
 			for (auto &m: mappings) {
 				const auto &segm = tidx.T[m.segm_id];
 				m.strand = is_same_strand(seq->seq.s, segm.seq.substr(m.T_l, m.T_r-m.T_l)) ? '+' : '-';
-				m.map_time = (T->secs("sketching") + T->secs("seeding") + T->secs("matching") + T->secs("sweep")) / (double)mappings.size();
+				m.map_time = read_mapping_time.secs() / (double)mappings.size();
 				m.print_paf(query_id, segm, (int)matches.size());
 				C->inc("J", int(10000.0*m.J));
 				C->inc("mappings");
@@ -322,7 +338,6 @@ class SweepMap {
 			if (mappings.empty())
 				C->inc("unmapped_reads");
 
-			T->stop("postproc");
 			T->stop("query_mapping");
 			T->start("query_reading");
 		});
