@@ -10,6 +10,11 @@
 #include "io.h"
 #include "sketch.h"
 
+namespace sweepmap {
+
+using std::setw;
+using std::right;
+
 struct Seed {
 	pos_t P_r;
 	hash_t kmer;
@@ -211,7 +216,7 @@ class SweepMap {
 	// another overlapping match). Runs in O(|all|).
 	vector<Mapping> filter_reasonable(const vector<Mapping> &all, const pos_t P_len) {
 		vector<Mapping> reasonable;
-		deque<Mapping> recent;
+		std::deque<Mapping> recent;
 
 		// Minimal separation between mappings to be considered reasonable
 		pos_t sep = pos_t((1.0 - params.tThres) * double(P_len));
@@ -366,7 +371,7 @@ class SweepMap {
 	}
 
 	void print_report(const Counters &C, const Timers &T) {
-		cerr << fixed << setprecision(1);
+		cerr << std::fixed << std::setprecision(1);
 		cerr << "Stats:" << endl;
 		cerr << " | Total reads:           " << C.count("reads") << " (~" << 1.0*C.count("read_len") / C.count("reads") << " nb per read)" << endl;
 		cerr << " | Sketched read kmers:   " << C.count("sketched_kmers") << " (" << C.frac("sketched_kmers", "reads") << " per read)" << endl;
@@ -395,5 +400,7 @@ class SweepMap {
 		cerr << " ----" 							 << endl;
 	}
 };
+
+}  // namespace sweepmap
 
 #endif

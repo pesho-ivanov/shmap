@@ -1,5 +1,7 @@
 #include "sweepmap.h"
 
+using namespace sweepmap;
+
 int main(int argc, char **argv) {
 	initialize_LUT();
 	
@@ -46,7 +48,7 @@ int main(int argc, char **argv) {
 
 	if (!params.paramsFile.empty()) {
 		cerr << "Writing parameters to " << params.paramsFile << "..." << endl;
-		auto fout = ofstream(params.paramsFile);
+		auto fout = std::ofstream(params.paramsFile);
 		params.print(fout, false);
 	} else {
 		params.print(cerr, true);

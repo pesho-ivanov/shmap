@@ -12,6 +12,8 @@
 #include "kseq.h"  
 #include "utils.h"
 
+namespace sweepmap {
+
 using std::cerr;
 using std::cout;
 using std::vector;
@@ -346,5 +348,7 @@ void read_fasta_klib(const std::string& filename, std::function<void(kseq_t*)> c
     kseq_destroy(seq);
     gzclose(fp);
 }
+
+} // namespace sweepmap
 
 #endif

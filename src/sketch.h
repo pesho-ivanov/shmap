@@ -13,11 +13,25 @@
 #include "utils.h"
 #include "io.h"
 
-using namespace std;
+namespace sweepmap {
 
 using hash_t     = uint64_t;
 using pos_t      = int32_t;
 using blmers_t   = std::unordered_map<hash_t, char>;
+
+string revCompl(string s) {
+    for (auto& c : s) {
+		switch (c) {
+			case 'A': c = 'T'; break;
+			case 'C': c = 'G'; break;
+			case 'G': c = 'C'; break;
+			case 'T': c = 'A'; break;
+			default: break;
+		}
+	}
+    std::reverse(s.begin(), s.end());
+    return s;
+}
 
 struct kmer_with_pos_t {
 	pos_t r;
@@ -40,8 +54,6 @@ struct Hit {
 };
 
 using Sketch     = vector<kmer_with_pos_t>;  // (kmer hash, kmer's left 0-based position)
-
-using std::rotl;
 
 static hash_t LUT_fw[256], LUT_rc[256];
 //static Timer FMH_time;
@@ -75,7 +87,7 @@ void initialize_LUT() {
 //return 0;
 // TODO: use either only forward or only reverse
 const Sketch buildFMHSketch(const string& s, int k, double hFrac, const blmers_t& blmers) {
-	// TODO: accept char*
+		// TODO: accept char*
 	Sketch sk;
 	sk.reserve((int)(1.1 * (double)s.size() * hFrac));
 
@@ -87,12 +99,13 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac, const blmers_t
 	int r;
 
 	for (r=0; r<k; r++) {
-		h_fw ^= rotl(LUT_fw[(int)s[r]], k-r-1);
-		h_rc ^= rotl(LUT_rc[(int)s[r]], r);
+		h_fw ^= std::rotl(LUT_fw[(int)s[r]], k-r-1);
+		h_rc ^= std::rotl(LUT_rc[(int)s[r]], r);
 	}
 
 	while(true) {
 		// HACK! the least significant bit is quite random and does not correlate with (h < hThres)
+		// TODO: tie break
 		h = std::countr_zero(h_fw) < std::countr_zero(h_rc) ? h_fw : h_rc;
 
 		//cerr << s << " " << r << " " << std::hex << std::setfill('0') << std::setw(16) << h
@@ -104,8 +117,8 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac, const blmers_t
 					
 		if (r >= (int)s.size()) break;
 
-		h_fw = rotl(h_fw, 1) ^ rotl(LUT_fw[(int)s[r-k]], k) ^ LUT_fw[(int)s[r]];
-		h_rc = rotr(h_rc, 1) ^ rotr(LUT_rc[(int)s[r-k]], 1) ^ rotl(LUT_rc[(int)s[r]], k-1);
+		h_fw = std::rotl(h_fw, 1) ^ std::rotl(LUT_fw[(int)s[r-k]], k) ^ LUT_fw[(int)s[r]];
+		h_rc = std::rotr(h_rc, 1) ^ std::rotr(LUT_rc[(int)s[r-k]], 1) ^ std::rotl(LUT_rc[(int)s[r]], k-1);
 
 		++r;
 	}
@@ -124,8 +137,8 @@ const Sketch buildFMHSketch_onlyfw(const string& s, int k, double hFrac, int max
 	int r;
 
 	for (r=0; r<k; r++) {
-		h_fw ^= rotl(LUT_fw[(int)s[r]], k-r-1);
-		h_rc ^= rotl(LUT_rc[(int)s[r]], r);
+		h_fw ^= std::rotl(LUT_fw[(int)s[r]], k-r-1);
+		h_rc ^= std::rotl(LUT_rc[(int)s[r]], r);
 	}
 
 	while(true) {
@@ -134,11 +147,11 @@ const Sketch buildFMHSketch_onlyfw(const string& s, int k, double hFrac, int max
 				sk.emplace_back(r, h_fw);
 				if (max_sketch_size != -1 && (int)sk.size() >= max_sketch_size) break;
 			}
-					
+
 		if (r >= (int)s.size()) break;
 
-		h_fw = rotl(h_fw, 1) ^ rotl(LUT_fw[(int)s[r-k]], k) ^ LUT_fw[(int)s[r]];
-		h_rc = rotr(h_rc, 1) ^ rotr(LUT_rc[(int)s[r-k]], 1) ^ rotl(LUT_rc[(int)s[r]], k-1);
+		h_fw = std::rotl(h_fw, 1) ^ std::rotl(LUT_fw[(int)s[r-k]], k) ^ LUT_fw[(int)s[r]];
+		h_rc = std::rotr(h_rc, 1) ^ std::rotr(LUT_rc[(int)s[r-k]], 1) ^ std::rotl(LUT_rc[(int)s[r]], k-1);
 
 		++r;
 	}
@@ -177,13 +190,13 @@ struct SketchIndex {
 				hist[occ] += occ;
 		}
 
-		cerr << fixed << setprecision(2);
+		cerr << std::fixed << std::setprecision(2);
 		cerr << "Histogram of " << kmers << " kmers ("
 			<< 100.0*double(different_kmers)/double(kmers) << "\% different) covering "
 			<< 100.0*double(params.k)*double(kmers)/double(total_size) << "\% of the " << total_size << "nb index" << endl;
 		for (size_t i=0; i<hist.size(); ++i)
 			if (hist[i] > 0)
-				cerr << setw(5) << right << i << (i<hist.size()-1?" ":"+") << "occ: " << setw(9) << right << hist[i] << " kmers (" << 100.0*double(hist[i])/double(kmers) << "\%)" << endl;
+				cerr << std::setw(5) << std::right << i << (i<hist.size()-1?" ":"+") << "occ: " << std::setw(9) << std::right << hist[i] << " kmers (" << 100.0*double(hist[i])/double(kmers) << "\%)" << endl;
 		cerr << "The most frequent kmer occurs " << max_occ << " times." << endl;
 	}
 
@@ -222,18 +235,6 @@ struct SketchIndex {
 	//}
 };
 
-string revCompl(string s) {
-    for (auto& c : s) {
-		switch (c) {
-			case 'A': c = 'T'; break;
-			case 'C': c = 'G'; break;
-			case 'G': c = 'C'; break;
-			case 'T': c = 'A'; break;
-			default: break;
-		}
-	}
-    std::reverse(s.begin(), s.end());
-    return s;
-}
+} // namespace sweepmap
 
 #endif

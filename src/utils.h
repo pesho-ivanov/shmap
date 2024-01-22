@@ -7,7 +7,7 @@
 #include <memory>
 #include <string>
 
-using std::string;
+namespace sweepmap {
 
 class Timer {
 public:
@@ -140,5 +140,7 @@ public:
 //template<typename TT> auto prev(const typename TT::iterator &it) {
 //    auto pr = it; return --pr;
 //}
+
+} // namespace sweepmap
 
 #endif
