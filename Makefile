@@ -22,15 +22,14 @@ MEANLEN ?= 10000
 
 K ?= 22
 R ?= 0.1 
-#W ?= 20
-S ?= 200
-M ?= 2000
+S ?= 150
+M ?= 1500
 T ?= 0.0
 
 K_SLOW ?= 22
 R_SLOW ?= 0.1
-S_SLOW ?= 1000
-M_SLOW ?= 10000
+S_SLOW ?= 3000
+M_SLOW ?= 30000
 T_SLOW ?= 0.0
 
 DIR = evals
@@ -45,6 +44,7 @@ ALLOUT_DIR = $(DIR)/out
 OUTDIR = $(ALLOUT_DIR)/$(READS_PARAMS)
 
 SWEEPMAP_PREF = $(OUTDIR)/sweepmap/sweepmap
+SWEEPMAP_SLOW_PREF = $(OUTDIR)/sweepmap-slow/sweepmap-slow
 MINIMAP_PREF = $(OUTDIR)/minimap/minimap
 BLEND_PREF = $(OUTDIR)/blend/blend
 MAPQUIK_PREF = $(OUTDIR)/mapquik/mapquik
@@ -97,11 +97,12 @@ eval_sweepmap: sweepmap gen_reads
 	paftools.js mapeval $(SWEEPMAP_PREF).paf | tee $(SWEEPMAP_PREF).eval
 	paftools.js mapeval -Q 60 $(SWEEPMAP_PREF).paf >$(SWEEPMAP_PREF).wrong
 
-#eval_sweepmap_slow: sweepmap gen_reads
-#	mkdir -p $(OUTDIR)
-#	$(TIME_CMD) -o $(OUTDIR)/sweep-slow.time ./$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(OUTDIR)/sweep-slow.params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) 2> >(tee $(OUTDIR)/sweep-slow.log) >$(OUTDIR)/sweep-slow.paf 
-#	paftools.js mapeval $(OUTDIR)/sweep-slow.paf | tee $(OUTDIR)/sweep-slow.eval
-#	paftools.js mapeval -Q 0 $(OUTDIR)/sweep-slow.paf >$(OUTDIR)/sweep-slow.wrong
+eval_sweepmap_slow: sweepmap gen_reads
+	@mkdir -p $(shell dirname $(SWEEPMAP_SLOW_PREF))
+	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) >/dev/null 2>&1
+	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) 2> >(tee $(SWEEPMAP_SLOW_PREF).log) >$(SWEEPMAP_SLOW_PREF).paf 
+	paftools.js mapeval $(SWEEPMAP_SLOW_PREF).paf | tee $(SWEEPMAP_SLOW_PREF).eval
+	paftools.js mapeval -Q 0 $(SWEEPMAP_SLOW_PREF).paf >$(SWEEPMAP_SLOW_PREF).wrong
 
 eval_winnowmap: gen_reads
 	@mkdir -p $(shell dirname $(WINNOWMAP_PREF))
