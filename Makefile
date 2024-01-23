@@ -53,6 +53,9 @@ WINNOWMAP_PREF = $(OUTDIR)/winnowmap/winnowmap
 MAX_SEEDS = 10 30 100 300 1000 3000 10000
 MAX_MATCHES = 100 300 1000 3000 10000 30000 100000 300000
 
+Ks = 14 16 18 20 22 24 26
+Rs = 0.01 0.05 0.1 0.15 0.2
+
 all: sweepmap
 
 $(SWEEPMAP_BIN): $(SRCS)
@@ -78,6 +81,19 @@ ifeq ($(wildcard $(READS)),)
 	awk '/^>/ {printit = /+$$/} printit' $(READS)_ >$(READS)
 endif
 
+eval_sketching: sweepmap gen_reads
+	@DIR=$(OUTDIR)/sketching; \
+	mkdir -p $${DIR}; \
+	for k in $(Ks); do \
+		for r in $(Rs); do \
+			f=$${DIR}/"sweepmap-K$${k}-R$${r}"; \
+			echo "Processing $${f}"; \
+			$(TIME_CMD) -o $${f}.index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $${k} -r $${r} -S $(S) -M $(M) 2>&1 >/dev/null; \
+			$(TIME_CMD) -o $${f}.time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $${f}.params -x -t $(T) -k $${k} -r $${r} -S $(S) -M $(M) 2> >(tee $${f}.log) >$${f}.paf; \
+			paftools.js mapeval $${f}.paf | tee $${f}.eval; \
+		done \
+    done
+
 eval_thinning: sweepmap gen_reads
 	@DIR=$(OUTDIR)/thinning; \
 	mkdir -p $${DIR}; \
@@ -90,7 +106,6 @@ eval_thinning: sweepmap gen_reads
 			paftools.js mapeval $${f}.paf | tee $${f}.eval; \
 		done \
     done
-#			time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 22 -z sweep.params -S $${maxseeds} -M $${maxmatches} $${f}.params >$${f}.paf 2>$${f}.log; \
 
 eval_sweepmap: sweepmap gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_PREF))
