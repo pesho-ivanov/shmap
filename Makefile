@@ -2,7 +2,7 @@ SHELL := /bin/bash
 CC = g++
 CXX_STANDARD = -std=c++20
 CFLAGS = -O2 -g -march=native -lm -lpthread -Igtl/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive #-Wconversion 
-LIBS = minimap2/libminimap2.a -lz
+LIBS = -lz
 DEPFLAGS = -MMD -MP
 
 TIME_CMD = /usr/bin/time -f "%U\t%M"
@@ -35,13 +35,19 @@ T_SLOW ?= 0.0
 DIR = evals
 REF_DIR = $(DIR)/refs
 REF = $(REF_DIR)/$(REFNAME).fa
-READS_PARAMS = $(REFNAME)-a$(ACCURACY)-d$(DEPTH)-l$(MEANLEN)
-READS_PREFIX = reads-$(READS_PARAMS)
+READS_PREFIX ?= $(REFNAME)-a$(ACCURACY)-d$(DEPTH)-l$(MEANLEN)
 ALLREADS_DIR = $(DIR)/reads
 READS = $(ALLREADS_DIR)/$(READS_PREFIX).fa
+#ifeq ($(wildcard $(READS)),)
+#	READS = $(foreach ext,fasta fq fastq,$(if $(wildcard $(ALLREADS_DIR)/$(READS_PREFIX).$(ext)),$(ALLREADS_DIR)/$(READS_PREFIX).$(ext),))
+#endif
+#READS = $(ALLREADS_DIR)/$(READS_PREFIX).fa
+#ifeq ($(wildcard $(READS)),)
+#    READS = $(ALLREADS_DIR)/$(READS_PREFIX).fq
+#endif
 ONE_READ = $(ALLREADS_DIR)/$(READS_PREFIX).oneread.fa
 ALLOUT_DIR = $(DIR)/out
-OUTDIR = $(ALLOUT_DIR)/$(READS_PARAMS)
+OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 
 SWEEPMAP_PREF = $(OUTDIR)/sweepmap/sweepmap
 SWEEPMAP_SLOW_PREF = $(OUTDIR)/sweepmap-slow/sweepmap-slow
@@ -63,6 +69,7 @@ $(SWEEPMAP_BIN): $(SRCS)
 
 gen_reads:
 ifeq ($(wildcard $(READS)),)
+	echo $(READS)
 	mkdir -p $(ALLREADS_DIR)
 	pbsim \
 		   $(REF) \
@@ -76,9 +83,12 @@ ifeq ($(wildcard $(READS)),)
 	samtools faidx $(REF)
 	paftools.js pbsim2fq $(REF).fai "$(READS_PREFIX)"_*.maf >$(READS)
 	rm -f "$(READS_PREFIX)"_*.maf "$(READS_PREFIX)"_*.ref "$(READS_PREFIX)"_*.fastq
+# take only positive strand reads
 #	mv $(READS)_ $(READS)
-	head -n 2 $(READS) >$(ONE_READ)
 #	awk '/^>/ {printit = /+$$/} printit' $(READS)_ >$(READS)
+endif
+ifeq ($(wildcard $(ONE_READ)),)
+	head -n 2 $(READS) >$(ONE_READ)
 endif
 
 eval_sketching: sweepmap gen_reads
@@ -151,12 +161,20 @@ eval_mapquik: gen_reads
 
 eval_all: eval_sweepmap eval_sweepmap_slow eval_mapquik eval_blend eval_minimap #eval_winnowmap
 
+compare:
+	make eval_all REFNAME=t2tChrY DEPTH=10
+	make eval_all REFNAME=chm13 DEPTH=0.1
+
 clean:
 	rm -r $(SWEEPMAP_BIN)
 
 clean_evals:
 	rm -r $(ALLREADS_DIR)
 	rm -r $(ALLOUT_DIR)
+
+# TODO: add curl -r 0-1073741823 https://storage.googleapis.com/brain-genomics-public/research/deepconsensus/publication/deepconsensus_predictions/hg002_24kb/two_smrt_cells/HG002_24kb_132517_061936_2fl_DC_hifi_reads.fastq >HG002_24kb_132517_061936_2fl_DC_hifi_reads.1GB.fastq
+# TODO: `seqtk seq -AU` for mapquik
+# TODO: `seqtk seq -A HG002_24kb.fastq >HG002_24kb.fa`
 
 #EDLIB_BIN = ~/libs/edlib/build/bin/edlib-aligner
 #VERITYMAP_BIN = ~/libs/VerityMap/veritymap/main.py
