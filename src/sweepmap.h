@@ -17,19 +17,19 @@ using std::right;
 using std::vector;
 
 struct Seed {
-	pos_t P_r;
-	hash_t h;
+	Kmer kmer;
 	const vector<Hit> *hits_in_T;
-
-	Seed() {}
-	Seed(pos_t P_r, hash_t h, const vector<Hit> *hits_in_T) :
-		P_r(P_r), h(h), hits_in_T(hits_in_T) {}
+	Seed(const Kmer &kmer, const vector<Hit> *hits_in_T) :
+		kmer(kmer), hits_in_T(hits_in_T) {}
 };
 
 struct Match {
 	const Seed *seed;
 	const Hit *hit;
 	Match(const Seed &seed, const Hit &hit) : seed(&seed), hit(&hit) {}
+	bool is_same_strand() const {
+		return seed->kmer.strand == hit->strand;
+	}
 };
 
 struct Mapping {
@@ -48,8 +48,8 @@ struct Mapping {
 	bool unreasonable;  // reserved for filtering matches
 
     Mapping() {}
-	Mapping(int k, pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, int segm_id, pos_t s_sz, int xmin)
-		: k(k), P_sz(P_sz), seeds(seeds), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), xmin(xmin), J(double(xmin) / std::max(seeds, s_sz)), mapq(255), unreasonable(false) {}
+	Mapping(int k, pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, int segm_id, pos_t s_sz, int xmin, int same_strand_seeds)
+		: k(k), P_sz(P_sz), seeds(seeds), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), xmin(xmin), J(double(xmin) / std::max(seeds, s_sz)), mapq(255), strand(same_strand_seeds > 0 ? '+' : '-'), unreasonable(false) {}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
     void print_paf(const string &query_id, const RefSegment &segm, const int matches) const {
@@ -92,15 +92,15 @@ class SweepMap {
 
 		// TODO: limit the number of kmers in the pattern p
 		T->start("collect_seed_info");
-		for (const auto &curr: p) {
-			auto hist_it = hist->find(curr.h);
+		for (const auto &kmer: p) {
+			auto hist_it = hist->find(kmer.h);
 			if (hist_it != hist->end()) {
 				++(hist_it->second);
 			} else {
-				(*hist)[curr.h] = 1;
-				auto t_it = tidx.h2pos.find(curr.h);
+				(*hist)[kmer.h] = 1;
+				auto t_it = tidx.h2pos.find(kmer.h);
 				if (t_it != tidx.h2pos.end())
-					seeds.push_back(Seed(curr.r, curr.h, &t_it->second));
+					seeds.push_back(Seed(kmer, &t_it->second));
 			}
 		}
 		T->stop("collect_seed_info");
@@ -113,7 +113,7 @@ class SweepMap {
 		T->stop("sort_seeds");
 
 		if ((int)seeds.size() > max_seeds)
-			seeds.resize(max_seeds);
+			seeds.erase(seeds.begin()+max_seeds, seeds.end());
 
 		return seeds;
 	}
@@ -156,25 +156,31 @@ class SweepMap {
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
 
 		int xmin = 0;
-		Mapping best(params.k, P_len, 0, -1, -1, -1, -1, -1);
+		Mapping best(params.k, P_len, 0, -1, -1, -1, -1, -1, 0);
 		Mapping second = best;
+		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 
 		// Increase the left point end of the window [l,r) one by one. O(matches)
 		int i = 0, j = 0;
 		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l, ++i) {
+			same_strand_seeds += l->is_same_strand() ? +1 : -1;
 			// Increase the right end of the window [l,r) until it gets out.
 			for(;  r != M.end()
 				&& l->hit->segm_id == r->hit->segm_id   // make sure they are in the same segment since we sweep over all matches
 				&& r->hit->r + params.k <= l->hit->r + P_len
 				; ++r, ++j) {
 				// If taking this kmer from T increases the intersection with P.
-				if (--diff_hist[r->seed->h] >= 0)
+				if (--diff_hist[r->seed->kmer.h] >= 0)
 					++xmin;
 				assert (l->hit->r <= r->hit->r);
 			}
 
-			auto m = Mapping(params.k, P_len, seeds, l->hit->r, prev(r)->hit->r, l->hit->segm_id, pos_t(r-l), xmin);
+			auto m = Mapping(params.k, P_len, seeds, l->hit->r, prev(r)->hit->r, l->hit->segm_id, pos_t(r-l), xmin, same_strand_seeds);
+
 			// second best without guarantees
+			// Wrong invariant:
+			// best[l,r) -- a mapping best.l<=l with maximal J
+			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
 			if (params.onlybest) {
 				if (m.J > best.J) {  // if (xmin > best.xmin)
 					if (best.T_l < m.T_l - 0.9*P_len)
@@ -189,17 +195,15 @@ class SweepMap {
 				}
 			}
 
-			// Invariant:
-			// best[l,r) -- a mapping best.l<=l with maximal J
-			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
-
 			// Prepare for the next step by moving `l` to the right.
-			if (++diff_hist[l->seed->h] > 0)
+			if (++diff_hist[l->seed->kmer.h] > 0)
 				--xmin;
+			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
 
 			assert(xmin >= 0);
 		}
-		assert (xmin == 0);
+		assert(xmin == 0);
+		assert(same_strand_seeds == 0);
 
 		if (params.onlybest && best.xmin != -1) { // && best.J > params.tThres)
 			best.mapq = (best.xmin > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
@@ -275,27 +279,6 @@ class SweepMap {
 			}
 		}
 
-	bool is_same_strand(const string &P, const string &S) {
-		auto p_fw = buildFMHSketch_onlyfw(P, params.k, params.hFrac);
-		auto s_fw = buildFMHSketch_onlyfw(S, params.k, params.hFrac, 150);
-		auto s_rc = buildFMHSketch_onlyfw(revCompl(S), params.k, params.hFrac, 150);
-
-		auto p_fw_set = ankerl::unordered_dense::set<hash_t>();
-		for (const auto &item: p_fw)
-			p_fw_set.insert(item.h);
-
-		int diff=0;
-		for (const auto &s: s_fw)
-			if (p_fw_set.contains(s.h))
-				++diff;
-
-		for (const auto &s: s_rc)
-			if (p_fw_set.contains(s.h))
-				--diff;
-
-		return diff > 0;
-	}
-
 	void map(const string &pFile) {
 		T->start("mapping");
 		T->start("query_reading");
@@ -333,7 +316,6 @@ class SweepMap {
 
 			for (auto &m: mappings) {
 				const auto &segm = tidx.T[m.segm_id];
-				m.strand = is_same_strand(seq->seq.s, segm.seq.substr(m.T_l, m.T_r-m.T_l)) ? '+' : '-';  // TODO: optimize to char*
 				m.map_time = read_mapping_time.secs() / (double)mappings.size();
 				m.print_paf(query_id, segm, (int)matches.size());
 				C->inc("J", int(10000.0*m.J));

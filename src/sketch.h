@@ -39,9 +39,11 @@ struct Kmer {
 
 struct Hit {
 	pos_t r;
+	bool strand;
 	pos_t pos;
 	int segm_id;
-	Hit(pos_t r, pos_t pos, int segm_id) : r(r), pos(pos), segm_id(segm_id) {}
+	Hit(const Kmer &kmer, pos_t pos, int segm_id)
+		: r(kmer.r), strand(kmer.strand), pos(pos), segm_id(segm_id) {}
 };
 
 using Sketch = std::vector<Kmer>;  // (kmer hash, kmer's left 0-based position)
@@ -186,8 +188,8 @@ struct SketchIndex {
 	void populate_h2pos(const Sketch& sketch, int segm_id) {
 		//print_sketches(name, sketch);
 		for (size_t tpos = 0; tpos < sketch.size(); ++tpos) {
-			const Kmer& abs_hash = sketch[tpos];
-			h2pos[abs_hash.h].push_back(Hit(abs_hash.r, tpos, segm_id));
+			const Kmer& kmer = sketch[tpos];
+			h2pos[kmer.h].push_back(Hit(kmer, tpos, segm_id));
 		}
 	}
 
