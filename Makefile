@@ -22,13 +22,13 @@ MEANLEN ?= 10000
 
 K ?= 22
 R ?= 0.1 
-S ?= 150
-M ?= 1500
+S ?= 300
+M ?= 3000
 T ?= 0.0
 
 K_SLOW ?= 22
 R_SLOW ?= 0.1
-S_SLOW ?= 3000
+S_SLOW ?= 1000
 M_SLOW ?= 30000
 T_SLOW ?= 0.0
 
@@ -50,8 +50,8 @@ BLEND_PREF = $(OUTDIR)/blend/blend
 MAPQUIK_PREF = $(OUTDIR)/mapquik/mapquik
 WINNOWMAP_PREF = $(OUTDIR)/winnowmap/winnowmap
 
-MAX_SEEDS = 10000
-MAX_MATCHES = 100 300 1000 3000 10000 30000 100000
+MAX_SEEDS = 10 30 100 300 1000 3000 10000
+MAX_MATCHES = 100 300 1000 3000 10000 30000 100000 300000
 
 all: sweepmap
 
@@ -78,17 +78,19 @@ ifeq ($(wildcard $(READS)),)
 	awk '/^>/ {printit = /+$$/} printit' $(READS)_ >$(READS)
 endif
 
-eval_sweep_max_seeds: sweep gen_reads
-	@DIR=evals/eval_sweep-K22; \
+eval_max_seeds: sweepmap gen_reads
+	@DIR=$(OUTDIR)/max_seeds; \
 	mkdir -p $${DIR}; \
-	for maxseeds in $(MAX_SEEDS); do \
-		for maxmatches in $(MAX_MATCHES); do \
-			f=$${DIR}/"sweep-S$${maxseeds}-M$${maxmatches}"; \
+	for s in $(MAX_SEEDS); do \
+		for m in $(MAX_MATCHES); do \
+			f=$${DIR}/"sweepmap-S$${s}-M$${m}"; \
 			echo "Processing $${f}"; \
-			time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 22 -z sweep.params -S $${maxseeds} -M $${maxmatches} $${f}.params >$${f}.paf 2>$${f}.log; \
+			$(TIME_CMD) -o $${f}.index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $${m} 2>&1 >/dev/null; \
+			$(TIME_CMD) -o $${f}.time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $${f}.params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $${m} 2> >(tee $${f}.log) >$${f}.paf; \
 			paftools.js mapeval $${f}.paf | tee $${f}.eval; \
 		done \
     done
+#			time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -t 0.0 -x -k 22 -z sweep.params -S $${maxseeds} -M $${maxmatches} $${f}.params >$${f}.paf 2>$${f}.log; \
 
 eval_sweepmap: sweepmap gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_PREF))
@@ -132,7 +134,7 @@ eval_mapquik: gen_reads
 	$(TIME_CMD) -o $(MAPQUIK_PREF).time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(MAPQUIK_PREF) | tee $(MAPQUIK_PREF).log
 	paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
-eval_all: eval_sweepmap eval_mapquik eval_blend eval_minimap eval_winnowmap
+eval_all: eval_sweepmap eval_sweepmap_slow eval_mapquik eval_blend eval_minimap eval_winnowmap
 
 clean:
 	rm -r $(SWEEPMAP_BIN)
