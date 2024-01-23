@@ -69,6 +69,20 @@ struct params_t {
 				out << p.second << "\t";
 		}
 	}
+
+	void print_display(std::ostream& out) {
+		out << "Params:" << endl;
+		out << " | reference:             " << tFile << endl;
+		out << " | queries:               " << pFile << endl;
+		out << " | k:                     " << k << endl;
+		out << " | hFrac:                 " << hFrac << endl;
+		out << " | max_seeds (S):         " << max_seeds << endl;
+		out << " | max_matches (M):       " << max_matches << endl;
+		out << " | onlybest:              " << onlybest << endl;
+		out << " | tThres:                " << tThres << endl;
+		out << " \\---" 					 << endl;
+	}
+
 };
 
 inline void dsHlp() {

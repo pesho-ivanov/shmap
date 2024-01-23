@@ -1,5 +1,4 @@
 #include "sweepmap.h"
-
 using namespace sweepmap;
 
 int main(int argc, char **argv) {
@@ -18,7 +17,7 @@ int main(int argc, char **argv) {
 		dsHlp();
 		return 1;
 	}
-	SweepMap::print_params(params);
+	params.print_display(std::cerr);
 
 	T.start("indexing");
 	cerr << "Indexing " << params.tFile << "..." << endl;

@@ -5,10 +5,8 @@
 #include <string>
 #include <iostream>
 #include <vector>
-#include <unordered_map>
 
 #include <ankerl/unordered_dense.h>
-//#include "phmap.hpp"
 
 #include "utils.h"
 #include "io.h"
@@ -41,9 +39,6 @@ struct kmer_with_pos_t {
 	}
 };
 
-//using abs_hash_t = pair<pos_t, hash_t>;
-//using Hit  = pair<pos_t, pos_t>; 
-
 struct Hit {
 	pos_t r;
 	pos_t pos;
@@ -55,14 +50,6 @@ struct Hit {
 using Sketch = std::vector<kmer_with_pos_t>;  // (kmer hash, kmer's left 0-based position)
 
 static hash_t LUT_fw[256], LUT_rc[256];
-//static Timer FMH_time;
-
-//void print_sketches(const string &seqID, const Sketch &sks) {
-//	cout << seqID << endl;
-//	for (const auto& sk : sks) {
-//		cout << "  " << sk.r << ", " << sk.kmer << endl;
-//	}
-//}
 
 void initialize_LUT() {
 	// https://gist.github.com/Daniel-Liu-c0deb0t/7078ebca04569068f15507aa856be6e8
@@ -84,15 +71,14 @@ void initialize_LUT() {
 //Sketch sk2 = buildFMHSketch(revComp(s), 5, 1.0, blmers);
 //return 0;
 // TODO: use either only forward or only reverse
+// TODO: accept char*
 const Sketch buildFMHSketch(const string& s, int k, double hFrac) {
-		// TODO: accept char*
 	Sketch sk;
 	sk.reserve((int)(1.1 * (double)s.size() * hFrac));
 
 	if ((int)s.size() < k) return sk;
 
 	hash_t h, h_fw = 0, h_rc = 0;
-	//hash_t h_fw = 0;
 	hash_t hThres = hash_t(hFrac * double(std::numeric_limits<hash_t>::max()));
 	int r;
 
@@ -106,11 +92,6 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac) {
 		// TODO: tie break
 		auto first_diff_bit = 1 << std::countr_zero(h_fw ^ h_rc);
 		h = (h_rc & first_diff_bit) ? h_fw : h_rc;
-
-		//if (std::countr_zero(h_fw) == std::countr_zero(h_rc)) {
-		//	h = h_fw < h_rc ? h_fw : h_rc;
-		//} else 
-		//	h = std::countr_zero(h_fw) < std::countr_zero(h_rc) ? h_fw : h_rc;
 
 		//cerr << s << " " << r << " " << std::hex << std::setfill('0') << std::setw(16) << h
 		//					<< " = " << std::hex << std::setfill('0') << std::setw(16) << h_fw
@@ -130,6 +111,7 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac) {
 	return sk;
 }
 
+// TODO: remove
 const Sketch buildFMHSketch_onlyfw(const string& s, int k, double hFrac, int max_sketch_size=-1) {
 	Sketch sk;
 	sk.reserve((int)(1.1 * (double)s.size() * hFrac));
@@ -176,11 +158,7 @@ struct SketchIndex {
 	std::vector<RefSegment> T;
 	pos_t total_size;  // total size of all segments // TODO: change type to size_t
 	const params_t &params;
-	//unordered_map<hash_t, std::vector<Hit>> h2pos;
 	ankerl::unordered_dense::map<hash_t, std::vector<Hit>> h2pos;
-	//gtl::flat_hash_map<hash_t, std::vector<Hit>> h2pos;
-	//gtl::node_hash_map<hash_t, std::vector<Hit>> h2pos;
-	//ankerl::unordered_dense::map<hash_t, Hit> h2singlepos;
 
 	void print_hist() {
 		std::vector<int> hist(10, 0);
@@ -221,25 +199,7 @@ struct SketchIndex {
 		populate_h2pos(sketch, T.size()-1);
 	}
 
-	SketchIndex(const params_t &params)
-		: total_size(0), params(params) {
-	}
-
-	//SketchIndex(const string &name, const string &ref, const params_t &params)
-	//	: T_sz((pos_t)ref.size()), name(name), params(params) {
-	//	Sketch sketch = buildFMHSketch(ref, params.k, params.hFrac);
-	//	populate_h2pos(sketch);
-	//}
-
-	//SketchIndex(const string &tFile, const params_t &params) {
-	//	read_fasta_klib(tFile, [this, &params, &bLstmers](kseq_t *seq) {
-	//		assert(name.empty());  // TODO: support multi-sequence files
-	//		name = seq->name.s;
-	//		T_sz = seq->seq.l;
-	//		Sketch sketch = buildFMHSketch(seq->seq.s, params.k, params.hFrac);
-	//		populate_h2pos(sketch);
-	//	});
-	//}
+	SketchIndex(const params_t &params) : total_size(0), params(params) {}
 };
 
 } // namespace sweepmap

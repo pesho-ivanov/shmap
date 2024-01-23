@@ -356,21 +356,6 @@ class SweepMap {
 		T->stop("mapping");
 	}
 
-	static void print_params(const params_t &params) {
-		cerr << "Params:" << endl;
-		cerr << " | reference:             " << params.tFile << endl;
-		cerr << " | queries:               " << params.pFile << endl;
-		cerr << " | k:                     " << params.k << endl;
-		//cerr << " | w:                     " << params.w << endl;
-		//cerr << " | blacklist file:        " << (params.bLstFl.size() ? params.bLstFl : "-") << endl;
-		cerr << " | hFrac:                 " << params.hFrac << endl;
-		cerr << " | max_seeds (S):         " << params.max_seeds << endl;
-		cerr << " | max_matches (M):       " << params.max_matches << endl;
-		cerr << " | onlybest:              " << params.onlybest << endl;
-		cerr << " | tThres:                " << params.tThres << endl;
-		cerr << " \\---" 					 << endl;
-	}
-
 	void print_report(const Counters &C, const Timers &T) {
 		cerr << std::fixed << std::setprecision(1);
 		cerr << "Stats:" << endl;
