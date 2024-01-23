@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
 	sweepmap.map(params.pFile);
 
 	T.stop("total");
-	sweepmap.print_report(C, T);
+	sweepmap.print_report();
 
 	return 0;
 }
