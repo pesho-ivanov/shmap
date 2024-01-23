@@ -7,7 +7,7 @@ DEPFLAGS = -MMD -MP
 
 TIME_CMD = /usr/bin/time -f "%U\t%M"
 
-SRCS = src/sweepmap.cpp src/sweepmap.h src/io.h src/sketch.h src/utils.h src/kseq.h
+SRCS = src/sweepmap.cpp src/sweepmap.h src/io.h src/sketch.h src/utils.h ext/kseq.h
 SWEEPMAP_BIN = ./sweepmap
 MINIMAP_BIN = minimap2
 BLEND_BIN = ~/libs/blend/bin/blend

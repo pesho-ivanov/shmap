@@ -9,7 +9,7 @@
 #include <vector>
 
 #include <zlib.h>  
-#include "kseq.h"  
+#include "../ext/kseq.h"
 #include "utils.h"
 
 namespace sweepmap {
