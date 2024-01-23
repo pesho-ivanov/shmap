@@ -18,12 +18,12 @@ using std::vector;
 
 struct Seed {
 	pos_t P_r;
-	hash_t kmer;
+	hash_t h;
 	const vector<Hit> *hits_in_T;
 
 	Seed() {}
-	Seed(pos_t P_r, hash_t kmer, const vector<Hit> *hits_in_T) :
-		P_r(P_r), kmer(kmer), hits_in_T(hits_in_T) {}
+	Seed(pos_t P_r, hash_t h, const vector<Hit> *hits_in_T) :
+		P_r(P_r), h(h), hits_in_T(hits_in_T) {}
 };
 
 struct Match {
@@ -86,21 +86,21 @@ class SweepMap {
 
 	using hist_t = ankerl::unordered_dense::map<hash_t, int>;
 
-	vector<Seed> choose_seeds(const Sketch& p, int max_seeds, hist_t *hist) {
+	vector<Seed> select_seeds(const Sketch& p, int max_seeds, hist_t *hist) {
 		vector<Seed> seeds;
 		seeds.reserve(p.size());
 
 		// TODO: limit the number of kmers in the pattern p
 		T->start("collect_seed_info");
 		for (const auto &curr: p) {
-			auto hist_it = hist->find(curr.kmer);
+			auto hist_it = hist->find(curr.h);
 			if (hist_it != hist->end()) {
 				++(hist_it->second);
 			} else {
-				(*hist)[curr.kmer] = 1;
-				auto t_it = tidx.h2pos.find(curr.kmer);
+				(*hist)[curr.h] = 1;
+				auto t_it = tidx.h2pos.find(curr.h);
 				if (t_it != tidx.h2pos.end())
-					seeds.push_back(Seed(curr.r, curr.kmer, &t_it->second));
+					seeds.push_back(Seed(curr.r, curr.h, &t_it->second));
 			}
 		}
 		T->stop("collect_seed_info");
@@ -168,7 +168,7 @@ class SweepMap {
 				&& r->hit->r + params.k <= l->hit->r + P_len
 				; ++r, ++j) {
 				// If taking this kmer from T increases the intersection with P.
-				if (--diff_hist[r->seed->kmer] >= 0)
+				if (--diff_hist[r->seed->h] >= 0)
 					++xmin;
 				assert (l->hit->r <= r->hit->r);
 			}
@@ -194,7 +194,7 @@ class SweepMap {
 			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
 
 			// Prepare for the next step by moving `l` to the right.
-			if (++diff_hist[l->seed->kmer] > 0)
+			if (++diff_hist[l->seed->h] > 0)
 				--xmin;
 
 			assert(xmin >= 0);
@@ -282,15 +282,15 @@ class SweepMap {
 
 		auto p_fw_set = ankerl::unordered_dense::set<hash_t>();
 		for (const auto &item: p_fw)
-			p_fw_set.insert(item.kmer);
+			p_fw_set.insert(item.h);
 
 		int diff=0;
 		for (const auto &s: s_fw)
-			if (p_fw_set.contains(s.kmer))
+			if (p_fw_set.contains(s.h))
 				++diff;
 
 		for (const auto &s: s_rc)
-			if (p_fw_set.contains(s.kmer))
+			if (p_fw_set.contains(s.h))
 				--diff;
 
 		return diff > 0;
@@ -315,7 +315,7 @@ class SweepMap {
 			Timer read_mapping_time;
 			read_mapping_time.start();
 			T->start("seeding");
-			vector<Seed> seeds = choose_seeds(p, params.max_seeds, &p_hist);
+			vector<Seed> seeds = select_seeds(p, params.max_seeds, &p_hist);
 			T->stop("seeding");
 
 			T->start("matching");

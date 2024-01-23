@@ -30,24 +30,21 @@ string revCompl(string s) {
     return s;
 }
 
-struct kmer_with_pos_t {
+struct Kmer {
 	pos_t r;
-	hash_t kmer;
-
-	bool operator<(const kmer_with_pos_t& rhs) const {
-		return kmer < rhs.kmer;
-	}
+	hash_t h;
+	bool strand;  // false: forward, true: reverse
+	Kmer(pos_t r, hash_t h, bool strand) : r(r), h(h), strand(strand) {}
 };
 
 struct Hit {
 	pos_t r;
 	pos_t pos;
 	int segm_id;
-
 	Hit(pos_t r, pos_t pos, int segm_id) : r(r), pos(pos), segm_id(segm_id) {}
 };
 
-using Sketch = std::vector<kmer_with_pos_t>;  // (kmer hash, kmer's left 0-based position)
+using Sketch = std::vector<Kmer>;  // (kmer hash, kmer's left 0-based position)
 
 static hash_t LUT_fw[256], LUT_rc[256];
 
@@ -90,14 +87,15 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac) {
 	while(true) {
 		// HACK! the least significant bit is quite random and does not correlate with (h < hThres)
 		// TODO: tie break
-		auto first_diff_bit = 1 << std::countr_zero(h_fw ^ h_rc);
-		h = (h_rc & first_diff_bit) ? h_fw : h_rc;
+		const auto first_diff_bit = 1 << std::countr_zero(h_fw ^ h_rc);
+		const bool strand         = h_fw & first_diff_bit;
+		h = strand ? h_rc : h_fw;
 
 		//cerr << s << " " << r << " " << std::hex << std::setfill('0') << std::setw(16) << h
 		//					<< " = " << std::hex << std::setfill('0') << std::setw(16) << h_fw
 		//					<< " ^ " << std::hex << std::setfill('0') << std::setw(16) << h_rc << endl;
 		if (h < hThres) { // optimize to only look at specific bits
-			sk.emplace_back(r, h);
+			sk.push_back(Kmer(r, h, strand));
 		}
 					
 		if (r >= (int)s.size()) break;
@@ -132,7 +130,7 @@ const Sketch buildFMHSketch_onlyfw(const string& s, int k, double hFrac, int max
 			auto first_diff_bit = 1 << std::countr_zero(h_fw ^ h_rc);
 			if (h_rc & first_diff_bit) {
 			//if (std::countr_zero(h_fw) < std::countr_zero(h_rc) || (std::countr_zero(h_fw) == std::countr_zero(h_rc) && h_fw < h_rc)) {
-				sk.emplace_back(r, h_fw);
+				sk.push_back(Kmer(r, h_fw, false));
 				if (max_sketch_size != -1 && (int)sk.size() >= max_sketch_size) break;
 			}
 		}
@@ -188,8 +186,8 @@ struct SketchIndex {
 	void populate_h2pos(const Sketch& sketch, int segm_id) {
 		//print_sketches(name, sketch);
 		for (size_t tpos = 0; tpos < sketch.size(); ++tpos) {
-			const kmer_with_pos_t& abs_hash = sketch[tpos];
-			h2pos[abs_hash.kmer].push_back(Hit(abs_hash.r, tpos, segm_id));
+			const Kmer& abs_hash = sketch[tpos];
+			h2pos[abs_hash.h].push_back(Hit(abs_hash.r, tpos, segm_id));
 		}
 	}
 
