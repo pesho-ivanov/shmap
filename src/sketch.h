@@ -17,7 +17,6 @@ namespace sweepmap {
 
 using hash_t     = uint64_t;
 using pos_t      = int32_t;
-using blmers_t   = std::unordered_map<hash_t, char>;
 
 string revCompl(string s) {
     for (auto& c : s) {
@@ -80,13 +79,12 @@ void initialize_LUT() {
 	LUT_rc['t'] = LUT_rc['T'] = LUT_fw['A'];
 }
 
-//blmers_t blmers;
 //string s = "ACGTTAG";
 //Sketch sk1 = buildFMHSketch(s, 5, 1.0, blmers);
 //Sketch sk2 = buildFMHSketch(revComp(s), 5, 1.0, blmers);
 //return 0;
 // TODO: use either only forward or only reverse
-const Sketch buildFMHSketch(const string& s, int k, double hFrac, const blmers_t& blmers) {
+const Sketch buildFMHSketch(const string& s, int k, double hFrac) {
 		// TODO: accept char*
 	Sketch sk;
 	sk.reserve((int)(1.1 * (double)s.size() * hFrac));
@@ -214,17 +212,17 @@ struct SketchIndex {
 		populate_h2pos(sketch, T.size()-1);
 	}
 
-	SketchIndex(const params_t &params, const blmers_t &bLstmers)
+	SketchIndex(const params_t &params)
 		: total_size(0), params(params) {
 	}
 
-	//SketchIndex(const string &name, const string &ref, const params_t &params, const blmers_t &bLstmers)
+	//SketchIndex(const string &name, const string &ref, const params_t &params)
 	//	: T_sz((pos_t)ref.size()), name(name), params(params) {
 	//	Sketch sketch = buildFMHSketch(ref, params.k, params.hFrac, bLstmers);
 	//	populate_h2pos(sketch);
 	//}
 
-	//SketchIndex(const string &tFile, const params_t &params, const blmers_t &bLstmers) {
+	//SketchIndex(const string &tFile, const params_t &params) {
 	//	read_fasta_klib(tFile, [this, &params, &bLstmers](kseq_t *seq) {
 	//		assert(name.empty());  // TODO: support multi-sequence files
 	//		name = seq->name.s;

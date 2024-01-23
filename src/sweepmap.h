@@ -298,14 +298,14 @@ class SweepMap {
 		return diff > 0;
 	}
 
-	void map(const string &pFile, const blmers_t &bLstmers) {
+	void map(const string &pFile) {
 		T->start("mapping");
 		T->start("query_reading");
-		read_fasta_klib(pFile, [this, &bLstmers](kseq_t *seq) {
+		read_fasta_klib(pFile, [this](kseq_t *seq) {
 			T->stop("query_reading");
 			T->start("query_mapping");
 			T->start("sketching");
-			Sketch p = buildFMHSketch(seq->seq.s, params.k, params.hFrac, bLstmers);
+			Sketch p = buildFMHSketch(seq->seq.s, params.k, params.hFrac);
 			T->stop("sketching");
 
 			string query_id = seq->name.s;

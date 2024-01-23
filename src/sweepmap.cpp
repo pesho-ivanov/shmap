@@ -20,17 +20,15 @@ int main(int argc, char **argv) {
 	}
 	SweepMap::print_params(params);
 
-	blmers_t bLstmers;  // TODO: not used
-
 	T.start("indexing");
 	cerr << "Indexing " << params.tFile << "..." << endl;
-	SketchIndex tidx(params, bLstmers);
+	SketchIndex tidx(params);
 
 	T.start("index_reading");
-	read_fasta_klib(params.tFile, [&tidx, &params, &bLstmers, &T](kseq_t *seq) {
+	read_fasta_klib(params.tFile, [&tidx, &params, &T](kseq_t *seq) {
 		T.stop("index_reading");
 		T.start("index_sketching");
-		Sketch t = buildFMHSketch(seq->seq.s, params.k, params.hFrac, bLstmers);
+		Sketch t = buildFMHSketch(seq->seq.s, params.k, params.hFrac);
 		T.stop("index_sketching");
 
 		T.start("index_initializing");
@@ -56,7 +54,7 @@ int main(int argc, char **argv) {
 
 	cerr << "Mapping reads " << params.pFile << "..." << endl;
 	SweepMap sweepmap(tidx, params, &T, &C);
-	sweepmap.map(params.pFile, bLstmers);
+	sweepmap.map(params.pFile);
 
 	T.stop("total");
 	sweepmap.print_report(C, T);
