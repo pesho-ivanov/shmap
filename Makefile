@@ -74,11 +74,11 @@ ifeq ($(wildcard $(READS)),)
 		   --length-mean $(MEANLEN)
 
 	samtools faidx $(REF)
-	paftools.js pbsim2fq $(REF).fai "$(READS_PREFIX)"_*.maf >$(READS)_
+	paftools.js pbsim2fq $(REF).fai "$(READS_PREFIX)"_*.maf >$(READS)
 	rm -f "$(READS_PREFIX)"_*.maf "$(READS_PREFIX)"_*.ref "$(READS_PREFIX)"_*.fastq
 #	mv $(READS)_ $(READS)
 	head -n 2 $(READS) >$(ONE_READ)
-	awk '/^>/ {printit = /+$$/} printit' $(READS)_ >$(READS)
+#	awk '/^>/ {printit = /+$$/} printit' $(READS)_ >$(READS)
 endif
 
 eval_sketching: sweepmap gen_reads
@@ -149,7 +149,7 @@ eval_mapquik: gen_reads
 	$(TIME_CMD) -o $(MAPQUIK_PREF).time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(MAPQUIK_PREF) | tee $(MAPQUIK_PREF).log
 	paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
-eval_all: eval_sweepmap eval_sweepmap_slow eval_mapquik eval_blend eval_minimap eval_winnowmap
+eval_all: eval_sweepmap eval_sweepmap_slow eval_mapquik eval_blend eval_minimap #eval_winnowmap
 
 clean:
 	rm -r $(SWEEPMAP_BIN)
