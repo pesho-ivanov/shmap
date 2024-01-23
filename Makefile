@@ -78,15 +78,15 @@ ifeq ($(wildcard $(READS)),)
 	awk '/^>/ {printit = /+$$/} printit' $(READS)_ >$(READS)
 endif
 
-eval_max_seeds: sweepmap gen_reads
-	@DIR=$(OUTDIR)/max_seeds; \
+eval_thinning: sweepmap gen_reads
+	@DIR=$(OUTDIR)/thinning; \
 	mkdir -p $${DIR}; \
 	for s in $(MAX_SEEDS); do \
 		for m in $(MAX_MATCHES); do \
 			f=$${DIR}/"sweepmap-S$${s}-M$${m}"; \
 			echo "Processing $${f}"; \
-			$(TIME_CMD) -o $${f}.index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $${m} 2>&1 >/dev/null; \
-			$(TIME_CMD) -o $${f}.time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $${f}.params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $${m} 2> >(tee $${f}.log) >$${f}.paf; \
+			$(TIME_CMD) -o $${f}.index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $${s} -M $${m} 2>&1 >/dev/null; \
+			$(TIME_CMD) -o $${f}.time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $${f}.params -x -t $(T) -k $(K) -r $(R) -S $${s} -M $${m} 2> >(tee $${f}.log) >$${f}.paf; \
 			paftools.js mapeval $${f}.paf | tee $${f}.eval; \
 		done \
     done
