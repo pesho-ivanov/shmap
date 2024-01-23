@@ -14,6 +14,7 @@ namespace sweepmap {
 
 using std::setw;
 using std::right;
+using std::vector;
 
 struct Seed {
 	pos_t P_r;
@@ -55,7 +56,7 @@ struct Mapping {
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
     void print_paf(const string &query_id, const RefSegment &segm, const int matches) const {
-		cout << query_id  			// Query sequence name
+		std::cout << query_id  			// Query sequence name
 			<< "\t" << P_sz     // query sequence length
 			<< "\t" << 0   // query start (0-based; closed)
 			<< "\t" << P_sz  // query end (0-based; open)
@@ -125,7 +126,7 @@ class SweepMap {
 		T->start("collect_matches");
 		// Get MAX_SEEDS of kmers with the lowest number of hits.
 		vector<Match> matches;
-		matches.reserve(P_MULTIPLICITY * p_sz);
+		matches.reserve(std::min(params.max_matches, 2*p_sz));  // expected 2 matches per kmer
 
 		int total_hits = 0;
 		for (const auto &seed: seeds) {

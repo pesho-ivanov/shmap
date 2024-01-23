@@ -52,7 +52,7 @@ struct Hit {
 	Hit(pos_t r, pos_t pos, int segm_id) : r(r), pos(pos), segm_id(segm_id) {}
 };
 
-using Sketch     = vector<kmer_with_pos_t>;  // (kmer hash, kmer's left 0-based position)
+using Sketch = std::vector<kmer_with_pos_t>;  // (kmer hash, kmer's left 0-based position)
 
 static hash_t LUT_fw[256], LUT_rc[256];
 //static Timer FMH_time;
@@ -173,17 +173,17 @@ struct RefSegment {
 };
 
 struct SketchIndex {
-	vector<RefSegment> T;
+	std::vector<RefSegment> T;
 	pos_t total_size;  // total size of all segments // TODO: change type to size_t
 	const params_t &params;
-	//unordered_map<hash_t, vector<Hit>> h2pos;
-	ankerl::unordered_dense::map<hash_t, vector<Hit>> h2pos;
-	//gtl::flat_hash_map<hash_t, vector<Hit>> h2pos;
-	//gtl::node_hash_map<hash_t, vector<Hit>> h2pos;
+	//unordered_map<hash_t, std::vector<Hit>> h2pos;
+	ankerl::unordered_dense::map<hash_t, std::vector<Hit>> h2pos;
+	//gtl::flat_hash_map<hash_t, std::vector<Hit>> h2pos;
+	//gtl::node_hash_map<hash_t, std::vector<Hit>> h2pos;
 	//ankerl::unordered_dense::map<hash_t, Hit> h2singlepos;
 
 	void print_hist() {
-		vector<int> hist(10, 0);
+		std::vector<int> hist(10, 0);
 		int kmers = 0, different_kmers = 0, max_occ = 0;
 		for (const auto& h2p : h2pos) {
 			int occ = h2p.second.size();
