@@ -104,7 +104,10 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac) {
 	while(true) {
 		// HACK! the least significant bit is quite random and does not correlate with (h < hThres)
 		// TODO: tie break
-		h = std::countr_zero(h_fw) < std::countr_zero(h_rc) ? h_fw : h_rc;
+		if (std::countr_zero(h_fw) == std::countr_zero(h_rc)) {
+			h = h_fw < h_rc ? h_fw : h_rc;
+		} else 
+			h = std::countr_zero(h_fw) < std::countr_zero(h_rc) ? h_fw : h_rc;
 
 		//cerr << s << " " << r << " " << std::hex << std::setfill('0') << std::setw(16) << h
 		//					<< " = " << std::hex << std::setfill('0') << std::setw(16) << h_fw
@@ -140,11 +143,12 @@ const Sketch buildFMHSketch_onlyfw(const string& s, int k, double hFrac, int max
 	}
 
 	while(true) {
-		if (std::countr_zero(h_fw) < std::countr_zero(h_rc))
-			if (h_fw < hThres) {
+		if (h_fw < hThres) {
+			if (std::countr_zero(h_fw) < std::countr_zero(h_rc) || (std::countr_zero(h_fw) == std::countr_zero(h_rc) && h_fw < h_rc)) {
 				sk.emplace_back(r, h_fw);
 				if (max_sketch_size != -1 && (int)sk.size() >= max_sketch_size) break;
 			}
+		}
 
 		if (r >= (int)s.size()) break;
 
@@ -218,7 +222,7 @@ struct SketchIndex {
 
 	//SketchIndex(const string &name, const string &ref, const params_t &params)
 	//	: T_sz((pos_t)ref.size()), name(name), params(params) {
-	//	Sketch sketch = buildFMHSketch(ref, params.k, params.hFrac, bLstmers);
+	//	Sketch sketch = buildFMHSketch(ref, params.k, params.hFrac);
 	//	populate_h2pos(sketch);
 	//}
 
@@ -227,7 +231,7 @@ struct SketchIndex {
 	//		assert(name.empty());  // TODO: support multi-sequence files
 	//		name = seq->name.s;
 	//		T_sz = seq->seq.l;
-	//		Sketch sketch = buildFMHSketch(seq->seq.s, params.k, params.hFrac, bLstmers);
+	//		Sketch sketch = buildFMHSketch(seq->seq.s, params.k, params.hFrac);
 	//		populate_h2pos(sketch);
 	//	});
 	//}
