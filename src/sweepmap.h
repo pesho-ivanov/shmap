@@ -27,12 +27,9 @@ struct Seed {
 };
 
 struct Match {
-	hash_t kmer;
-	pos_t P_r;
-	Hit hit;
-
-	Match(hash_t kmer, pos_t P_r, const Hit &hit) :
-		kmer(kmer), P_r(P_r), hit(hit) {}
+	const Seed *seed;
+	const Hit *hit;
+	Match(const Seed &seed, const Hit &hit) : seed(&seed), hit(&hit) {}
 };
 
 struct Mapping {
@@ -132,7 +129,7 @@ class SweepMap {
 		for (const auto &seed: seeds) {
 			for (const auto &hit: *(seed.hits_in_T)) {
 				assert(hit.segm_id >= 0 && (size_t)hit.segm_id < tidx.T.size());
-				matches.push_back(Match(seed.kmer, seed.P_r, hit));
+				matches.push_back(Match(seed, hit));
 			}
 			if ((total_hits += (int)seed.hits_in_T->size()) > (int)params.max_matches) {
 				C->inc("matches_limit_reached");
@@ -144,9 +141,9 @@ class SweepMap {
 		T->start("sort_matches");
 		sort(matches.begin(), matches.end(), [](const Match &a, const Match &b) {
 			// Preparation for sweeping: sort M by ascending positions within one reference segment.
-			if (a.hit.segm_id != b.hit.segm_id)
-				return a.hit.segm_id < b.hit.segm_id;
-			return a.hit.r < b.hit.r;
+			if (a.hit->segm_id != b.hit->segm_id)
+				return a.hit->segm_id < b.hit->segm_id;
+			return a.hit->r < b.hit->r;
 		});
 		T->stop("sort_matches");
 
@@ -167,16 +164,16 @@ class SweepMap {
 		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l, ++i) {
 			// Increase the right end of the window [l,r) until it gets out.
 			for(;  r != M.end()
-				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
-				&& r->hit.r + params.k <= l->hit.r + P_len
+				&& l->hit->segm_id == r->hit->segm_id   // make sure they are in the same segment since we sweep over all matches
+				&& r->hit->r + params.k <= l->hit->r + P_len
 				; ++r, ++j) {
 				// If taking this kmer from T increases the intersection with P.
-				if (--diff_hist[r->kmer] >= 0)
+				if (--diff_hist[r->seed->kmer] >= 0)
 					++xmin;
-				assert (l->hit.r <= r->hit.r);
+				assert (l->hit->r <= r->hit->r);
 			}
 
-			auto m = Mapping(params.k, P_len, seeds, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), xmin);
+			auto m = Mapping(params.k, P_len, seeds, l->hit->r, prev(r)->hit->r, l->hit->segm_id, pos_t(r-l), xmin);
 			// second best without guarantees
 			if (params.onlybest) {
 				if (m.J > best.J) {  // if (xmin > best.xmin)
@@ -197,7 +194,7 @@ class SweepMap {
 			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
 
 			// Prepare for the next step by moving `l` to the right.
-			if (++diff_hist[l->kmer] > 0)
+			if (++diff_hist[l->seed->kmer] > 0)
 				--xmin;
 
 			assert(xmin >= 0);
