@@ -159,12 +159,12 @@ eval_mapquik: gen_reads
 	$(TIME_CMD) -o $(MAPQUIK_PREF).time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(MAPQUIK_PREF) | tee $(MAPQUIK_PREF).log
 	-paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
-eval_all: eval_sweepmap eval_sweepmap_slow eval_mapquik eval_blend eval_minimap #eval_winnowmap
+eval_tools: eval_sweepmap eval_sweepmap_slow eval_mapquik eval_blend eval_minimap #eval_winnowmap
 
-compare:
-	make eval_all REFNAME=t2tChrY DEPTH=10
-	make eval_all REFNAME=chm13 DEPTH=0.1
-	make eval_all READS_PREFIX=HG002_24kb
+eval_tools_on_datasets::
+	make eval_tools REFNAME=t2tChrY DEPTH=10
+	make eval_tools REFNAME=chm13   DEPTH=0.1
+	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb
 
 clean:
 	rm -r $(SWEEPMAP_BIN)
