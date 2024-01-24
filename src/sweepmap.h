@@ -346,7 +346,7 @@ class SweepMap {
 		cerr << " | Unmapped reads:        " << C->count("unmapped_reads") << " (" << C->perc("unmapped_reads", "reads") << "%)" << endl;
 		cerr << " | Average Jaccard:       " << C->frac("J", "mappings") / 10000.0 << endl;
 		cerr << " \\---" 					 << endl;
-		cerr << "Total time [sec]:         "         << setw(5) << right << T->secs("total")             << " (" << setw(4) << right << C->count("reads") / T->secs("total")      << " reads per sec)" << endl;
+		cerr << "Time [sec]:           "             << setw(5) << right << T->secs("total")             << " (" << setw(4) << right << C->count("reads") / T->secs("total")      << " reads per sec)" << endl;
 		cerr << " | Index:                 "         << setw(5) << right << T->secs("indexing")          << " (" << setw(4) << right << T->perc("indexing", "total")              << "\%)" << endl;
 		cerr << " |  | loading:                "     << setw(5) << right << T->secs("index_reading")     << " (" << setw(4) << right << T->perc("index_reading", "indexing")      << "\%)" << endl;
 		cerr << " |  | sketch:                 "     << setw(5) << right << T->secs("index_sketching")   << " (" << setw(4) << right << T->perc("index_sketching", "indexing")    << "\%)" << endl;
@@ -363,6 +363,9 @@ class SweepMap {
 		cerr << " |  | sweep:                  "     << setw(5) << right << T->secs("sweep")             << " (" << setw(4) << right << T->perc("sweep", "mapping")               << "\%, " << setw(5) << right << T->range_ratio("sweep") << "x)" << endl;
 		cerr << " |  | post proc:              "     << setw(5) << right << T->secs("postproc")          << " (" << setw(4) << right << T->perc("postproc", "mapping")            << "\%, " << setw(5) << right << T->range_ratio("postproc") << "x)" << endl;
 		cerr << " \\---" 							 << endl;
+//		cerr << "Virtual memory [MB]:  "             << setw(5) << right << C->count("total_memory_MB")  << endl;
+//		cerr << " | Index:                 "         << setw(5) << right << C->count("index_memory_MB") << " (" << setw(4) << right << C->perc("index_memory_MB", "total_memory_MB") << "\%)" << endl;
+//		cerr << " \\---" 							 << endl;
 	}
 };
 

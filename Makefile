@@ -21,7 +21,7 @@ DEPTH ?= 1
 MEANLEN ?= 10000
 
 K ?= 22
-R ?= 0.1 
+R ?= 0.1
 S ?= 300
 M ?= 3000
 T ?= 0.0
@@ -164,6 +164,7 @@ eval_all: eval_sweepmap eval_sweepmap_slow eval_mapquik eval_blend eval_minimap 
 compare:
 	make eval_all REFNAME=t2tChrY DEPTH=10
 	make eval_all REFNAME=chm13 DEPTH=0.1
+	make eval_all READS_PREFIX=HG002_24kb
 
 clean:
 	rm -r $(SWEEPMAP_BIN)

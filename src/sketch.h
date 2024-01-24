@@ -96,47 +96,9 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac) {
 		//cerr << s << " " << r << " " << std::hex << std::setfill('0') << std::setw(16) << h
 		//					<< " = " << std::hex << std::setfill('0') << std::setw(16) << h_fw
 		//					<< " ^ " << std::hex << std::setfill('0') << std::setw(16) << h_rc << endl;
-		if (h < hThres) { // optimize to only look at specific bits
+		if (h < hThres) // optimize to only look at specific bits
 			sk.push_back(Kmer(r, h, strand));
-		}
 					
-		if (r >= (int)s.size()) break;
-
-		h_fw = std::rotl(h_fw, 1) ^ std::rotl(LUT_fw[(int)s[r-k]], k) ^ LUT_fw[(int)s[r]];
-		h_rc = std::rotr(h_rc, 1) ^ std::rotr(LUT_rc[(int)s[r-k]], 1) ^ std::rotl(LUT_rc[(int)s[r]], k-1);
-
-		++r;
-	}
-
-	return sk;
-}
-
-// TODO: remove
-const Sketch buildFMHSketch_onlyfw(const string& s, int k, double hFrac, int max_sketch_size=-1) {
-	Sketch sk;
-	sk.reserve((int)(1.1 * (double)s.size() * hFrac));
-
-	if ((int)s.size() < k) return sk;
-
-	hash_t h_fw = 0, h_rc = 0;
-	hash_t hThres = hash_t(hFrac * double(std::numeric_limits<hash_t>::max()));
-	int r;
-
-	for (r=0; r<k; r++) {
-		h_fw ^= std::rotl(LUT_fw[(int)s[r]], k-r-1);
-		h_rc ^= std::rotl(LUT_rc[(int)s[r]], r);
-	}
-
-	while(true) {
-		if (h_fw < hThres) {
-			auto first_diff_bit = 1 << std::countr_zero(h_fw ^ h_rc);
-			if (h_rc & first_diff_bit) {
-			//if (std::countr_zero(h_fw) < std::countr_zero(h_rc) || (std::countr_zero(h_fw) == std::countr_zero(h_rc) && h_fw < h_rc)) {
-				sk.push_back(Kmer(r, h_fw, false));
-				if (max_sketch_size != -1 && (int)sk.size() >= max_sketch_size) break;
-			}
-		}
-
 		if (r >= (int)s.size()) break;
 
 		h_fw = std::rotl(h_fw, 1) ^ std::rotl(LUT_fw[(int)s[r-k]], k) ^ LUT_fw[(int)s[r]];
@@ -160,7 +122,7 @@ struct SketchIndex {
 	const params_t &params;
 	ankerl::unordered_dense::map<hash_t, std::vector<Hit>> h2pos;
 
-	void print_hist() {
+	void print_kmer_hist() {
 		std::vector<int> hist(10, 0);
 		int kmers = 0, different_kmers = 0, max_occ = 0;
 		for (const auto& h2p : h2pos) {
@@ -194,7 +156,8 @@ struct SketchIndex {
 	}
 
 	void add_segment(const Sketch& sketch, const string &name, char *T_segm) {
-		T.push_back(RefSegment(name, T_segm));
+		//T.push_back(RefSegment(name, T_segm));
+		T.push_back(RefSegment(name, ""));
 		total_size += this->T.back().seq.size();
 		populate_h2pos(sketch, T.size()-1);
 	}

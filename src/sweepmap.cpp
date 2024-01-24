@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
 		T.stop("index_sketching");
 
 		T.start("index_initializing");
-		tidx.add_segment(t, seq->name.s, seq->seq.s);
+		tidx.add_segment(t, seq->name.s, seq->seq.s); // TODO: don't pass seq.s
 		T.stop("index_initializing");
 
 		T.start("index_reading");
@@ -39,9 +39,10 @@ int main(int argc, char **argv) {
 	T.stop("index_reading");
 	T.stop("indexing");
 
-	tidx.print_hist();
+	tidx.print_kmer_hist();
 
 	C.inc("T_sz", tidx.total_size);
+	//C.inc("index_memory_MB", get_current_memory_MB());
 
 	if (!params.paramsFile.empty()) {
 		cerr << "Writing parameters to " << params.paramsFile << "..." << endl;
@@ -56,6 +57,7 @@ int main(int argc, char **argv) {
 	sweepmap.map(params.pFile);
 
 	T.stop("total");
+	//C.inc("total_memory_MB", get_current_memory_MB());
 	sweepmap.print_report();
 
 	return 0;
