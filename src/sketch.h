@@ -16,20 +16,6 @@ namespace sweepmap {
 using hash_t     = uint64_t;
 using pos_t      = int32_t;
 
-string revCompl(string s) {
-    for (auto& c : s) {
-		switch (c) {
-			case 'A': c = 'T'; break;
-			case 'C': c = 'G'; break;
-			case 'G': c = 'C'; break;
-			case 'T': c = 'A'; break;
-			default: break;
-		}
-	}
-    std::reverse(s.begin(), s.end());
-    return s;
-}
-
 struct Kmer {
 	pos_t r;
 	hash_t h;
