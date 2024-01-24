@@ -148,7 +148,7 @@ struct SketchIndex {
 	}
 
 	void populate_h2pos(const Sketch& sketch, int segm_id) {
-		//print_sketches(name, sketch);
+		h2pos.reserve(sketch.size());
 		for (size_t tpos = 0; tpos < sketch.size(); ++tpos) {
 			const Kmer& kmer = sketch[tpos];
 			h2pos[kmer.h].push_back(Hit(kmer, tpos, segm_id));
