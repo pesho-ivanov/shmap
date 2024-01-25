@@ -182,11 +182,11 @@ class SweepMap {
 			// best[l,r) -- a mapping best.l<=l with maximal J
 			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
 			if (params.onlybest) {
-				if (m.J > best.J) {  // if (xmin > best.xmin)
+				if (m.xmin > best.xmin) {  // if (xmin > best.xmin)
 					if (best.T_l < m.T_l - 0.9*P_len)
 						second = best;
 					best = m;
-				} else if (m.J > second.J && m.T_l > best.T_l + 0.9*P_len) {
+				} else if (m.xmin > second.xmin && m.T_l > best.T_l + 0.9*P_len) {
 					second = m;
 				}
 			} else {
