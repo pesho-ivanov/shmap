@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
 		T.stop("index_sketching");
 
 		T.start("index_initializing");
-		tidx.add_segment(t, seq->name.s, seq->seq.s); // TODO: don't pass seq.s
+		tidx.add_segment(t, seq->name.s, seq->seq.l);
 		T.stop("index_initializing");
 
 		T.start("index_reading");

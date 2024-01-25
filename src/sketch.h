@@ -98,8 +98,8 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac) {
 
 struct RefSegment {
 	string name;
-	string seq;  // TODO: change type to char* and store compressed (2 bits per base)
-	RefSegment(const string &name, const string &seq) : name(name), seq(seq) {}
+	int sz;
+	RefSegment(const string &name, const int sz) : name(name), sz(sz) {}
 };
 
 struct SketchIndex {
@@ -141,10 +141,9 @@ struct SketchIndex {
 		}
 	}
 
-	void add_segment(const Sketch& sketch, const string &name, char *T_segm) {
-		//T.push_back(RefSegment(name, T_segm));
-		T.push_back(RefSegment(name, ""));
-		total_size += this->T.back().seq.size();
+	void add_segment(const Sketch& sketch, const string &name, int T_sz) {
+		T.push_back(RefSegment(name, T_sz));
+		total_size += T_sz;
 		populate_h2pos(sketch, T.size()-1);
 	}
 

@@ -46,10 +46,11 @@ struct Mapping {
 	int mapq;
 	char strand;    // '+' or '-'
 	bool unreasonable;  // reserved for filtering matches
+	int P_start;
 
     Mapping() {}
-	Mapping(int k, pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, int segm_id, pos_t s_sz, int xmin, int same_strand_seeds)
-		: k(k), P_sz(P_sz), seeds(seeds), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), xmin(xmin), J(double(xmin) / std::max(seeds, s_sz)), mapq(255), strand(same_strand_seeds > 0 ? '+' : '-'), unreasonable(false) {}
+	Mapping(int k, pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, int segm_id, pos_t s_sz, int xmin, int same_strand_seeds, int P_start)
+		: k(k), P_sz(P_sz), seeds(seeds), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), xmin(xmin), J(double(xmin) / std::max(seeds, s_sz)), mapq(255), strand(same_strand_seeds > 0 ? '+' : '-'), unreasonable(false), P_start(P_start) {}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
     void print_paf(const string &query_id, const RefSegment &segm, const int matches) const {
@@ -59,7 +60,7 @@ struct Mapping {
 			<< "\t" << P_sz  // query end (0-based; open)
 			<< "\t" << strand   // '+' or '-'
 			<< "\t" << segm.name // reference segment name
-			<< "\t" << segm.seq.size() // T_sz -- target sequence length
+			<< "\t" << segm.sz // T_sz -- target sequence length
 			<< "\t" << T_l  // target start on original strand (0-based)
 			<< "\t" << T_r  // target start on original strand (0-based)
 			<< "\t" << P_sz  // TODO: fix; Number of residue matches (number of nucleotide matches)
@@ -156,7 +157,7 @@ class SweepMap {
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
 
 		int xmin = 0;
-		Mapping best(params.k, P_len, 0, -1, -1, -1, -1, -1, 0);
+		Mapping best(params.k, P_len, 0, -1, -1, -1, -1, -1, 0, -1);
 		Mapping second = best;
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 
@@ -175,7 +176,8 @@ class SweepMap {
 				assert (l->hit->r <= r->hit->r);
 			}
 
-			auto m = Mapping(params.k, P_len, seeds, l->hit->r, prev(r)->hit->r, l->hit->segm_id, pos_t(r-l), xmin, same_strand_seeds);
+			// TODO: pass hits to Mapping()
+			auto m = Mapping(params.k, P_len, seeds, l->hit->r, prev(r)->hit->r, l->hit->segm_id, pos_t(r-l), xmin, same_strand_seeds, l->seed->kmer.r);
 
 			// second best without guarantees
 			// Wrong invariant:
