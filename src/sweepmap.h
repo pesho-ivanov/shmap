@@ -61,8 +61,8 @@ struct Mapping {
 			<< "\t" << strand   // '+' or '-'
 			<< "\t" << segm.name // reference segment name
 			<< "\t" << segm.sz // T_sz -- target sequence length
-			<< "\t" << T_l  // target start on original strand (0-based)
-			<< "\t" << T_r  // target start on original strand (0-based)
+			<< "\t" << std::max(T_l-k-P_start, 0)  // target start on original strand (0-based)
+			<< "\t" << std::max(T_r, T_l-k-P_start+P_sz)  // target start on original strand (0-based)
 			<< "\t" << P_sz  // TODO: fix; Number of residue matches (number of nucleotide matches)
 			<< "\t" << P_sz  // TODO: fix; Alignment block length: total number of sequence matches, mismatches, insertions and deletions in the alignment
 			<< "\t" << mapq  // Mapping quality (0-255; 255 for missing)
