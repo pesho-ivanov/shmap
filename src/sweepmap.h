@@ -89,11 +89,11 @@ class SweepMap {
 	using hist_t = vector<int>;
 
 	vector<Seed> select_seeds(const Sketch& p, hist_t *hist) {
+		T->start("collect_seed_info");
 		vector<Seed> kmers;
 		kmers.reserve(p.size());
 
 		// TODO: limit the number of kmers in the pattern p
-		T->start("collect_seed_info");
 		for (const auto &kmer: p) {
 			auto t_it = tidx.h2pos.find(kmer.h);
 			if (t_it != tidx.h2pos.end())
@@ -111,6 +111,7 @@ class SweepMap {
 		});
 		T->stop("sort_seeds");
 
+		T->start("select_seeds");
 		vector<Seed> seeds;
 		int total_hits = 0;
 		int total_seeds = std::min(kmers.size(), (size_t)params.max_seeds);
@@ -128,6 +129,7 @@ class SweepMap {
 			else ++(hist->back());
 		}
 		//std::cout << "kmers.size()=" << kmers.size() << ", seeds.size()=" << seeds.size() << std::endl;
+		T->stop("select_seeds");
 		return seeds;
 	}
 
