@@ -102,20 +102,21 @@ class SweepMap {
 		T->stop("collect_seed_info");
         C->inc("collected_seeds", kmers.size());
 
-		T->start("sort_seeds");
-
+		T->start("thin_sketch");
 		int total_seeds = std::min(kmers.size(), (size_t)params.max_seeds);
-        std::partial_sort(kmers.begin(), kmers.begin() + total_seeds, kmers.end(),
-            [](const Seed &a, const Seed &b) {
-			// Sort the matching kmers by number of hits in the reference
-			if (a.hits_in_T->size() != b.hits_in_T->size())
-				return a.hits_in_T->size() < b.hits_in_T->size();
+        std::nth_element(kmers.begin(), kmers.begin() + total_seeds, kmers.end(), [](const Seed &a, const Seed &b) {
+            return a.hits_in_T->size() < b.hits_in_T->size();
+        });
+		T->stop("thin_sketch");
+
+		T->start("sort_seeds");
+        std::sort(kmers.begin(), kmers.begin() + total_seeds, [](const Seed &a, const Seed &b) {
 			return a.kmer.h < b.kmer.h;
 			//return a.kmer.r < b.kmer.r;
 		});
 		T->stop("sort_seeds");
 
-		T->start("select_seeds");
+		T->start("unique_seeds");
 		vector<Seed> seeds;
 		seeds.reserve(total_seeds);
 		hist->reserve(total_seeds);
@@ -126,7 +127,8 @@ class SweepMap {
 			}
 			else ++(hist->back());
 		}
-		T->stop("select_seeds");
+
+		T->stop("unique_seeds");
         C->inc("selected_seeds", seeds.size());
 		return seeds;
 	}
@@ -363,8 +365,9 @@ class SweepMap {
 		cerr << " |  | sketch reads:           "     << setw(5) << right << T->secs("sketching")         << " (" << setw(4) << right << T->perc("sketching", "mapping")           << "\%, " << setw(5) << right << T->range_ratio("sketching") << "x)" << endl;
 		cerr << " |  | seeding:                "     << setw(5) << right << T->secs("seeding")           << " (" << setw(4) << right << T->perc("seeding", "mapping")             << "\%, " << setw(5) << right << T->range_ratio("seeding") << "x)" << endl;
 		cerr << " |  |  | collect seed info:       " << setw(5) << right << T->secs("collect_seed_info") << " (" << setw(4) << right << T->perc("collect_seed_info", "seeding")   << "\%, " << setw(5) << right << T->range_ratio("collect_seed_info") << "x)" << endl;
-		cerr << " |  |  | sort seeds by #matches:  " << setw(5) << right << T->secs("sort_seeds")        << " (" << setw(4) << right << T->perc("sort_seeds", "seeding")          << "\%, " << setw(5) << right << T->range_ratio("sort_seeds") << "x)" << endl;
-		cerr << " |  |  | thin sketch:             " << setw(5) << right << T->secs("select_seeds")      << " (" << setw(4) << right << T->perc("select_seeds", "seeding")        << "\%, " << setw(5) << right << T->range_ratio("select_seeds") << "x)" << endl;
+		cerr << " |  |  | thin sketch:             " << setw(5) << right << T->secs("thin_sketch")       << " (" << setw(4) << right << T->perc("thin_sketch", "seeding")         << "\%, " << setw(5) << right << T->range_ratio("thin_sketch") << "x)" << endl;
+		cerr << " |  |  | sort seeds:              " << setw(5) << right << T->secs("sort_seeds")        << " (" << setw(4) << right << T->perc("sort_seeds", "seeding")          << "\%, " << setw(5) << right << T->range_ratio("sort_seeds") << "x)" << endl;
+		cerr << " |  |  | unique seeds:            " << setw(5) << right << T->secs("unique_seeds")      << " (" << setw(4) << right << T->perc("unique_seeds", "seeding")        << "\%, " << setw(5) << right << T->range_ratio("unique_seeds") << "x)" << endl;
 		cerr << " |  | matching seeds:         "     << setw(5) << right << T->secs("matching")          << " (" << setw(4) << right << T->perc("matching", "mapping")            << "\%, " << setw(5) << right << T->range_ratio("matching") << "x)" << endl;
 		cerr << " |  |  | collect matches:         " << setw(5) << right << T->secs("collect_matches")   << " (" << setw(4) << right << T->perc("collect_matches", "matching")    << "\%, " << setw(5) << right << T->range_ratio("collect_matches") << "x)" << endl;
 		cerr << " |  |  | sort matches:            " << setw(5) << right << T->secs("sort_matches")      << " (" << setw(4) << right << T->perc("sort_matches", "matching")       << "\%, " << setw(5) << right << T->range_ratio("sort_matches") << "x)" << endl;
