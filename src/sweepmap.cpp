@@ -1,3 +1,4 @@
+#include "index.h"
 #include "sweepmap.h"
 using namespace sweepmap;
 
@@ -19,31 +20,8 @@ int main(int argc, char **argv) {
 	}
 	params.print_display(std::cerr);
 
-	T.start("indexing");
-	cerr << "Indexing " << params.tFile << "..." << endl;
-	SketchIndex tidx(params);
-
-	T.start("index_reading");
-	read_fasta_klib(params.tFile, [&tidx, &params, &T](kseq_t *seq) {
-		T.stop("index_reading");
-		T.start("index_sketching");
-		Sketch t = buildFMHSketch(seq->seq.s, params.k, params.hFrac);
-		T.stop("index_sketching");
-
-		T.start("index_initializing");
-		tidx.add_segment(t, seq->name.s, seq->seq.l);
-		T.stop("index_initializing");
-
-		T.start("index_reading");
-	});
-	T.stop("index_reading");
-	T.stop("indexing");
-
-	tidx.apply_blacklist(params.max_matches);
-	tidx.print_kmer_hist();
-
-	C.inc("T_sz", tidx.total_size);
-	//C.inc("index_memory_MB", get_current_memory_MB());
+	SketchIndex tidx(params, &T, &C);
+	tidx.index(params.tFile);
 
 	if (!params.paramsFile.empty()) {
 		cerr << "Writing parameters to " << params.paramsFile << "..." << endl;

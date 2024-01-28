@@ -9,6 +9,9 @@
 
 namespace sweepmap {
 
+using hash_t     = uint64_t;
+using pos_t      = int32_t;
+
 class Timer {
 public:
     std::chrono::time_point<std::chrono::high_resolution_clock> start_time_point_, end_time_point_;

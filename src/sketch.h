@@ -2,19 +2,13 @@
 #define SKETCH_HPP
 
 #include <climits>
-#include <string>
 #include <iostream>
+#include <string>
 #include <vector>
 
-#include <ankerl/unordered_dense.h>
-
 #include "utils.h"
-#include "io.h"
 
 namespace sweepmap {
-
-using hash_t     = uint64_t;
-using pos_t      = int32_t;
 
 struct Kmer {
 	pos_t r;
@@ -57,7 +51,7 @@ void initialize_LUT() {
 //return 0;
 // TODO: use either only forward or only reverse
 // TODO: accept char*
-const Sketch buildFMHSketch(const string& s, int k, double hFrac) {
+const Sketch buildFMHSketch(const std::string& s, int k, double hFrac) {
 	Sketch sk;
 	sk.reserve((int)(1.1 * (double)s.size() * hFrac));
 
@@ -95,67 +89,6 @@ const Sketch buildFMHSketch(const string& s, int k, double hFrac) {
 
 	return sk;
 }
-
-struct RefSegment {
-	string name;
-	int sz;
-	RefSegment(const string &name, const int sz) : name(name), sz(sz) {}
-};
-
-struct SketchIndex {
-	std::vector<RefSegment> T;
-	pos_t total_size;  // total size of all segments // TODO: change type to size_t
-	const params_t &params;
-	ankerl::unordered_dense::map<hash_t, std::vector<Hit>> h2pos;
-
-	void print_kmer_hist() {
-		std::vector<int> hist(10, 0);
-		int kmers = 0, different_kmers = 0, max_occ = 0;
-		for (const auto& h2p : h2pos) {
-			int occ = h2p.second.size();
-			kmers += occ;
-			++different_kmers;
-			if (occ >= (int)hist.size()-1) {
-				hist.back() += occ;
-				if (occ > max_occ)
-					max_occ = occ;
-			} else 
-				hist[occ] += occ;
-		}
-
-		cerr << std::fixed << std::setprecision(2);
-		cerr << "Histogram of " << kmers << " kmers ("
-			<< 100.0*double(different_kmers)/double(kmers) << "\% different) covering "
-			<< 100.0*double(params.k)*double(kmers)/double(total_size) << "\% of the " << total_size << "nb index" << endl;
-		for (size_t i=0; i<hist.size(); ++i)
-			if (hist[i] > 0)
-				cerr << std::setw(5) << std::right << i << (i<hist.size()-1?" ":"+") << "occ: " << std::setw(9) << std::right << hist[i] << " kmers (" << 100.0*double(hist[i])/double(kmers) << "\%)" << endl;
-		cerr << "The most frequent kmer occurs " << max_occ << " times." << endl;
-	}
-
-	void apply_blacklist(int blacklist_threshold) {
-		for (auto hits: h2pos)
-			if (hits.second.size() > (size_t)blacklist_threshold) {
-				h2pos.erase(hits.first);  // TODO: use the iterator instead
-			}
-	}
-
-	void populate_h2pos(const Sketch& sketch, int segm_id) {
-		h2pos.reserve(sketch.size());
-		for (size_t tpos = 0; tpos < sketch.size(); ++tpos) {
-			const Kmer& kmer = sketch[tpos];
-			h2pos[kmer.h].push_back(Hit(kmer, tpos, segm_id));
-		}
-	}
-
-	void add_segment(const Sketch& sketch, const string &name, int T_sz) {
-		T.push_back(RefSegment(name, T_sz));
-		total_size += T_sz;
-		populate_h2pos(sketch, T.size()-1);
-	}
-
-	SketchIndex(const params_t &params) : total_size(0), params(params) {}
-};
 
 } // namespace sweepmap
 
