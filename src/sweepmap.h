@@ -117,17 +117,12 @@ class SweepMap {
 
 		T->start("select_seeds");
 		vector<Seed> seeds;
-		int total_hits = 0;
 		seeds.reserve(total_seeds);
 		hist->reserve(total_seeds);
 		for (int i=0; i<total_seeds; i++) {
 			if (i==0 || kmers[i-1].kmer.h != kmers[i].kmer.h) {
 				hist->push_back(1);
 				seeds.push_back(kmers[i]);
-				if ((total_hits += kmers[i].hits_in_T->size()) > params.max_matches) {
-					C->inc("matches_limit_reached");
-					break;
-				}
 			}
 			else ++(hist->back());
 		}
@@ -140,7 +135,7 @@ class SweepMap {
 	vector<Match> match_seeds(pos_t p_sz, const vector<Seed> &seeds) {
 		T->start("collect_matches");
 		vector<Match> matches;
-		matches.reserve(std::min(params.max_matches, 2*(int)seeds.size()));
+		matches.reserve(2*(int)seeds.size());
 
 		for (int i=0; i<(int)seeds.size(); i++)
 			for (auto &hit: *(seeds[i].hits_in_T)) {
@@ -369,7 +364,7 @@ class SweepMap {
 		cerr << " |  | seeding:                "     << setw(5) << right << T->secs("seeding")           << " (" << setw(4) << right << T->perc("seeding", "mapping")             << "\%, " << setw(5) << right << T->range_ratio("seeding") << "x)" << endl;
 		cerr << " |  |  | collect seed info:       " << setw(5) << right << T->secs("collect_seed_info") << " (" << setw(4) << right << T->perc("collect_seed_info", "seeding")   << "\%, " << setw(5) << right << T->range_ratio("collect_seed_info") << "x)" << endl;
 		cerr << " |  |  | sort seeds by #matches:  " << setw(5) << right << T->secs("sort_seeds")        << " (" << setw(4) << right << T->perc("sort_seeds", "seeding")          << "\%, " << setw(5) << right << T->range_ratio("sort_seeds") << "x)" << endl;
-		cerr << " |  |  | sketch thinning:         " << setw(5) << right << T->secs("select_seeds")      << " (" << setw(4) << right << T->perc("select_seeds", "seeding")        << "\%, " << setw(5) << right << T->range_ratio("select_seeds") << "x)" << endl;
+		cerr << " |  |  | thin sketch:             " << setw(5) << right << T->secs("select_seeds")      << " (" << setw(4) << right << T->perc("select_seeds", "seeding")        << "\%, " << setw(5) << right << T->range_ratio("select_seeds") << "x)" << endl;
 		cerr << " |  | matching seeds:         "     << setw(5) << right << T->secs("matching")          << " (" << setw(4) << right << T->perc("matching", "mapping")            << "\%, " << setw(5) << right << T->range_ratio("matching") << "x)" << endl;
 		cerr << " |  |  | collect matches:         " << setw(5) << right << T->secs("collect_matches")   << " (" << setw(4) << right << T->perc("collect_matches", "matching")    << "\%, " << setw(5) << right << T->range_ratio("collect_matches") << "x)" << endl;
 		cerr << " |  |  | sort matches:            " << setw(5) << right << T->secs("sort_matches")      << " (" << setw(4) << right << T->perc("sort_matches", "matching")       << "\%, " << setw(5) << right << T->range_ratio("sort_matches") << "x)" << endl;

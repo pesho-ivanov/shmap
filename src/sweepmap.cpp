@@ -39,6 +39,7 @@ int main(int argc, char **argv) {
 	T.stop("index_reading");
 	T.stop("indexing");
 
+	tidx.apply_blacklist(params.max_matches);
 	tidx.print_kmer_hist();
 
 	C.inc("T_sz", tidx.total_size);

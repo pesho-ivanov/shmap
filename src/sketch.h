@@ -133,6 +133,13 @@ struct SketchIndex {
 		cerr << "The most frequent kmer occurs " << max_occ << " times." << endl;
 	}
 
+	void apply_blacklist(int blacklist_threshold) {
+		for (auto hits: h2pos)
+			if (hits.second.size() > (size_t)blacklist_threshold) {
+				h2pos.erase(hits.first);  // TODO: use the iterator instead
+			}
+	}
+
 	void populate_h2pos(const Sketch& sketch, int segm_id) {
 		h2pos.reserve(sketch.size());
 		for (size_t tpos = 0; tpos < sketch.size(); ++tpos) {

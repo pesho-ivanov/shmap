@@ -15,7 +15,7 @@ MAPQUIK_BIN = mapquik
 MERYL_BIN = ~/libs/Winnowmap/bin/meryl
 WINNOWMAP_BIN = ~/libs/Winnowmap/bin/winnowmap
 
-REFNAME ?= chm13
+REFNAME ?= t2tChrY
 ACCURACY ?= 0.99
 DEPTH ?= 1
 MEANLEN ?= 10000
@@ -23,7 +23,7 @@ MEANLEN ?= 10000
 K ?= 22
 R ?= 0.1
 S ?= 300
-M ?= 3000
+M ?= 100
 T ?= 0.0
 
 K_SLOW ?= 22
@@ -166,7 +166,6 @@ eval_tools_on_datasets:
 	make eval_tools REFNAME=t2tChrY DEPTH=1  MEANLEN=24000
 	make eval_tools REFNAME=chm13   DEPTH=0.1
 	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb
-
 
 eval_sweepmap_on_datasets:
 	make eval_sweepmap REFNAME=t2tChrY DEPTH=10
