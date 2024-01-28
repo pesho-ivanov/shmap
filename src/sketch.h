@@ -1,5 +1,5 @@
-#ifndef SKETCH_HPP
-#define SKETCH_HPP
+#ifndef SWEEPMAP_SKETCH_HPP
+#define SWEEPMAP_SKETCH_HPP
 
 #include <climits>
 #include <iostream>

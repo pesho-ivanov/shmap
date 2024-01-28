@@ -1,5 +1,5 @@
-#ifndef INDEX_HPP
-#define INDEX_HPP
+#ifndef SWEEPMAP_INDEX_HPP
+#define SWEEPMAP_INDEX_HPP
 
 #include <iostream>
 #include <string>

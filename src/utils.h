@@ -1,5 +1,5 @@
-#ifndef UTILS_HPP
-#define UTILS_HPP
+#ifndef SWEEPMAP_TILS_HPP
+#define SWEEPMAP_TILS_HPP
 
 #include <cassert>
 #include <chrono>

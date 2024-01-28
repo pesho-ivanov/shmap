@@ -1,5 +1,5 @@
-#ifndef SWEEP_HPP
-#define SWEEP_HPP
+#ifndef SWEEPMAP_SWEEPMAP_HPP
+#define SWEEPMAP_SWEEPMAP_HPP
 
 #include <algorithm>
 #include <cassert>

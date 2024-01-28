@@ -1,5 +1,5 @@
-#ifndef IO_HPP
-#define IO_HPP
+#ifndef SWEEPMAP_IO_HPP
+#define SWEEPMAP_IO_HPP
 
 #include <fstream>
 #include <functional>
