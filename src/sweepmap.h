@@ -278,6 +278,15 @@ class SweepMap {
 		return reasonable;
 	}
 
+    // TODO: disable in release
+    int spurious_matches(const Mapping &m, const vector<Match> &matches) {
+        int included = 0;
+        for (auto &match: matches)
+            if (match.hit.segm_id == m.segm_id && match.hit.r >= m.T_l && match.hit.r <= m.T_r)
+                included++;
+        return matches.size() - included;
+    }
+
   public:
 	SweepMap(const SketchIndex &tidx, const params_t &params, Timers *T, Counters *C)
 		: tidx(tidx), params(params), T(T), C(C) {
@@ -326,6 +335,7 @@ class SweepMap {
 				const auto &segm = tidx.T[m.segm_id];
 				m.map_time = read_mapping_time.secs() / (double)mappings.size();
 				m.print_paf(query_id, segm, (int)matches.size());
+                C->inc("spurious_matches", spurious_matches(m, matches));
 				C->inc("J", int(10000.0*m.J));
 				C->inc("mappings");
 				C->inc("sketched_kmers", m.seeds);
@@ -351,6 +361,7 @@ class SweepMap {
 		cerr << " | Kmer matches:          " << C->count("matches") << " (" << C->frac("matches", "reads") << " per read)" << endl;
 		//cerr << " | Seed limit reached:    " << C->count("seeds_limit_reached") << " (" << C->perc("seeds_limit_reached", "reads") << "%)" << endl;
 		cerr << " | Matches limit reached: " << C->count("matches_limit_reached") << " (" << C->perc("matches_limit_reached", "reads") << "%)" << endl;
+		cerr << " | Spurious matches:      " << C->count("spurious_matches") << " (" << C->perc("spurious_matches", "matches") << "%)" << endl;
 		cerr << " | Selected seeds:        " << C->count("selected_seeds") << " (" << C->perc("selected_seeds", "collected_seeds") << "%)" << endl;
 		cerr << " | Unmapped reads:        " << C->count("unmapped_reads") << " (" << C->perc("unmapped_reads", "reads") << "%)" << endl;
 		cerr << " | Average Jaccard:       " << C->frac("J", "mappings") / 10000.0 << endl;
