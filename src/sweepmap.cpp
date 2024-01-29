@@ -9,9 +9,6 @@ int main(int argc, char **argv) {
 	Timers T;
 
 	T.start("total");
-	C.inc("seeds_limit_reached", 0);
-	C.inc("matches_limit_reached", 0);
-	C.inc("unmapped_reads", 0);
 
 	params_t params;
 	if(!prsArgs(argc, argv, &params)) {

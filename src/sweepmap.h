@@ -103,7 +103,11 @@ class SweepMap {
         C->inc("collected_seeds", kmers.size());
 
 		T->start("thin_sketch");
-		int total_seeds = std::min(kmers.size(), (size_t)params.max_seeds);
+		int total_seeds = (int)kmers.size();
+		if ((int)params.max_seeds < total_seeds) {
+			total_seeds = (int)params.max_seeds;
+			C->inc("seeds_limit_reached");
+		}
         std::nth_element(kmers.begin(), kmers.begin() + total_seeds, kmers.end(), [](const Seed &a, const Seed &b) {
             return a.hits_in_T->size() < b.hits_in_T->size();
         });
@@ -129,7 +133,7 @@ class SweepMap {
 		}
 
 		T->stop("unique_seeds");
-        C->inc("selected_seeds", seeds.size());
+        C->inc("discarded_seeds", kmers.size() - seeds.size());
 		return seeds;
 	}
 
@@ -290,6 +294,8 @@ class SweepMap {
   public:
 	SweepMap(const SketchIndex &tidx, const params_t &params, Timers *T, Counters *C)
 		: tidx(tidx), params(params), T(T), C(C) {
+			C->inc("seeds_limit_reached", 0);
+			C->inc("unmapped_reads", 0);
 			if (params.tThres < 0.0 || params.tThres > 1.0) {
 				cerr << "tThres = " << params.tThres << " outside of [0,1]." << endl;
 				exit(1);
@@ -359,10 +365,10 @@ class SweepMap {
 		cerr << " | Total reads:           " << C->count("reads") << " (~" << 1.0*C->count("read_len") / C->count("reads") << " nb per read)" << endl;
 		cerr << " | Sketched read kmers:   " << C->count("sketched_kmers") << " (" << C->frac("sketched_kmers", "reads") << " per read)" << endl;
 		cerr << " | Kmer matches:          " << C->count("matches") << " (" << C->frac("matches", "reads") << " per read)" << endl;
-		//cerr << " | Seed limit reached:    " << C->count("seeds_limit_reached") << " (" << C->perc("seeds_limit_reached", "reads") << "%)" << endl;
-		cerr << " | Matches limit reached: " << C->count("matches_limit_reached") << " (" << C->perc("matches_limit_reached", "reads") << "%)" << endl;
+		cerr << " | Seed limit reached:    " << C->count("seeds_limit_reached") << " (" << C->perc("seeds_limit_reached", "reads") << "%)" << endl;
+		//cerr << " | Matches limit reached: " << C->count("matches_limit_reached") << " (" << C->perc("matches_limit_reached", "reads") << "%)" << endl;
 		cerr << " | Spurious matches:      " << C->count("spurious_matches") << " (" << C->perc("spurious_matches", "matches") << "%)" << endl;
-		cerr << " | Selected seeds:        " << C->count("selected_seeds") << " (" << C->perc("selected_seeds", "collected_seeds") << "%)" << endl;
+		cerr << " | Discarded seeds:       " << C->count("discarded_seeds") << " (" << C->perc("discarded_seeds", "collected_seeds") << "%)" << endl;
 		cerr << " | Unmapped reads:        " << C->count("unmapped_reads") << " (" << C->perc("unmapped_reads", "reads") << "%)" << endl;
 		cerr << " | Average Jaccard:       " << C->frac("J", "mappings") / 10000.0 << endl;
 		cerr << " \\---" 					 << endl;
