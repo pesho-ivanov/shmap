@@ -164,14 +164,14 @@ eval_tools: eval_sweepmap eval_sweepmap_slow eval_mapquik eval_blend eval_minima
 eval_tools_on_datasets:
 	make eval_tools REFNAME=t2tChrY DEPTH=10
 	make eval_tools REFNAME=chm13   DEPTH=0.1
-	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb
 	make eval_tools REFNAME=t2tChrY DEPTH=1  MEANLEN=24000
+	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb
 
 eval_sweepmap_on_datasets:
 	make eval_sweepmap REFNAME=t2tChrY DEPTH=10
 	make eval_sweepmap REFNAME=chm13   DEPTH=0.1
-	make eval_sweepmap REFNAME=chm13   READS_PREFIX=HG002_24kb
 	make eval_sweepmap REFNAME=t2tChrY DEPTH=1 	MEANLEN=24000
+	make eval_sweepmap REFNAME=chm13   READS_PREFIX=HG002_24kb
 
 clean:
 	rm -r $(SWEEPMAP_BIN)
