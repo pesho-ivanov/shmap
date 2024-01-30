@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <chrono>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -11,6 +12,7 @@ namespace sweepmap {
 
 using hash_t     = uint64_t;
 using pos_t      = int32_t;
+using segm_t     = int8_t;
 
 class Timer {
 public:
@@ -139,6 +141,24 @@ public:
 		return 100.0 * frac(name, total);
 	}
 };
+
+void printMemoryUsage() {
+    std::ifstream statusFile("/proc/self/status");
+    std::string line;
+
+    if (statusFile.is_open()) {
+        while (getline(statusFile, line)) {
+            // Check for memory usage lines
+            if (line.find("VmSize:") != std::string::npos || line.find("VmRSS:") != std::string::npos) {
+                std::cerr << line << std::endl;
+            }
+        }
+        statusFile.close();
+    } else {
+        std::cerr << "Unable to open /proc/self/status" << std::endl;
+    }
+}
+
 
 } // namespace sweepmap
 

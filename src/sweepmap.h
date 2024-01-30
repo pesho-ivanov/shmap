@@ -39,7 +39,7 @@ struct Mapping {
 	pos_t seeds;     // number of seeds (subset of the sketch kmers)
 	pos_t T_l;      // the position of the leftmost nucleotide of the mapping
 	pos_t T_r;      // the position of the rightmost nucleotide of the mapping
-	int segm_id;
+	segm_t segm_id;
 	pos_t s_sz;      // the position of the rightmost nucleotide of the mapping
 	int xmin;     // the number of kmers in the intersection between the pattern and its mapping in `t'
 	double J, J2;     // Jaccard similarity in [0;1] for the best and for the second best mapping
@@ -50,7 +50,7 @@ struct Mapping {
 	int P_start;
 
     Mapping() {}
-	Mapping(int k, pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, int segm_id, pos_t s_sz, int xmin, int same_strand_seeds, int P_start)
+	Mapping(int k, pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, segm_t segm_id, pos_t s_sz, int xmin, int same_strand_seeds, int P_start)
 		: k(k), P_sz(P_sz), seeds(seeds), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), xmin(xmin), J(double(xmin) / std::max(seeds, s_sz)), mapq(255), strand(same_strand_seeds > 0 ? '+' : '-'), unreasonable(false), P_start(P_start) {}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
@@ -394,6 +394,7 @@ class SweepMap {
 //		cerr << "Virtual memory [MB]:  "             << setw(5) << right << C->count("total_memory_MB")  << endl;
 //		cerr << " | Index:                 "         << setw(5) << right << C->count("index_memory_MB") << " (" << setw(4) << right << C->perc("index_memory_MB", "total_memory_MB") << "\%)" << endl;
 //		cerr << " \\---" 							 << endl;
+		printMemoryUsage();
 	}
 };
 
