@@ -17,13 +17,11 @@ struct Kmer {
 	Kmer(pos_t r, hash_t h, bool strand) : r(r), h(h), strand(strand) {}
 };
 
-struct Hit {
+struct Hit {  // TODO: compress all in 32bit
 	pos_t r;
 	bool strand;
-	pos_t pos;
-	int segm_id;
-	Hit(const Kmer &kmer, pos_t pos, int segm_id)
-		: r(kmer.r), strand(kmer.strand), pos(pos), segm_id(segm_id) {}
+	//pos_t pos;
+		 //pos(pos),
 };
 
 using Sketch = std::vector<Kmer>;  // (kmer hash, kmer's left 0-based position)
@@ -67,7 +65,7 @@ const Sketch buildFMHSketch(const std::string& s, int k, double hFrac) {
 	}
 
 	while(true) {
-		// HACK! the least significant bit is quite random and does not correlate with (h < hThres)
+		// HACK! the lowest differing bit is not expected to correlate much with (h < hThres)
 		// TODO: tie break
 		const auto first_diff_bit = 1 << std::countr_zero(h_fw ^ h_rc);
 		const bool strand         = h_fw & first_diff_bit;

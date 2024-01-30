@@ -54,7 +54,7 @@ public:
 		cerr << "The most frequent kmer occurs " << max_occ << " times." << endl;
 	}
 
-	void apply_blacklist(int blacklist_threshold) {
+	void apply_blacklist() {
 		for (auto hits: h2pos)
 			if (hits.second.size() > (size_t)blacklist_threshold) {
 				h2pos.erase(hits.first);  // TODO: use the iterator instead
@@ -97,7 +97,7 @@ public:
 		timer->stop("index_reading");
 		timer->stop("indexing");
 
-		apply_blacklist(params.max_matches);
+		apply_blacklist();
 		print_kmer_hist();
 
 		C->inc("T_sz", total_size);
