@@ -56,7 +56,7 @@ public:
 
 	void apply_blacklist() {
 		for (auto hits: h2pos)
-			if (hits.second.size() > (size_t)blacklist_threshold) {
+			if (hits.second.size() > (size_t)params.max_matches) {
 				h2pos.erase(hits.first);  // TODO: use the iterator instead
 			}
 	}
@@ -99,7 +99,7 @@ public:
 
 		apply_blacklist();
 		print_kmer_hist();
-
+		
 		C->inc("T_sz", total_size);
 		//C->inc("index_memory_MB", get_current_memory_MB());
 	}
