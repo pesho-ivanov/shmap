@@ -17,13 +17,6 @@ struct Kmer {
 	Kmer(pos_t r, hash_t h, bool strand) : r(r), h(h), strand(strand) {}
 };
 
-struct Hit {  // TODO: compress all in 32bit
-	pos_t r;
-	bool strand;
-	//pos_t pos;
-		 //pos(pos),
-};
-
 using Sketch = std::vector<Kmer>;  // (kmer hash, kmer's left 0-based position)
 
 static hash_t LUT_fw[256], LUT_rc[256];

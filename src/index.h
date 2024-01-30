@@ -19,6 +19,15 @@ struct RefSegment {
 	RefSegment(const std::string &name, const int sz) : name(name), sz(sz) {}
 };
 
+struct Hit {  // TODO: compress all in 32bit
+	pos_t r;
+	bool strand;
+	segm_t segm_id;
+	Hit(const Kmer &kmer, pos_t pos, segm_t segm_id)
+		: r(kmer.r), strand(kmer.strand),
+		 segm_id(segm_id) {}
+};
+
 class SketchIndex {
 
 public:
