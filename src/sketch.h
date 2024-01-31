@@ -36,6 +36,26 @@ void initialize_LUT() {
 	LUT_rc['t'] = LUT_rc['T'] = LUT_fw['A'];
 }
 
+Sketch addPairKmers(const Sketch &sk, double hFrac) {
+  hash_t hThres = hash_t(hFrac * double(std::numeric_limits<hash_t>::max()));
+  Sketch sk2;
+  sk2.reserve(2*sk.size());
+  for (int i=0; i<(int)sk.size(); ++i) {
+    sk2.push_back(sk[i]);
+    for (int j=i+1; j<std::min(i+20, (int)sk.size()); ++j) {
+      if (sk[i].strand == sk[j].strand) {
+        //if (sk[j].r - sk[i].r > 0 && sk[j].r - sk[i].r < 5000) {
+          if ((sk[i].h^sk[j].h) < hash_t(0.15*hThres)) {
+            sk2.push_back(Kmer(sk[i].r, sk[i].h^sk[j].h, sk[i].strand));
+			//break;
+		  }
+        //}
+      }
+    }
+  }
+  return sk2;
+}
+
 //string s = "ACGTTAG";
 //Sketch sk1 = buildFMHSketch(s, 5, 1.0, blmers);
 //Sketch sk2 = buildFMHSketch(revComp(s), 5, 1.0, blmers);
@@ -78,6 +98,7 @@ const Sketch buildFMHSketch(const std::string& s, int k, double hFrac) {
 		++r;
 	}
 
+	//return addPairKmers(sk, hFrac);
 	return sk;
 }
 
