@@ -303,6 +303,11 @@ class SweepMap {
 		}
 
 	void map(const string &pFile) {
+		C->inc("spurious_matches", 0);
+		C->inc("J", 0);
+		C->inc("mappings", 0);
+		C->inc("sketched_kmers", 0);
+
 		T->start("mapping");
 		T->start("query_reading");
 		read_fasta_klib(pFile, [this](kseq_t *seq) {
