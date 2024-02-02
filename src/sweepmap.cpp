@@ -1,5 +1,6 @@
 #include "index.h"
 #include "sweepmap.h"
+
 using namespace sweepmap;
 
 void print_time_stats(Timers *T, Counters *C) {
@@ -30,8 +31,6 @@ void print_time_stats(Timers *T, Counters *C) {
 }
 
 int main(int argc, char **argv) {
-	initialize_LUT();
-	
 	Counters C;
 	Timers T;
 

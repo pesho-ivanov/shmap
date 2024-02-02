@@ -112,8 +112,8 @@ public:
 
 	void populate_h2pos(const Sketch& sketch, int segm_id) {
 		// skip creating the sketch structure
-		for (size_t tpos = 0; tpos < sketch.size(); ++tpos) {
-			const Kmer& kmer = sketch[tpos];
+		for (size_t tpos = 0; tpos < sketch.kmers.size(); ++tpos) {
+			const Kmer& kmer = sketch.kmers[tpos];
 			const auto hit = Hit(kmer, tpos, segm_id);
 			if (!h2single.contains(kmer.h))
 				h2single[kmer.h] = hit; 
@@ -139,7 +139,7 @@ public:
 		read_fasta_klib(params.tFile, [this](kseq_t *seq) {
 			timer->stop("index_reading");
 			timer->start("index_sketching");
-			Sketch t = buildFMHSketch(seq->seq.s, params.k, params.hFrac);
+			Sketch t(seq->seq.s, params, timer, C);
 			timer->stop("index_sketching");
 
 			timer->start("index_initializing");

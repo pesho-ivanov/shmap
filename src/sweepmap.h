@@ -74,10 +74,10 @@ class SweepMap {
 	vector<Seed> select_seeds(const Sketch& p, hist_t *hist) {
 		T->start("collect_seed_info");
 		vector<Seed> kmers;
-		kmers.reserve(p.size());
+		kmers.reserve(p.kmers.size());
 
 		// TODO: limit the number of kmers in the pattern p
-		for (const auto &kmer: p) {
+		for (const auto &kmer: p.kmers) {
 			auto count = tidx.count(kmer.h);
 			if (count > 0)
 				kmers.push_back(Seed(kmer, count));
@@ -293,7 +293,7 @@ class SweepMap {
 			T->stop("query_reading");
 			T->start("query_mapping");
 			T->start("sketching");
-			Sketch p = buildFMHSketch(seq->seq.s, params.k, params.hFrac);
+			Sketch p(seq->seq.s, params, T, C);
 			T->stop("sketching");
 
 			string query_id = seq->name.s;
@@ -309,7 +309,7 @@ class SweepMap {
 			T->stop("seeding");
 
 			T->start("matching");
-			vector<Match> matches = match_seeds(p.size(), seeds);
+			vector<Match> matches = match_seeds(p.kmers.size(), seeds);
 			T->stop("matching");
 
 			T->start("sweep");
