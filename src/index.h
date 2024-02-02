@@ -13,19 +13,41 @@
 
 namespace sweepmap {
 
-struct RefSegment {
-	std::string name;
-	int sz;
-	RefSegment(const std::string &name, const int sz) : name(name), sz(sz) {}
-};
-
 struct Hit {  // TODO: compress all in 32bit
 	pos_t r;
 	bool strand;
 	segm_t segm_id;
+	Hit() {}
 	Hit(const Kmer &kmer, pos_t pos, segm_t segm_id)
 		: r(kmer.r), strand(kmer.strand),
 		 segm_id(segm_id) {}
+};
+
+struct Seed {
+	Kmer kmer;
+	int hits_in_T;
+	Seed(const Kmer &kmer, const int hits_in_T) :
+		kmer(kmer), hits_in_T(hits_in_T) {}	
+	//Seed(const Kmer &kmer, const Hit hit) :
+	//	kmer(kmer), hits_in_T(1, hit) {}
+	//Seed(const Kmer &kmer, const std::vector<Hit> &hits_in_T) :
+	//	kmer(kmer), hits_in_T(hits_in_T) {}
+};
+
+struct Match {
+	int seed_num;
+	Hit hit;
+	Match(int seed_num, Hit hit) : seed_num(seed_num), hit(hit) {}
+	inline bool is_same_strand(const std::vector<Seed> &seeds) const {
+		// TODO: possible issue here! the there may be different kmers under the same seed_num
+		return seeds[seed_num].kmer.strand == hit.strand;
+	}
+};
+
+struct RefSegment {
+	std::string name;
+	int sz;
+	RefSegment(const std::string &name, const int sz) : name(name), sz(sz) {}
 };
 
 class SketchIndex {
@@ -33,16 +55,17 @@ class SketchIndex {
 public:
 	std::vector<RefSegment> T;
 	const params_t &params;
-	ankerl::unordered_dense::map<hash_t, std::vector<Hit>> h2pos;
+	ankerl::unordered_dense::map<hash_t, Hit> h2single;
+	ankerl::unordered_dense::map<hash_t, std::vector<Hit>> h2multi;
 	Timers *timer;
 	Counters *C;
 
 	void get_kmer_stats() {
 		std::vector<int> hist(10, 0);
 		int max_occ = 0;
-        C->inc("indexed_hits", 0);
-        C->inc("indexed_kmers", 0);
-		for (const auto& h2p : h2pos) {
+        C->inc("indexed_hits", h2single.size());
+        C->inc("indexed_kmers", h2single.size());
+		for (const auto& h2p : h2multi) {
 			int occ = h2p.second.size();
 			C->inc("indexed_hits", occ);
 			C->inc("indexed_kmers");
@@ -56,23 +79,46 @@ public:
 		C->inc("indexed_highest_freq_kmer", max_occ);
 	}
 
+	int count(hash_t h) const {
+		if (h2single.contains(h)) return 1;
+		else if (h2multi.contains(h)) return h2multi.at(h).size();
+		else return 0;
+	}
+
+	void add_matches(std::vector<Match> *matches, const Seed &s, int num) const {
+		if (s.hits_in_T == 1) {
+			assert(h2single.contains(s.kmer.h));
+			matches->push_back(Match(num, h2single.at(s.kmer.h)));
+		} else {
+			assert(s.hits_in_T > 1);
+			assert(h2multi.contains(s.kmer.h));
+			for (const auto &hit: h2multi.at(s.kmer.h))
+				matches->push_back(Match(num, hit));
+		}	
+	}
+
 	void apply_blacklist() {
-        C->inc("blacklisted_kmers", 0);
-        C->inc("blacklisted_hits", 0);
-		for (auto hits: h2pos)
-			if (hits.second.size() > (size_t)params.max_matches) {
+		std::vector<hash_t> blacklisted_h;
+		for (auto &[h, hits]: h2multi)
+			if (hits.size() > (size_t)params.max_matches) {
+				blacklisted_h.push_back(h);
 				C->inc("blacklisted_kmers");
-				C->inc("blacklisted_hits", hits.second.size());
-				h2pos.erase(hits.first);  // TODO: use the iterator instead
+				C->inc("blacklisted_hits", hits.size());
 			}
+
+		for (auto h: blacklisted_h)
+			h2multi.erase(h);
 	}
 
 	void populate_h2pos(const Sketch& sketch, int segm_id) {
-		//h2pos.reserve(sketch.size());
+		// skip creating the sketch structure
 		for (size_t tpos = 0; tpos < sketch.size(); ++tpos) {
 			const Kmer& kmer = sketch[tpos];
-            if (h2pos[kmer.h].size() < (size_t)params.max_matches + 1)
-                h2pos[kmer.h].push_back(Hit(kmer, tpos, segm_id));
+			const auto hit = Hit(kmer, tpos, segm_id);
+			if (!h2single.contains(kmer.h))
+				h2single[kmer.h] = hit; 
+            else if (h2multi[kmer.h].size() < (size_t)params.max_matches + 1)
+                h2multi[kmer.h].push_back(hit);
 		}
 	}
 
@@ -102,10 +148,18 @@ public:
 
 			timer->start("index_reading");
 		});
+		for (auto &[h, hits] : h2multi) {
+			if (h2single.contains(h)) {
+				hits.push_back(h2single.at(h));
+				h2single.erase(h);
+			}
+		}
 		timer->stop("index_reading");
 		timer->stop("indexing");
 
 		get_kmer_stats();
+        C->inc("blacklisted_kmers", 0);
+        C->inc("blacklisted_hits", 0);
 		apply_blacklist();
 		print_stats();
 	}

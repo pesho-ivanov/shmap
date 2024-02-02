@@ -16,23 +16,6 @@ using std::setw;
 using std::right;
 using std::vector;
 
-struct Seed {
-	Kmer kmer;
-	const vector<Hit> *hits_in_T;
-	Seed(const Kmer &kmer, const vector<Hit> *hits_in_T) :
-		kmer(kmer), hits_in_T(hits_in_T) {}
-};
-
-struct Match {
-	int seed_num;
-	Hit hit;
-	Match(int seed_num, Hit hit) : seed_num(seed_num), hit(hit) {}
-	inline bool is_same_strand(const vector<Seed> &seeds) const {
-		// TODO: possible issue here! the there may be different kmers under the same seed_num
-		return seeds[seed_num].kmer.strand == hit.strand;
-	}
-};
-
 struct Mapping {
 	int k; 	   // kmer size
 	pos_t P_sz;     // pattern size |P| bp 
@@ -95,9 +78,9 @@ class SweepMap {
 
 		// TODO: limit the number of kmers in the pattern p
 		for (const auto &kmer: p) {
-			auto t_it = tidx.h2pos.find(kmer.h);
-			if (t_it != tidx.h2pos.end())
-				kmers.push_back(Seed(kmer, &t_it->second));
+			auto count = tidx.count(kmer.h);
+			if (count > 0)
+				kmers.push_back(Seed(kmer, count));
 		}
 		T->stop("collect_seed_info");
         C->inc("collected_seeds", kmers.size());
@@ -109,7 +92,7 @@ class SweepMap {
 			C->inc("seeds_limit_reached");
 		}
         std::nth_element(kmers.begin(), kmers.begin() + total_seeds, kmers.end(), [](const Seed &a, const Seed &b) {
-            return a.hits_in_T->size() < b.hits_in_T->size();
+            return a.hits_in_T < b.hits_in_T;
         });
 		T->stop("thin_sketch");
 
@@ -142,12 +125,8 @@ class SweepMap {
 		T->start("collect_matches");
 		vector<Match> matches;
 		matches.reserve(2*(int)seeds.size());
-
 		for (int i=0; i<(int)seeds.size(); i++)
-			for (auto &hit: *(seeds[i].hits_in_T)) {
-				assert(hit.segm_id >= 0 && (size_t)hit.segm_id < tidx.T.size());
-				matches.push_back(Match(i, hit));
-			}
+			tidx.add_matches(&matches, seeds[i], i);
 		T->stop("collect_matches");
 
 		T->start("sort_matches");
