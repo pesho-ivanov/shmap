@@ -33,10 +33,15 @@ void print_time_stats(Timers *T, Counters *C) {
 int main(int argc, char **argv) {
 	Counters C;
 	Timers T;
+	params_t params;
+
+	Sketch::initialize_LUT();
+	Sketch::params = &params;
+	Sketch::T = &T;
+	Sketch::C = &C;
 
 	T.start("total");
 
-	params_t params;
 	if(!prsArgs(argc, argv, &params)) {
 		dsHlp();
 		return 1;
@@ -59,6 +64,7 @@ int main(int argc, char **argv) {
 	sweepmap.map(params.pFile);
 
 	T.stop("total");
+	Sketch::print_stats();
 	print_time_stats(&T, &C);
 
 	return 0;

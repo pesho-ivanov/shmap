@@ -1,5 +1,4 @@
-#ifndef SWEEPMAP_IO_HPP
-#define SWEEPMAP_IO_HPP
+#pragma once
 
 #include <fstream>
 #include <functional>
@@ -21,7 +20,7 @@ using std::pair;
 using std::ifstream;
 using std::endl;
 
-#define T_HOM_OPTIONS "p:s:k:r:S:M:t:z:onxh"
+#define T_HOM_OPTIONS "p:s:k:r:S:M:t:z:onPxh"
 
 struct params_t {
 	// required
@@ -38,11 +37,12 @@ struct params_t {
 	// no arguments
 	bool overlaps;			// Permit overlapping mappings 
 	bool normalize; 		// Flag to save that scores are to be normalized
+	bool paired_kmers; 		// 
 	bool onlybest;			// Output up to one (best) mapping (if above the threshold)
 
 	params_t() :
 		k(15), hFrac(0.05), max_seeds(10000), max_matches(1000000), tThres(0.9),
-		overlaps(false), normalize(false), onlybest(false) {}
+		overlaps(false), normalize(false), paired_kmers(false), onlybest(false) {}
 
 	void print(std::ostream& out, bool human) {
 		std::vector<pair<string, string>> m;
@@ -56,6 +56,7 @@ struct params_t {
 		m.push_back({"paramsFile", paramsFile});
 		m.push_back({"overlaps", std::to_string(overlaps)});
 		m.push_back({"normalize", std::to_string(normalize)});
+		m.push_back({"paired_kmers", std::to_string(paired_kmers)});
 		m.push_back({"onlybest", std::to_string(onlybest)});
 
 		if (human) {
@@ -80,6 +81,7 @@ struct params_t {
 		out << " | max_seeds (S):         " << max_seeds << endl;
 		out << " | max_matches (M):       " << max_matches << endl;
 		out << " | onlybest:              " << onlybest << endl;
+		out << " | paired_kmers:          " << paired_kmers << endl;
 		out << " | tThres:                " << tThres << endl;
 		out << " \\---" 					 << endl;
 	}
@@ -107,6 +109,7 @@ inline void dsHlp() {
 	cerr << endl;
 	cerr << "Optional parameters without an argument:" << endl;
 	cerr << "   -n   --normalize  Normalize scores by length" << endl;
+	cerr << "   -P   --pair       Paired kmers" << endl;
 	cerr << "   -x   --onlybest   Output the best alignment if above threshold (otherwise none)" << endl;
 	cerr << "   -h   --help       Display this help message" << endl;
 }
@@ -124,6 +127,7 @@ bool prsArgs(int& nArgs, char** argList, params_t *params) {
         {"params",             required_argument,  0, 'z'},
         {"overlaps",           no_argument,        0, 'o'},
         {"normalize",          no_argument,        0, 'n'},
+        {"paired_kmers",       no_argument,        0, 'P'},
         {"onlybest",           no_argument,        0, 'x'},
         {"help",               no_argument,        0, 'h'},
         {0,                    0,                  0,  0 }
@@ -177,6 +181,9 @@ bool prsArgs(int& nArgs, char** argList, params_t *params) {
 				break;
 			case 'n':
 				params->normalize = true;
+				break;
+			case 'P':
+				params->paired_kmers = true;
 				break;
 			case 'x':
 				params->onlybest = true;
@@ -236,5 +243,3 @@ void read_fasta_klib(const std::string& filename, std::function<void(kseq_t*)> c
 }
 
 } // namespace sweepmap
-
-#endif

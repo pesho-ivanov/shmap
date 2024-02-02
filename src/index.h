@@ -1,5 +1,4 @@
-#ifndef SWEEPMAP_INDEX_HPP
-#define SWEEPMAP_INDEX_HPP
+#pragma once
 
 #include <iostream>
 #include <string>
@@ -139,7 +138,7 @@ public:
 		read_fasta_klib(params.tFile, [this](kseq_t *seq) {
 			timer->stop("index_reading");
 			timer->start("index_sketching");
-			Sketch t(seq->seq.s, params, timer, C);
+			Sketch t(seq->seq.s);
 			timer->stop("index_sketching");
 
 			timer->start("index_initializing");
@@ -189,5 +188,3 @@ public:
 };
 
 } // namespace sweepmap
-
-#endif

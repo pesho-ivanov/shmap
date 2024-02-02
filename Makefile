@@ -28,8 +28,8 @@ T ?= 0.0
 
 K_SLOW ?= 22
 R_SLOW ?= 0.1
-S_SLOW ?= 1000
-M_SLOW ?= 30000
+S_SLOW ?= 300
+M_SLOW ?= 100
 T_SLOW ?= 0.0
 
 DIR = evals
@@ -126,8 +126,8 @@ eval_sweepmap: sweepmap gen_reads
 
 eval_sweepmap_slow: sweepmap gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_SLOW_PREF))
-	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) >/dev/null 2>&1
-	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) 2> >(tee $(SWEEPMAP_SLOW_PREF).log) >$(SWEEPMAP_SLOW_PREF).paf 
+	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) -P >/dev/null 2>&1
+	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) -P 2> >(tee $(SWEEPMAP_SLOW_PREF).log) >$(SWEEPMAP_SLOW_PREF).paf 
 	-paftools.js mapeval $(SWEEPMAP_SLOW_PREF).paf | tee $(SWEEPMAP_SLOW_PREF).eval
 	@-paftools.js mapeval -Q 0 $(SWEEPMAP_SLOW_PREF).paf >$(SWEEPMAP_SLOW_PREF).wrong
 
@@ -172,6 +172,12 @@ eval_sweepmap_on_datasets:
 	make eval_sweepmap REFNAME=chm13   DEPTH=0.1
 	make eval_sweepmap REFNAME=t2tChrY DEPTH=1 	MEANLEN=24000
 	make eval_sweepmap REFNAME=chm13   READS_PREFIX=HG002_24kb
+
+eval_sweepmap_slow_on_datasets:
+	make eval_sweepmap_slow REFNAME=t2tChrY DEPTH=10
+	make eval_sweepmap_slow REFNAME=chm13   DEPTH=0.1
+	make eval_sweepmap_slow REFNAME=t2tChrY DEPTH=1 	MEANLEN=24000
+	make eval_sweepmap_slow REFNAME=chm13   READS_PREFIX=HG002_24kb
 
 clean:
 	rm -r $(SWEEPMAP_BIN)

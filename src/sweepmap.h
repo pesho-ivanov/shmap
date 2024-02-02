@@ -1,5 +1,4 @@
-#ifndef SWEEPMAP_SWEEPMAP_HPP
-#define SWEEPMAP_SWEEPMAP_HPP
+#pragma once
 
 #include <algorithm>
 #include <cassert>
@@ -293,7 +292,7 @@ class SweepMap {
 			T->stop("query_reading");
 			T->start("query_mapping");
 			T->start("sketching");
-			Sketch p(seq->seq.s, params, T, C);
+			Sketch p(seq->seq.s);
 			T->stop("sketching");
 
 			string query_id = seq->name.s;
@@ -362,5 +361,3 @@ class SweepMap {
 };
 
 }  // namespace sweepmap
-
-#endif

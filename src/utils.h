@@ -1,5 +1,4 @@
-#ifndef SWEEPMAP_TILS_HPP
-#define SWEEPMAP_TILS_HPP
+#pragma once
 
 #include <cassert>
 #include <chrono>
@@ -159,7 +158,4 @@ void printMemoryUsage() {
     }
 }
 
-
 } // namespace sweepmap
-
-#endif

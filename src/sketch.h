@@ -1,5 +1,4 @@
-#ifndef SWEEPMAP_SKETCH_HPP
-#define SWEEPMAP_SKETCH_HPP
+#pragma once
 
 #include <climits>
 #include <iostream>
@@ -19,14 +18,13 @@ struct Kmer {
 };
 
 class Sketch {
-	static hash_t LUT_fw[256], LUT_rc[256];
-	static bool initialized;
-
+public:
 	using sketch_t = std::vector<Kmer>;
 
-	const params_t &params;
-	Timers *timer;
-	Counters *counters;
+	inline static hash_t LUT_fw[256], LUT_rc[256];
+	inline static params_t *params;
+	inline static Timers *T;
+	inline static Counters *C;
 
 	static void initialize_LUT() {
 		// https://gist.github.com/Daniel-Liu-c0deb0t/7078ebca04569068f15507aa856be6e8
@@ -43,24 +41,26 @@ class Sketch {
 		LUT_rc['t'] = LUT_rc['T'] = LUT_fw['A'];
 	}
 
+private:
 	sketch_t addPairKmers(const sketch_t &kmers, double hFrac) {
 		hash_t hThres = hash_t(hFrac * double(std::numeric_limits<hash_t>::max()));
-		sketch_t sk2;
-		sk2.reserve(2*kmers.size());
+		sketch_t kmers2;
+		kmers2.reserve(2*kmers.size());
 		for (int i=0; i<(int)kmers.size(); ++i) {
-			sk2.push_back(kmers[i]);
+			kmers2.push_back(kmers[i]);
 			for (int j=i+1; j<std::min(i+20, (int)kmers.size()); ++j) {
 				if (kmers[i].strand == kmers[j].strand) {
 					//if (sk[j].r - sk[i].r > 0 && sk[j].r - sk[i].r < 5000) {
 					if ((kmers[i].h^kmers[j].h) < hash_t(0.15*hThres)) {
-						sk2.push_back(Kmer(kmers[i].r, kmers[i].h^kmers[j].h, kmers[i].strand));
+						kmers2.push_back(Kmer(kmers[i].r, kmers[i].h^kmers[j].h, kmers[i].strand));
 						//break;
 					}
 					//}
 				}
 			}
 		}
-		return sk2;
+		C->inc("paired_kmers", kmers2.size() - kmers.size());
+		return kmers2;
 	}
 
 	//string s = "ACGTTAG";
@@ -105,27 +105,31 @@ class Sketch {
 			++r;
 		}
 
-		//return addPairKmers(sk, hFrac);
 		return kmers;
 	}
 
 public:
 	sketch_t kmers;   // (kmer hash, kmer's left 0-based position)
 
-	Sketch(const std::string& s, const params_t &params, Timers *timer, Counters *counters)
-		: params(params), timer(timer), counters(counters) {
-		if (!initialized) {
-			initialize_LUT();
-			initialized = true;
-		}
+	Sketch(const std::string& s) {
+		kmers = buildFMHSketch(s, params->k, params->hFrac);
+		C->inc("sketched_seqs");
+		C->inc("sketched_len", s.size());
+		C->inc("original_kmers", kmers.size());
+		C->inc("paired_kmers", 0);
+		if (params->paired_kmers)
+			kmers = addPairKmers(kmers, params->hFrac);
+		C->inc("sketched_kmers", kmers.size());
+	}
 
-		kmers = buildFMHSketch(s, params.k, params.hFrac);
-		//kmers = addPairKmers(kmers, params.hFrac);
+	static void print_stats() {
+		cerr << std::fixed << std::setprecision(1);
+		cerr << "Sketching:" << endl;
+		cerr << " | Sketched sequences:    " << C->count("sketched_seqs") << " (" << C->count("sketched_len") << " nb)" << endl;
+		cerr << " | Kmers:                 " << C->count("sketched_kmers") << endl;
+		cerr << " |  | original:               " << C->count("original_kmers") << " (" << C->perc("original_kmers", "sketched_kmers") << "%)" << endl;
+		cerr << " |  | paired:                 " << C->count("paired_kmers") << " (" << C->perc("paired_kmers", "sketched_kmers") << "%)" << endl;
 	}
 };
-hash_t Sketch::LUT_fw[256], Sketch::LUT_rc[256];
-bool Sketch::initialized;
 
 } // namespace sweepmap
-
-#endif
