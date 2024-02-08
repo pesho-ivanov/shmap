@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <set>
 
+#include "../ext/pdqsort.h"
 #include "io.h"
 #include "sketch.h"
 
@@ -96,7 +97,7 @@ class SweepMap {
 		T->stop("thin_sketch");
 
 		T->start("sort_seeds");
-        std::sort(kmers.begin(), kmers.begin() + total_seeds, [](const Seed &a, const Seed &b) {
+		pdqsort_branchless(kmers.begin(), kmers.begin() + total_seeds, [](const Seed &a, const Seed &b) {
 			return a.kmer.h < b.kmer.h;
 			//return a.kmer.r < b.kmer.r;
 		});
@@ -129,7 +130,8 @@ class SweepMap {
 		T->stop("collect_matches");
 
 		T->start("sort_matches");
-		sort(matches.begin(), matches.end(), [](const Match &a, const Match &b) {
+		//sort
+		pdqsort_branchless(matches.begin(), matches.end(), [](const Match &a, const Match &b) {
 			// Preparation for sweeping: sort M by ascending positions within one reference segment.
 			if (a.hit.segm_id != b.hit.segm_id)
 				return a.hit.segm_id < b.hit.segm_id;
@@ -356,7 +358,6 @@ class SweepMap {
 		cerr << " | Discarded seeds:       " << C->count("discarded_seeds") << " (" << C->perc("discarded_seeds", "collected_seeds") << "%)" << endl;
 		cerr << " | Unmapped reads:        " << C->count("unmapped_reads") << " (" << C->perc("unmapped_reads", "reads") << "%)" << endl;
 		cerr << " | Average Jaccard:       " << C->frac("J", "mappings") / 10000.0 << endl;
-		//cerr << " \\---" 					 << endl;
 	}
 };
 
