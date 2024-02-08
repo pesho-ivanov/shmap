@@ -119,14 +119,14 @@ eval_thinning: sweepmap gen_reads
 
 eval_sweepmap: sweepmap gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_PREF))
-	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>&1 >/dev/null
+	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).paf
 	-paftools.js mapeval $(SWEEPMAP_PREF).paf | tee $(SWEEPMAP_PREF).eval
 	@-paftools.js mapeval -Q 60 $(SWEEPMAP_PREF).paf >$(SWEEPMAP_PREF).wrong
 
 eval_sweepmap_slow: sweepmap gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_SLOW_PREF))
-	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) -P >/dev/null 2>&1
+	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) -P >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) -P 2> >(tee $(SWEEPMAP_SLOW_PREF).log) >$(SWEEPMAP_SLOW_PREF).paf 
 	-paftools.js mapeval $(SWEEPMAP_SLOW_PREF).paf | tee $(SWEEPMAP_SLOW_PREF).eval
 	@-paftools.js mapeval -Q 0 $(SWEEPMAP_SLOW_PREF).paf >$(SWEEPMAP_SLOW_PREF).wrong
@@ -137,19 +137,19 @@ eval_winnowmap: gen_reads
 		$(MERYL_BIN) count k=15 output merylDB $(REF); \
 		$(MERYL_BIN) print greater-than distinct=0.9998 merylDB > $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt; \
 	fi
-	$(TIME_CMD) -o $(WINNOWMAP_PREF).index.time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 $(REF) $(ONE_READ) >/dev/null 2>&1 
+	$(TIME_CMD) -o $(WINNOWMAP_PREF).index.time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 $(REF) $(ONE_READ) >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(WINNOWMAP_PREF).time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 $(REF) $(READS) 2> >(tee $(WINNOWMAP_PREF).log) >$(WINNOWMAP_PREF).paf 
 	-paftools.js mapeval $(WINNOWMAP_PREF).paf | tee $(WINNOWMAP_PREF).eval
 
 eval_minimap: gen_reads
 	@mkdir -p $(shell dirname $(MINIMAP_PREF))
-	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(ONE_READ) >/dev/null 2>&1
+	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(ONE_READ) >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(MINIMAP_PREF).time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).paf 
 	-paftools.js mapeval $(MINIMAP_PREF).paf | tee $(MINIMAP_PREF).eval
 
 eval_blend: gen_reads
 	@mkdir -p $(shell dirname $(BLEND_PREF))
-	$(TIME_CMD) -o $(BLEND_PREF).index.time $(BLEND_BIN) -x map-hifi -t 1 -N 0 $(REF) $(ONE_READ) >/dev/null 2>&1
+	$(TIME_CMD) -o $(BLEND_PREF).index.time $(BLEND_BIN) -x map-hifi -t 1 -N 0 $(REF) $(ONE_READ) >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(BLEND_PREF).time $(BLEND_BIN) -x map-hifi -t 1 -N 0 $(REF) $(READS) 2> >(tee $(BLEND_PREF).log) >$(BLEND_PREF).paf 
 	-paftools.js mapeval $(BLEND_PREF).paf | tee $(BLEND_PREF).eval
 
