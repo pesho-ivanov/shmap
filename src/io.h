@@ -83,7 +83,6 @@ struct params_t {
 		out << " | onlybest:              " << onlybest << endl;
 		out << " | paired_kmers:          " << paired_kmers << endl;
 		out << " | tThres:                " << tThres << endl;
-		out << " \\---" 					 << endl;
 	}
 
 };

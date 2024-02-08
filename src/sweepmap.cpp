@@ -23,10 +23,8 @@ void print_time_stats(Timers *T, Counters *C) {
 	cerr << " |  |  | sort matches:            " << setw(5) << right << T->secs("sort_matches")      << " (" << setw(4) << right << T->perc("sort_matches", "matching")       << "\%, " << setw(5) << right << T->range_ratio("sort_matches") << "x)" << endl;
 	cerr << " |  | sweep:                  "     << setw(5) << right << T->secs("sweep")             << " (" << setw(4) << right << T->perc("sweep", "mapping")               << "\%, " << setw(5) << right << T->range_ratio("sweep") << "x)" << endl;
 	cerr << " |  | post proc:              "     << setw(5) << right << T->secs("postproc")          << " (" << setw(4) << right << T->perc("postproc", "mapping")            << "\%, " << setw(5) << right << T->range_ratio("postproc") << "x)" << endl;
-	cerr << " \\---" 							 << endl;
 //		cerr << "Virtual memory [MB]:  "             << setw(5) << right << C->count("total_memory_MB")  << endl;
 //		cerr << " | Index:                 "         << setw(5) << right << C->count("index_memory_MB") << " (" << setw(4) << right << C->perc("index_memory_MB", "total_memory_MB") << "\%)" << endl;
-//		cerr << " \\---" 							 << endl;
 	printMemoryUsage();
 }
 
