@@ -15,6 +15,8 @@ MAPQUIK_BIN = mapquik
 MERYL_BIN = ~/libs/Winnowmap/bin/meryl
 WINNOWMAP_BIN = ~/libs/Winnowmap/bin/winnowmap
 
+INF = 999999
+
 REFNAME ?= t2tChrY
 ACCURACY ?= 0.99
 DEPTH ?= 1
@@ -26,11 +28,11 @@ S ?= 300
 M ?= 100
 T ?= 0.0
 
-K_SLOW ?= 22
-R_SLOW ?= 0.1
-S_SLOW ?= 300
-M_SLOW ?= 100
-T_SLOW ?= 0.0
+K_SLOW ?= $(K) #22
+R_SLOW ?= $(R) #0.1
+S_SLOW ?= $(INF) #300
+M_SLOW ?= $(INF) #100
+T_SLOW ?= $(T) #0.0
 
 DIR = evals
 REF_DIR = $(DIR)/refs
@@ -126,8 +128,8 @@ eval_sweepmap: sweepmap gen_reads
 
 eval_sweepmap_slow: sweepmap gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_SLOW_PREF))
-	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) -P >/dev/null 2>/dev/null
-	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) -P 2> >(tee $(SWEEPMAP_SLOW_PREF).log) >$(SWEEPMAP_SLOW_PREF).paf 
+	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) >/dev/null 2>/dev/null
+	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) 2> >(tee $(SWEEPMAP_SLOW_PREF).log) >$(SWEEPMAP_SLOW_PREF).paf 
 	-paftools.js mapeval $(SWEEPMAP_SLOW_PREF).paf | tee $(SWEEPMAP_SLOW_PREF).eval
 	@-paftools.js mapeval -Q 0 $(SWEEPMAP_SLOW_PREF).paf >$(SWEEPMAP_SLOW_PREF).wrong
 
