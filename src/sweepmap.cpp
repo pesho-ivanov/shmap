@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
 	params.print_display(std::cerr);
 
 	SketchIndex tidx(params, &T, &C);
-	tidx.index(params.tFile);
+	tidx.build_index(params.tFile);
 
 	if (!params.paramsFile.empty()) {
 		cerr << "Writing parameters to " << params.paramsFile << "..." << endl;

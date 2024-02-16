@@ -86,6 +86,7 @@ class SweepMap {
         C->inc("collected_seeds", kmers.size());
 
 		T->start("thin_sketch");
+		// TODO: add all seeds to hist
 		int total_seeds = (int)kmers.size();
 		if ((int)params.max_seeds < total_seeds) {
 			total_seeds = (int)params.max_seeds;
@@ -163,6 +164,7 @@ class SweepMap {
 				&& r->hit.r + params.k <= l->hit.r + P_len
 				; ++r, ++j) {
 				// If taking this kmer from T increases the intersection with P.
+				// TODO: iterate following seeds
 				if (--diff_hist[r->seed_num] >= 0)
 					++xmin;
 				assert (l->hit.r <= r->hit.r);

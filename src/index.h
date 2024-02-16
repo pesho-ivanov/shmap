@@ -127,7 +127,7 @@ public:
 	SketchIndex(const params_t &params, Timers *timer, Counters *C)
 		: params(params), timer(timer), C(C) {}
 
-	void index(const std::string &tFile) {
+	void build_index(const std::string &tFile) {
 		timer->start("indexing");
 		cerr << "Indexing " << params.tFile << "..." << endl;
 		timer->start("index_reading");
@@ -143,6 +143,8 @@ public:
 
 			timer->start("index_reading");
 		});
+
+		// if a kmer is present in both single and multi, we move it out of single to multi
 		for (auto &[h, hits] : h2multi) {
 			if (h2single.contains(h)) {
 				hits.push_back(h2single.at(h));
