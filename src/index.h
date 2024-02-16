@@ -12,14 +12,14 @@
 
 namespace sweepmap {
 
-struct Hit {  // TODO: compress all in 32bit
-	pos_t r;
+struct Hit {  // TODO: compress into a 32bit field
+	pos_t r;            // right end of the kmer [l, r), where l+k=r
+	pos_t pos;		    // position in the sketch
 	bool strand;
 	segm_t segm_id;
 	Hit() {}
 	Hit(const Kmer &kmer, pos_t pos, segm_t segm_id)
-		: r(kmer.r), strand(kmer.strand),
-		 segm_id(segm_id) {}
+		: r(kmer.r), pos(pos), strand(kmer.strand), segm_id(segm_id) {}
 };
 
 struct Seed {
@@ -96,11 +96,16 @@ public:
 
 	void apply_blacklist() {
 		std::vector<hash_t> blacklisted_h;
-		for (auto &[h, hits]: h2multi)
+		for (const auto &[h, hits]: h2multi)
 			if (hits.size() > (size_t)params.max_matches) {
 				blacklisted_h.push_back(h);
 				C->inc("blacklisted_kmers");
 				C->inc("blacklisted_hits", hits.size());
+
+				for (const auto &[r, pos, strand, segm_id]: hits) {
+					assert(!T[segm_id].kmers[pos].black);
+					T[segm_id].kmers[pos].black = true;
+				}
 			}
 
 		for (auto h: blacklisted_h)

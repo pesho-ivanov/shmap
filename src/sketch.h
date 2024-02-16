@@ -14,6 +14,7 @@ struct Kmer {
 	pos_t r;      // kmer resides [l, r), where l+k=r
 	hash_t h;
 	bool strand;  // false: forward, true: reverse
+	bool black;   // if true, the kmer is blacklisted
 	Kmer(pos_t r, hash_t h, bool strand) : r(r), h(h), strand(strand) {}
 };
 
