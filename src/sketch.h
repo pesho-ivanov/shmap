@@ -62,7 +62,39 @@ private:
 		C->inc("paired_kmers", kmers2.size() - kmers.size());
 		return kmers2;
 	}
-
+	
+//	const sketch_t buildMinimizerSketch(const std::string &s, int k, int w) {
+//		sketch_t kmers;
+//		int r, min_r;
+//		hash_t min_h, h, h_fw = 0, h_rc = 0;
+//		std::deque<Kmer> W;  // kmers in [r-w; r) in increasing order of r
+//		for (r=0; r<k; r++) {
+//			h_fw ^= std::rotl(LUT_fw[(int)s[r]], k-r-1);
+//			h_rc ^= std::rotl(LUT_rc[(int)s[r]], r);
+//		}
+//		while (true) {
+//			const auto first_diff_bit = 1 << std::countr_zero(h_fw ^ h_rc);
+//			const bool strand         = h_fw & first_diff_bit;
+//			h = strand ? h_rc : h_fw;
+//
+//			W.push_back(Kmer(r, h, strand));
+//
+//			if (min_r + w < r) {
+//				kmers.push_back(Kmer(r, h, strand));
+//				
+//				min_r = r;
+//			}
+//
+//			if (r >= (int)s.size()) break;
+//
+//			h_fw = std::rotl(h_fw, 1) ^ std::rotl(LUT_fw[(int)s[r-k]], k) ^ LUT_fw[(int)s[r]];
+//			h_rc = std::rotr(h_rc, 1) ^ std::rotr(LUT_rc[(int)s[r-k]], 1) ^ std::rotl(LUT_rc[(int)s[r]], k-1);
+//
+//			++r;
+//		}
+//		return kmers;
+//	}
+//
 	//string s = "ACGTTAG";
 	//Sketch sk1 = buildFMHSketch(s, 5, 1.0, blmers);
 	//Sketch sk2 = buildFMHSketch(revComp(s), 5, 1.0, blmers);

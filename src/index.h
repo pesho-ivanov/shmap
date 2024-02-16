@@ -27,10 +27,6 @@ struct Seed {
 	int hits_in_T;
 	Seed(const Kmer &kmer, const int hits_in_T) :
 		kmer(kmer), hits_in_T(hits_in_T) {}	
-	//Seed(const Kmer &kmer, const Hit hit) :
-	//	kmer(kmer), hits_in_T(1, hit) {}
-	//Seed(const Kmer &kmer, const std::vector<Hit> &hits_in_T) :
-	//	kmer(kmer), hits_in_T(hits_in_T) {}
 };
 
 struct Match {
@@ -110,7 +106,7 @@ public:
 	}
 
 	void populate_h2pos(const Sketch& sketch, int segm_id) {
-		// skip creating the sketch structure
+		// TODO: skip creating the sketch structure
 		for (size_t tpos = 0; tpos < sketch.kmers.size(); ++tpos) {
 			const Kmer& kmer = sketch.kmers[tpos];
 			const auto hit = Hit(kmer, tpos, segm_id);

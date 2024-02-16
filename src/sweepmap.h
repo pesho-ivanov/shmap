@@ -133,6 +133,7 @@ class SweepMap {
 		//sort
 		pdqsort_branchless(matches.begin(), matches.end(), [](const Match &a, const Match &b) {
 			// Preparation for sweeping: sort M by ascending positions within one reference segment.
+			// NO SPEEDUP: return (int64_t(a.hit.segm_id) << 32 | a.hit.r) < (int64_t(b.hit.segm_id) << 32 | b.hit.r);
 			if (a.hit.segm_id != b.hit.segm_id)
 				return a.hit.segm_id < b.hit.segm_id;
 			return a.hit.r < b.hit.r;
