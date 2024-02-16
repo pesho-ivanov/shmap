@@ -40,9 +40,11 @@ struct Match {
 };
 
 struct RefSegment {
+	Sketch::sketch_t kmers;
 	std::string name;
 	int sz;
-	RefSegment(const std::string &name, const int sz) : name(name), sz(sz) {}
+	RefSegment(const Sketch &sk, const std::string &name, const int sz)
+		: kmers(sk.kmers), name(name), sz(sz) {}
 };
 
 class SketchIndex {
@@ -50,8 +52,8 @@ class SketchIndex {
 public:
 	std::vector<RefSegment> T;
 	const params_t &params;
-	ankerl::unordered_dense::map<hash_t, Hit> h2single;
-	ankerl::unordered_dense::map<hash_t, std::vector<Hit>> h2multi;
+	ankerl::unordered_dense::map<hash_t, Hit> h2single;               // all sketched kmers with =1 hit
+	ankerl::unordered_dense::map<hash_t, std::vector<Hit>> h2multi;   // all sketched kmers with >1 hits
 	Timers *timer;
 	Counters *C;
 
@@ -118,7 +120,7 @@ public:
 	}
 
 	void add_segment(const Sketch& sketch, const std::string &name, int T_sz) {
-		T.push_back(RefSegment(name, T_sz));
+		T.push_back(RefSegment(sketch, name, T_sz));
 		C->inc("segments");
 		C->inc("total_nucls", T_sz);
 		populate_h2pos(sketch, T.size()-1);
