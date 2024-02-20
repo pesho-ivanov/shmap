@@ -12,30 +12,34 @@
 
 namespace sweepmap {
 
+class SketchIndex;
+
 struct Hit {  // TODO: compress into a 32bit field
 	pos_t r;            // right end of the kmer [l, r), where l+k=r
-	pos_t pos;		    // position in the sketch
+	pos_t tpos;		    // position in the reference sketch
 	bool strand;
 	segm_t segm_id;
 	Hit() {}
-	Hit(const Kmer &kmer, pos_t pos, segm_t segm_id)
-		: r(kmer.r), pos(pos), strand(kmer.strand), segm_id(segm_id) {}
+	Hit(const Kmer &kmer, pos_t tpos, segm_t segm_id)
+		: r(kmer.r), tpos(tpos), strand(kmer.strand), segm_id(segm_id) {}
 };
 
 struct Seed {
 	Kmer kmer;
+	int ppos;
 	int hits_in_T;
-	Seed(const Kmer &kmer, const int hits_in_T) :
-		kmer(kmer), hits_in_T(hits_in_T) {}	
+	Seed(const Kmer &kmer, pos_t ppos, int hits_in_T) :
+		kmer(kmer), ppos(ppos), hits_in_T(hits_in_T) {}	
 };
-
 struct Match {
-	int seed_num;
+	Seed seed;
 	Hit hit;
-	Match(int seed_num, Hit hit) : seed_num(seed_num), hit(hit) {}
-	inline bool is_same_strand(const std::vector<Seed> &seeds) const {
-		// TODO: possible issue here! the there may be different kmers under the same seed_num
-		return seeds[seed_num].kmer.strand == hit.strand;
+	int seed_num;
+	Match(const Seed &seed, const Hit &hit, int seed_num)
+		: seed(seed), hit(hit), seed_num(seed_num) {}
+	
+	inline bool is_same_strand() const {
+		return seed.kmer.strand == hit.strand;
 	}
 };
 
@@ -82,15 +86,16 @@ public:
 		else return 0;
 	}
 
-	void add_matches(std::vector<Match> *matches, const Seed &s, int num) const {
+	void add_matches(std::vector<Match> *matches, const Seed &s, int seed_num) const {
 		if (s.hits_in_T == 1) {
 			assert(h2single.contains(s.kmer.h));
-			matches->push_back(Match(num, h2single.at(s.kmer.h)));
+			matches->push_back(Match(s, h2single.at(s.kmer.h), seed_num));
+				
 		} else {
 			assert(s.hits_in_T > 1);
 			assert(h2multi.contains(s.kmer.h));
 			for (const auto &hit: h2multi.at(s.kmer.h))
-				matches->push_back(Match(num, hit));
+				matches->push_back(Match(s, hit, seed_num));
 		}	
 	}
 

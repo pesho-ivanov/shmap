@@ -7,6 +7,7 @@
 #include <set>
 
 #include "../ext/pdqsort.h"
+#include "index.h"
 #include "io.h"
 #include "sketch.h"
 
@@ -77,10 +78,10 @@ class SweepMap {
 		kmers.reserve(p.kmers.size());
 
 		// TODO: limit the number of kmers in the pattern p
-		for (const auto &kmer: p.kmers) {
-			auto count = tidx.count(kmer.h);
+		for (const auto &kmer : p.kmers) {
+			const auto count = tidx.count(kmer.h);
 			if (count > 0)
-				kmers.push_back(Seed(kmer, count));
+				kmers.push_back(Seed(kmer, kmers.size(), count));
 		}
 		T->stop("collect_seed_info");
         C->inc("collected_seeds", kmers.size());
@@ -100,7 +101,6 @@ class SweepMap {
 		T->start("sort_seeds");
 		pdqsort_branchless(kmers.begin(), kmers.begin() + total_seeds, [](const Seed &a, const Seed &b) {
 			return a.kmer.h < b.kmer.h;
-			//return a.kmer.r < b.kmer.r;
 		});
 		T->stop("sort_seeds");
 
@@ -126,8 +126,8 @@ class SweepMap {
 		T->start("collect_matches");
 		vector<Match> matches;
 		matches.reserve(2*(int)seeds.size());
-		for (int i=0; i<(int)seeds.size(); i++)
-			tidx.add_matches(&matches, seeds[i], i);
+		for (int seed_num=0; seed_num<(int)seeds.size(); seed_num++)
+			tidx.add_matches(&matches, seeds[seed_num], seed_num);
 		T->stop("collect_matches");
 
 		T->start("sort_matches");
@@ -146,7 +146,7 @@ class SweepMap {
 
 	// vector<hash_t> diff_hist;  // diff_hist[kmer_hash] = #occurences in `p` - #occurences in `s`
 	// vector<Match> M;   	   // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
-	const vector<Mapping> sweep(hist_t &diff_hist, const vector<Match> &M, const pos_t P_len, const vector<Seed> &seeds) {
+	const vector<Mapping> sweep(hist_t &diff_hist, const vector<Match> &M, const pos_t P_len, const int thin_seeds_cnt) {
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
 
 		int xmin = 0;
@@ -157,12 +157,12 @@ class SweepMap {
 		// Increase the left point end of the window [l,r) one by one. O(matches)
 		int i = 0, j = 0;
 		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l, ++i) {
-			same_strand_seeds += l->is_same_strand(seeds) ? +1 : -1;
 			// Increase the right end of the window [l,r) until it gets out.
 			for(;  r != M.end()
 				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
 				&& r->hit.r + params.k <= l->hit.r + P_len
 				; ++r, ++j) {
+				same_strand_seeds += r->is_same_strand() ? +1 : -1;  // change to r inside the loop
 				// If taking this kmer from T increases the intersection with P.
 				// TODO: iterate following seeds
 				if (--diff_hist[r->seed_num] >= 0)
@@ -170,7 +170,7 @@ class SweepMap {
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			auto m = Mapping(params.k, P_len, seeds.size(), l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), xmin, same_strand_seeds, seeds[l->seed_num].kmer.r);
+			auto m = Mapping(params.k, P_len, thin_seeds_cnt, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), xmin, same_strand_seeds, l->seed.kmer.r);
 
 			// second best without guarantees
 			// Wrong invariant:
@@ -193,7 +193,7 @@ class SweepMap {
 			// Prepare for the next step by moving `l` to the right.
 			if (++diff_hist[l->seed_num] > 0)
 				--xmin;
-			same_strand_seeds -= l->is_same_strand(seeds) ? +1 : -1;
+			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
 
 			assert(xmin >= 0);
 		}
@@ -317,7 +317,7 @@ class SweepMap {
 			T->stop("matching");
 
 			T->start("sweep");
-			vector<Mapping> mappings = sweep(p_hist, matches, P_sz, seeds);
+			vector<Mapping> mappings = sweep(p_hist, matches, P_sz, seeds.size());
 			T->stop("sweep");
 
 			T->start("postproc");
