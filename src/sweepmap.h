@@ -74,51 +74,52 @@ class SweepMap {
 
 	vector<Seed> select_seeds(const Sketch& p, hist_t *hist) {
 		T->start("collect_seed_info");
-		vector<Seed> kmers;
-		kmers.reserve(p.kmers.size());
+		vector<Seed> seeds;
+		seeds.reserve(p.kmers.size());
 
-		// TODO: limit the number of kmers in the pattern p
-		for (const auto &kmer : p.kmers) {
+		// TODO: limit The number of kmers in the pattern p
+		for (int ppos = 0; ppos < (int)p.kmers.size(); ++ppos) {
+			const auto &kmer = p.kmers[ppos];
 			const auto count = tidx.count(kmer.h);
 			if (count > 0)
-				kmers.push_back(Seed(kmer, kmers.size(), count));
+				seeds.push_back(Seed(kmer, ppos, count));
 		}
 		T->stop("collect_seed_info");
-        C->inc("collected_seeds", kmers.size());
+        C->inc("collected_seeds", seeds.size());
 
 		T->start("thin_sketch");
 		// TODO: add all seeds to hist
-		int total_seeds = (int)kmers.size();
+		int total_seeds = (int)seeds.size();
 		if ((int)params.max_seeds < total_seeds) {
 			total_seeds = (int)params.max_seeds;
 			C->inc("seeds_limit_reached");
 		}
-        std::nth_element(kmers.begin(), kmers.begin() + total_seeds, kmers.end(), [](const Seed &a, const Seed &b) {
+        std::nth_element(seeds.begin(), seeds.begin() + total_seeds, seeds.end(), [](const Seed &a, const Seed &b) {
             return a.hits_in_T < b.hits_in_T;
         });
 		T->stop("thin_sketch");
 
 		T->start("sort_seeds");
-		pdqsort_branchless(kmers.begin(), kmers.begin() + total_seeds, [](const Seed &a, const Seed &b) {
+		pdqsort_branchless(seeds.begin(), seeds.begin() + total_seeds, [](const Seed &a, const Seed &b) {
 			return a.kmer.h < b.kmer.h;
 		});
 		T->stop("sort_seeds");
 
 		T->start("unique_seeds");
-		vector<Seed> seeds;
-		seeds.reserve(total_seeds);
+		vector<Seed> thin_seeds;
+		thin_seeds.reserve(total_seeds);
 		hist->reserve(total_seeds);
 		for (int i=0; i<total_seeds; i++) {
-			if (i==0 || kmers[i-1].kmer.h != kmers[i].kmer.h) {
+			if (i==0 || seeds[i-1].kmer.h != seeds[i].kmer.h) {
 				hist->push_back(1);
-				seeds.push_back(kmers[i]);
+				thin_seeds.push_back(seeds[i]);
 			}
 			else ++(hist->back());
 		}
 
 		T->stop("unique_seeds");
-        C->inc("discarded_seeds", kmers.size() - seeds.size());
-		return seeds;
+        C->inc("discarded_seeds", seeds.size() - thin_seeds.size());
+		return thin_seeds;
 	}
 
 	// Initializes the histogram of the pattern and the list of matches
@@ -146,7 +147,8 @@ class SweepMap {
 
 	// vector<hash_t> diff_hist;  // diff_hist[kmer_hash] = #occurences in `p` - #occurences in `s`
 	// vector<Match> M;   	   // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
-	const vector<Mapping> sweep(hist_t &diff_hist, const vector<Match> &M, const pos_t P_len, const int thin_seeds_cnt) {
+	const vector<Mapping> sweep(hist_t &diff_hist, const Sketch &p, const vector<Match> &M, const pos_t P_len, const int thin_seeds_cnt) {
+//		const int MAX_BL = 100;
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
 
 		int xmin = 0;
@@ -158,7 +160,7 @@ class SweepMap {
 		int i = 0, j = 0;
 		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l, ++i) {
 			// Increase the right end of the window [l,r) until it gets out.
-			for(;  r != M.end()
+		for(;  r != M.end()
 				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
 				&& r->hit.r + params.k <= l->hit.r + P_len
 				; ++r, ++j) {
@@ -309,15 +311,15 @@ class SweepMap {
 			Timer read_mapping_time;
 			read_mapping_time.start();
 			T->start("seeding");
-			vector<Seed> seeds = select_seeds(p, &p_hist);
+			vector<Seed> thin_seeds = select_seeds(p, &p_hist);
 			T->stop("seeding");
 
 			T->start("matching");
-			vector<Match> matches = match_seeds(p.kmers.size(), seeds);
+			vector<Match> matches = match_seeds(p.kmers.size(), thin_seeds);
 			T->stop("matching");
 
 			T->start("sweep");
-			vector<Mapping> mappings = sweep(p_hist, matches, P_sz, seeds.size());
+			vector<Mapping> mappings = sweep(p_hist, p, matches, P_sz, thin_seeds.size());
 			T->stop("sweep");
 
 			T->start("postproc");
@@ -365,3 +367,9 @@ class SweepMap {
 };
 
 }  // namespace sweepmap
+
+//				auto nextr = r; ++nextr;
+//				hash_t nexth = (nextr != M.end() ? nextr->seed.kmer.h : -1);
+//				for (int tpos(r->hit.tpos+1), ppos(r->seed.ppos+1); ppos<(int)p.kmers.size() && p.kmers[ppos].h != nexth && p.kmers[ppos].r < r->seed.kmer.r + MAX_BL; ++ppos, ++tpos)
+//					if (tidx.T[r->hit.segm_id].kmers[tpos].h == p.kmers[ppos].h)
+//						++xmin;
