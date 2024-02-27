@@ -21,6 +21,7 @@ BLEND_BIN = ~/libs/blend/bin/blend
 MAPQUIK_BIN = mapquik
 MERYL_BIN = ~/libs/Winnowmap/bin/meryl
 WINNOWMAP_BIN = ~/libs/Winnowmap/bin/winnowmap
+SURVIVOR_BIN = ~/libs/SURVIVOR/Debug/SURVIVOR
 
 INF = 999999
 
@@ -28,6 +29,7 @@ REFNAME ?= t2tChrY
 ACCURACY ?= 0.99
 DEPTH ?= 1
 MEANLEN ?= 10000
+READSIM_REFNAME ?= $(REFNAME)
 
 K ?= 22
 R ?= 0.1
@@ -44,7 +46,8 @@ T_SLOW ?= $(T) #0.0
 DIR = evals
 REF_DIR = $(DIR)/refs
 REF = $(REF_DIR)/$(REFNAME).fa
-READS_PREFIX ?= $(REFNAME)-a$(ACCURACY)-d$(DEPTH)-l$(MEANLEN)
+READSIM_REF = $(REF_DIR)/$(READSIM_REFNAME).fa
+READS_PREFIX ?= $(REFNAME)-reads$(READSIM_REFNAME)-a$(ACCURACY)-d$(DEPTH)-l$(MEANLEN)
 ALLREADS_DIR = $(DIR)/reads
 READS = $(ALLREADS_DIR)/$(READS_PREFIX).fa
 #ifeq ($(wildcard $(READS)),)
@@ -76,12 +79,17 @@ all: sweepmap
 $(SWEEPMAP_BIN): $(SRCS)
 	$(CC) $(CXX_STANDARD) $(CFLAGS) $< -o $@ $(LIBS)
 
+simulate_SVs:
+	cd $(REF_DIR);\
+	$(SURVIVOR_BIN) simSV $(REFNAME).fa SURVIVOR.params 0 0 $(REFNAME)-SVs;\
+	mv $(REFNAME)-SVs.fasta $(REFNAME)-SVs.fa
+
 gen_reads:
 ifeq ($(wildcard $(READS)),)
 	echo $(READS)
 	mkdir -p $(ALLREADS_DIR)
 	pbsim \
-		   $(REF) \
+		   $(READSIM_REF) \
 		   --model_qc $(DIR)/model_qc_clr \
 		   --accuracy-mean $(ACCURACY)\
 		   --accuracy-sd 0\
@@ -89,8 +97,8 @@ ifeq ($(wildcard $(READS)),)
 		   --prefix $(READS_PREFIX)\
 		   --length-mean $(MEANLEN)
 
-	samtools faidx $(REF)
-	-paftools.js pbsim2fq $(REF).fai "$(READS_PREFIX)"_*.maf >$(READS)
+	samtools faidx $(READSIM_REF)
+	-paftools.js pbsim2fq $(READSIM_REF).fai "$(READS_PREFIX)"_*.maf >$(READS)
 	rm -f "$(READS_PREFIX)"_*.maf "$(READS_PREFIX)"_*.ref "$(READS_PREFIX)"_*.fastq
 # take only positive strand reads
 #	mv $(READS)_ $(READS)
@@ -168,7 +176,7 @@ eval_mapquik: gen_reads
 	$(TIME_CMD) -o $(MAPQUIK_PREF).time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(MAPQUIK_PREF) | tee $(MAPQUIK_PREF).log
 	-paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
-eval_tools: eval_sweepmap eval_sweepmap_slow eval_mapquik eval_blend eval_minimap eval_winnowmap
+eval_tools: eval_sweepmap eval_sweepmap_slow eval_mapquik eval_blend eval_minimap eval_winnowmap 
 
 eval_tools_on_datasets:
 	make eval_tools REFNAME=t2tChrY DEPTH=10
