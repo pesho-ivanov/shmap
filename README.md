@@ -10,4 +10,5 @@ SweepMap is an algorithm for sketch-based read mapping of genomic sequences.
 
 ## Evaluation
 * [PBSIM](https://github.com/pfaucon/PBSIM-PacBio-Simulator) -- long read simulator
-* [https://github.com/samtools/samtools](samtools) -- labeling reads
+* [samtools](https://github.com/samtools/samtools) -- labeling reads
+* [paftools](https://github.com/RBGKew/pypaftol/blob/master/paftools_tutorial.md) -- evaluating .paf
