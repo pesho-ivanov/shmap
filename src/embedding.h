@@ -18,7 +18,7 @@ public:
     }
 
 	Embedding(const Kmer &kmer) {
-		std::mt19937 gen(kmer.h);
+        std::minstd_rand gen(kmer.h);
 
 		v.reserve(D);
         for (int i = 0; i < D; ++i)
