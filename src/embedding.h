@@ -1,4 +1,4 @@
-#include <random>
+//#include <immintrin.h>
 
 #include "sketch.h"
 
@@ -6,8 +6,21 @@ namespace sweepmap {
 
 using std::vector;
 
-int D = 50;
-std::uniform_real_distribution<float> distr(-1.0, 1.0);
+int D = 8*8;
+
+class FastRand {
+public:
+    FastRand(unsigned long long seed = 1) : val(seed) {}
+
+    float nextFloat() {
+        val = 6364136223846793005ULL * val + 1;
+        return float((val >> 40) * 2.3283064365386963e-10 * 2.0 - 1.0);
+    }
+
+private:
+    unsigned long long val;
+};
+
 
 class Embedding {
 	vector<float> v;
@@ -18,11 +31,11 @@ public:
     }
 
 	Embedding(const Kmer &kmer) {
-        std::minstd_rand gen(kmer.h);
+        v.resize(D);
+        FastRand randGen(kmer.h);
 
-		v.reserve(D);
-        for (int i = 0; i < D; ++i)
-            v.push_back(distr(gen));
+        for (int i = 0; i < D; i += 8)
+            v[i] = randGen.nextFloat();
 	}
 
     Embedding operator+=(const Embedding &other) {
