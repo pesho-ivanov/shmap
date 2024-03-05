@@ -1,20 +1,25 @@
 # distutils: language=c++
 
 cimport cython
+from cython.operator cimport dereference as deref
 
 from libc cimport stdint
+from libcpp cimport bool
 from libcpp.vector cimport vector
 from libcpp.unordered_map cimport unordered_map
+from libcpp.unordered_set cimport unordered_set
 from libcpp.bit cimport rotl, rotr, countr_zero
+from libcpp.algorithm cimport nth_element
+from libcpp.utility cimport pair
 
 ctypedef stdint.uint64_t hash_t
-ctypedef stdint.int32_t pos_t
+ctypedef stdint.uint32_t pos_t
 ctypedef stdint.int8_t segm_t
 
 cdef struct Kmer:
     pos_t pos
     hash_t hash
-    bint strand
+    bool strand
 
 ctypedef vector[Kmer] sketch_t
 
@@ -24,45 +29,42 @@ cdef hash_t[256] LUT_fw, LUT_rc
 # TODO: What the hell is LUT
 cdef initialize_lut():
     # https://gist.github.com/Daniel-Liu-c0deb0t/7078ebca04569068f15507aa856be6e8
-    LUT_fw['a'] = LUT_fw['A'] = 0x3c8bfbb395c60474
-    LUT_fw['c'] = LUT_fw['C'] = 0x3193c18562a02b4c
-    LUT_fw['g'] = LUT_fw['G'] = 0x20323ed082572324
-    LUT_fw['t'] = LUT_fw['T'] = 0x295549f54be24456
-    LUT_rc['a'] = LUT_rc['A'] = LUT_fw['T']
-    LUT_rc['c'] = LUT_rc['C'] = LUT_fw['G']
-    LUT_rc['g'] = LUT_rc['G'] = LUT_fw['C']
-    LUT_rc['t'] = LUT_rc['T'] = LUT_fw['A']
+    LUT_fw[<unsigned char>b'a'] = LUT_fw[<unsigned char>b'A'] = 0x3c8bfbb395c60474
+    LUT_fw[<unsigned char>b'c'] = LUT_fw[<unsigned char>b'C'] = 0x3193c18562a02b4c
+    LUT_fw[<unsigned char>b'g'] = LUT_fw[<unsigned char>b'G'] = 0x20323ed082572324
+    LUT_fw[<unsigned char>b't'] = LUT_fw[<unsigned char>b'T'] = 0x295549f54be24456
+    LUT_rc[<unsigned char>b'a'] = LUT_rc[<unsigned char>b'A'] = LUT_fw[<unsigned char>b'T']
+    LUT_rc[<unsigned char>b'c'] = LUT_rc[<unsigned char>b'C'] = LUT_fw[<unsigned char>b'G']
+    LUT_rc[<unsigned char>b'g'] = LUT_rc[<unsigned char>b'G'] = LUT_fw[<unsigned char>b'C']
+    LUT_rc[<unsigned char>b't'] = LUT_rc[<unsigned char>b'T'] = LUT_fw[<unsigned char>b'A']
 
 @cython.boundscheck(False)
-@cython.wraparound(False)
-cpdef sketch_t build_fmh_sketch(const unsigned char[:] s, int k, double h_frac):
+#@cython.wraparound(False)
+cpdef sketch_t build_fmh_sketch(const unsigned char[:] s, pos_t k, double h_frac):
     initialize_lut()
 
     cdef size_t length = s.shape[0]
     cdef sketch_t kmers
-    kmers.reserve(<size_t>(1.1 * length * h_frac))
+    kmers.reserve(<size_t>(1.1 * <float>length * <float>h_frac))
 
     if length < k:
         return kmers
 
     cdef hash_t h, h_fw = 0, h_rc = 0
-    cdef hash_t h_thresh = <hash_t>(h_frac * stdint.UINT64_MAX)
-    cdef int r
+    cdef hash_t h_thresh = <hash_t>(h_frac * <double>stdint.UINT64_MAX)
 
+    cdef pos_t r
     for r in range(k):
         h_fw ^= rotl(LUT_fw[s[r]], k-r-1)
         h_rc ^= rotl(LUT_rc[s[r]], r)
 
-    cdef hash_t first_diff_bit
-    cdef bint strand
-
+    r = k
     while True:
         # HACK! the lowest differing bit is not expected to correlate much with (h < hThres)
         # TODO: tie break
 
         first_diff_bit = 1 << countr_zero(h_fw ^ h_rc)
         strand = h_fw & first_diff_bit
-        
         h = h_rc if strand else h_fw
 
         if h < h_thresh:
@@ -83,7 +85,7 @@ cpdef sketch_t build_fmh_sketch(const unsigned char[:] s, int k, double h_frac):
 cdef class Sketch:
     cdef sketch_t _sketch
 
-    def __init__(self, const unsigned char[:] s, int k, double h_frac):
+    def __init__(self, const unsigned char[:] s, pos_t k, double h_frac):
         self._sketch = build_fmh_sketch(s, k, h_frac)
 
     def state(self):
@@ -111,6 +113,12 @@ cdef class Index:
             else:
                 self.hit_rest[kmer.hash].push_back(hit)
 
+    cdef pos_t hits_count(self, hash_t hash):
+        if self.hit_first.contains(hash):
+            return 1 + self.hit_rest[hash].size()
+        else:
+            return 1 if self.hit_first.contains(hash) else 0
+
     def add(self, Sketch sketch):
         self._add(sketch._sketch)
 
@@ -122,18 +130,125 @@ cdef struct Mapping:
     segm_t segm
     pos_t pos
     
+cdef bool compare_hits((hash_t, pos_t) a, (hash_t, pos_t) b):
+    if a[1] == b[1]:
+        # TODO: Add random order for equal hits
+        # Using kmer might be a bad idea
+        return a[0] < b[0]
+    else:
+        return a[1] < b[1]
 
-cdef vector[Mapping] sweep_map(Index reference_index, sketch_t pattern_sketch, max_hits):
+
+cdef extern from "pdqsort.h" nogil:
+    void pdqsort[Iter, Compare](Iter begin, Iter end, Compare comp) except +
+    void pdqsort_branchless[Iter, Compare](Iter begin, Iter end, Compare comp) except +
+
+
+cdef class DiffHist:
+    """
+    H1
+    value: +1       I += min(max(-D, 0), value)
+        D>=0 => 0
+        D<0  => I+1
+    value: -1       I += min(0, value + max(0, D))
+        D>0  => 0     I += min(0, value + D)
+        D<=0 => I-1   I += value
+    H2
+    value: +1       I += min(max(D, 0), value)
+        D>0  => I+1   
+        D<=0 => 0
+    value: -1       I += min(0, value + max(0, -D))
+        D>=0  => I-1  I += value
+        D<0   => 0    I += min(0, value - D)
+    """
+    cdef unordered_map[hash_t, int] diff  # Difference between corresponding bins H1[i]-H2[i]
+    cdef readonly int intersection
+
+    def state(self):
+        return (self.intersection, self.diff)
+
+    def __cinit__(self):
+        self.intersection = 0
+
+    cpdef update1(self, hash_t key, int value):
+        cdef unordered_map[hash_t, int].iterator iter = self.diff.insert(pair[hash_t, int](key, 0)).first
+        cdef int d = deref(iter).second
+
+        if value > 0:
+            self.intersection += min(max(-d, 0), value)
+        else:
+            self.intersection += min(0, value + max(0, d))
+        
+        deref(iter).second = d + value
+
+    cpdef update2(self, hash_t key, int value):
+        cdef unordered_map[hash_t, int].iterator iter = self.diff.insert(pair[hash_t, int](key, 0)).first
+        cdef int d = deref(iter).second
+
+        if value > 0:
+            self.intersection += min(max(d, 0), value)
+        else:
+            self.intersection += min(0, value + max(0, -d))
+        
+        deref(iter).second = d - value
+
+
+def sweep_map(Index reference_index, Sketch pattern_sketch_, pos_t max_hashes):
+    cdef sketch_t pattern_sketch = pattern_sketch_._sketch
     cdef vector[Mapping] mapping
 
-    # get [(hash, hits_in_index)]
+    # Build a limited set of Kmer hashes from the pattern.
+    # We pick a random subset of hashes with the lowest hits in the reference index.
+    cdef vector[(hash_t, pos_t)] hash_with_hits  # (hash, hits in reference)
+    cdef unordered_set[hash_t] hash_added        # whether a hash has been added to hash_with_hits
+    hash_with_hits.reserve(pattern_sketch.size())
+    for pos in range(pattern_sketch.size()):
+        hash = pattern_sketch[pos].hash
+        # TODO: use emplace()
+        if not hash_added.count(hash):
+            hash_added.insert(hash)
+            hash_with_hits.push_back((hash, reference_index.hits_count(hash)))
 
-    # leave only the first max_hits with the lowest hits: selected_hashes
+    cdef size_t total_hashes = hash_with_hits.size()
+    if total_hashes > max_hashes:
+        total_hashes = max_hashes
+    
+    # This makes sure that matched_hashes[:total_hashes] has elements with the lowest hits
+    nth_element(
+        hash_with_hits.begin(),
+        hash_with_hits.begin() + total_hashes,
+        hash_with_hits.end(),
+        compare_hits,
+    )
+    
+    cdef size_t total_matches = 0
+    for i in range(total_hashes):
+        total_matches += hash_with_hits[i][1]
 
-    # build [(hash, ref_pos)] with only selected_hashes
-    # sort it by ref_pos
+    # Estimate the total number of mathes to reserve space for them
+    cdef unordered_set[hash_t] selected_hashes
+    for i in range(total_hashes):
+        selected_hashes.insert(hash_with_hits[i][0])
+
+    # Build the list of matched kmers in the reference sorted by position
+    cdef vector[(hash_t, pos_t)] reference_matches  # (hash, ref_pos)
+    reference_matches.reserve(total_matches)
+    for hash in selected_hashes:
+        if reference_index.hit_first.contains(hash):
+            reference_matches.push_back((hash, reference_index.hit_first[hash].pos))
+            for hit in reference_index.hit_rest[hash]:
+                reference_matches.push_back((hash, hit.pos))
+
+    pdqsort_branchless(reference_matches.begin(), reference_matches.end(), compare_hits)    
+
+    # Initialize Pattern histogram (or whatever given selected_hashes)
+    cdef unordered_map[hash_t, pos_t] pattern_histogram
+    for i in range(total_hashes):
+        pattern_histogram[hash_with_hits[i][0]] = 0
+
+    return reference_matches
 
     # run sweep, collect mapping
 
-    mapping.push_back(Mapping(0, 0))
-    return mapping
+    # mapping.push_back(Mapping(0, 0))
+    # return mapping

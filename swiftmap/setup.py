@@ -7,6 +7,7 @@ extensions = [
         ["sketch.pyx"],
         extra_compile_args=[
             "-std=c++20", 
+            "-Wno-unreachable-code",
             #"-stdlib=libc++",
             #"-O3", "-ffast-math", "-march=native", "-Xpreprocessor", "-fopenmp"
         ],
@@ -16,10 +17,9 @@ extensions = [
             #"-Xpreprocessor", "-fopenmp"
         ],
         #include_dirs=[numpy.get_include()]
-        annotate=True,
     )
 ]
 
 setup(
-    ext_modules = cythonize(extensions, annotate=True)
+    ext_modules = cythonize(extensions, annotate=True, language_level=3)
 )
