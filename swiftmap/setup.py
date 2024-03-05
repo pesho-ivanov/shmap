@@ -16,9 +16,10 @@ extensions = [
             #"-Xpreprocessor", "-fopenmp"
         ],
         #include_dirs=[numpy.get_include()]
+        annotate=True,
     )
 ]
 
 setup(
-    ext_modules = cythonize(extensions)
+    ext_modules = cythonize(extensions, annotate=True)
 )
