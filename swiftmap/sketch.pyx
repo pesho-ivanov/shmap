@@ -170,27 +170,24 @@ cdef class DiffHist:
     def __cinit__(self):
         self.intersection = 0
 
-    cpdef update1(self, hash_t key, int value):
+    cpdef update(self, hash_t key, int value, int hist):
+        assert hist in (1, -1)
+
         cdef unordered_map[hash_t, int].iterator iter = self.diff.insert(pair[hash_t, int](key, 0)).first
         cdef int d = deref(iter).second
 
         if value > 0:
-            self.intersection += min(max(-d, 0), value)
+            self.intersection += min(max((-1)*hist*d, 0), value)
         else:
-            self.intersection += min(0, value + max(0, d))
+            self.intersection += min(0, value + max(0, hist*d))
         
-        deref(iter).second = d + value
+        deref(iter).second = d + hist*value
+
+    cpdef update1(self, hash_t key, int value):
+        self.update(key, value, 1)
 
     cpdef update2(self, hash_t key, int value):
-        cdef unordered_map[hash_t, int].iterator iter = self.diff.insert(pair[hash_t, int](key, 0)).first
-        cdef int d = deref(iter).second
-
-        if value > 0:
-            self.intersection += min(max(d, 0), value)
-        else:
-            self.intersection += min(0, value + max(0, -d))
-        
-        deref(iter).second = d - value
+        self.update(key, value, -1)
 
 
 def sweep_map(Index reference_index, Sketch pattern_sketch_, pos_t max_hashes):
@@ -242,9 +239,9 @@ def sweep_map(Index reference_index, Sketch pattern_sketch_, pos_t max_hashes):
     pdqsort_branchless(reference_matches.begin(), reference_matches.end(), compare_hits)    
 
     # Initialize Pattern histogram (or whatever given selected_hashes)
-    cdef unordered_map[hash_t, pos_t] pattern_histogram
+    cdef DiffHist pattern_hist
     for i in range(total_hashes):
-        pattern_histogram[hash_with_hits[i][0]] = 0
+        pass
 
     return reference_matches
 
