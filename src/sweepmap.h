@@ -157,13 +157,12 @@ class SweepMap {
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 
 		// Increase the left point end of the window [l,r) one by one. O(matches)
-		int i = 0, j = 0;
-		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l, ++i) {
+		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l) {
 			// Increase the right end of the window [l,r) until it gets out.
 		for(;  r != M.end()
 				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
 				&& r->hit.r + params.k <= l->hit.r + P_len
-				; ++r, ++j) {
+				; ++r) {
 				same_strand_seeds += r->is_same_strand() ? +1 : -1;  // change to r inside the loop
 				// If taking this kmer from T increases the intersection with P.
 				// TODO: iterate following seeds
