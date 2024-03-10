@@ -366,9 +366,3 @@ class SweepMap {
 };
 
 }  // namespace sweepmap
-
-//				auto nextr = r; ++nextr;
-//				hash_t nexth = (nextr != M.end() ? nextr->seed.kmer.h : -1);
-//				for (int tpos(r->hit.tpos+1), ppos(r->seed.ppos+1); ppos<(int)p.kmers.size() && p.kmers[ppos].h != nexth && p.kmers[ppos].r < r->seed.kmer.r + MAX_BL; ++ppos, ++tpos)
-//					if (tidx.T[r->hit.segm_id].kmers[tpos].h == p.kmers[ppos].h)
-//						++xmin;

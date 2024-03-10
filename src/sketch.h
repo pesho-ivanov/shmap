@@ -66,9 +66,6 @@ private:
 			const bool strand         = h_fw & first_diff_bit;
 			h = strand ? h_rc : h_fw;
 
-			//cerr << s << " " << r << " " << std::hex << std::setfill('0') << std::setw(16) << h
-			//					<< " = " << std::hex << std::setfill('0') << std::setw(16) << h_fw
-			//					<< " ^ " << std::hex << std::setfill('0') << std::setw(16) << h_rc << endl;
 			if (h < hThres) // optimize to only look at specific bits
 				kmers.push_back(Kmer(r, h, strand));
 						

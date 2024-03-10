@@ -181,14 +181,6 @@ public:
 		cerr << " | | most frequent kmer:      " << C->count("indexed_highest_freq_kmer") << " times." << endl;
 		cerr << " | | blacklisted kmers:       " << C->count("blacklisted_kmers") << " (" << C->perc("blacklisted_kmers", "indexed_kmers") << "\%)" << endl;
 		cerr << " | | blacklisted hits:        " << C->count("blacklisted_hits") << " (" << C->perc("blacklisted_hits", "indexed_hits") << "\%)" << endl;
-
-//		cerr << std::fixed << std::setprecision(2);
-//		cerr << "Histogram of " << C->count("indexed_total_kmers") << " kmers ("
-//			<< 100.0*double(C->count("indexed_different_kmers"))/double(C->count("indexed_total_kmers")) << "\% different) covering "
-//			<< 100.0*double(params.k)*double(C->count("indexed_total_kmers"))/double(C->count("total_nucls")) << "\% of the " << C->count("total_nucls") << "nb index" << endl;
-//		for (size_t i=0; i<hist.size(); ++i)
-//			if (hist[i] > 0)
-//				cerr << std::setw(5) << std::right << i << (i<hist.size()-1?" ":"+") << "occ: " << std::setw(9) << std::right << hist[i] << " kmers (" << 100.0*double(hist[i])/double(kmers) << "\%)" << endl;
 	}
 };
 
