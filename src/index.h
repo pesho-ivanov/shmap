@@ -99,18 +99,13 @@ public:
 		}	
 	}
 
-	void apply_blacklist() {
+	void erase_frequent_kmers() {
 		std::vector<hash_t> blacklisted_h;
 		for (const auto &[h, hits]: h2multi)
 			if (hits.size() > (size_t)params.max_matches) {
 				blacklisted_h.push_back(h);
 				C->inc("blacklisted_kmers");
 				C->inc("blacklisted_hits", hits.size());
-
-				for (const auto &[r, pos, strand, segm_id]: hits) {
-					assert(!T[segm_id].kmers[pos].black);
-					T[segm_id].kmers[pos].black = true;
-				}
 			}
 
 		for (auto h: blacklisted_h)
@@ -169,7 +164,7 @@ public:
 		get_kmer_stats();
         C->inc("blacklisted_kmers", 0);
         C->inc("blacklisted_hits", 0);
-		apply_blacklist();
+		erase_frequent_kmers();
 		print_stats();
 	}
 
