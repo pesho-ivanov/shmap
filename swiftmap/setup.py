@@ -13,7 +13,7 @@ extensions = [
         ],
         language='c++',
         extra_link_args=[
-            "-stdlib=libc++",
+            #"-stdlib=libc++",
             #"-Xpreprocessor", "-fopenmp"
         ],
         #include_dirs=[numpy.get_include()]
