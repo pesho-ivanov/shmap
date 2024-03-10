@@ -39,8 +39,8 @@ cdef initialize_lut():
     LUT_rc[<unsigned char>b't'] = LUT_rc[<unsigned char>b'T'] = LUT_fw[<unsigned char>b'A']
 
 @cython.boundscheck(False)
-#@cython.wraparound(False)
-cpdef sketch_t build_fmh_sketch(const unsigned char[:] s, pos_t k, double h_frac):
+@cython.wraparound(False)
+cpdef (sketch_t, pos_t) build_fmh_sketch(const unsigned char[:] s, pos_t k, double h_frac):
     initialize_lut()
 
     cdef size_t length = s.shape[0]
@@ -48,7 +48,7 @@ cpdef sketch_t build_fmh_sketch(const unsigned char[:] s, pos_t k, double h_frac
     kmers.reserve(<size_t>(1.1 * <float>length * <float>h_frac))
 
     if length < k:
-        return kmers
+        return kmers, 0
 
     cdef hash_t h, h_fw = 0, h_rc = 0
     cdef hash_t h_thresh = <hash_t>(h_frac * <double>stdint.UINT64_MAX)
@@ -80,13 +80,14 @@ cpdef sketch_t build_fmh_sketch(const unsigned char[:] s, pos_t k, double h_frac
 
         r += 1
 
-    return kmers
+    return kmers, r-k+1
 
 cdef class Sketch:
     cdef sketch_t _sketch
+    cdef readonly pos_t size
 
     def __init__(self, const unsigned char[:] s, pos_t k, double h_frac):
-        self._sketch = build_fmh_sketch(s, k, h_frac)
+        self._sketch, self.size = build_fmh_sketch(s, k, h_frac)
 
     def state(self):
         return self._sketch
@@ -98,13 +99,13 @@ cdef struct RefPos:
 
 
 cdef class Index:
-    cdef vector[sketch_t] segments
+    cdef vector[pos_t] segment_size
     cdef unordered_map[hash_t, RefPos] hit_first
     cdef unordered_map[hash_t, vector[RefPos]] hit_rest
 
-    cdef _add(self, sketch_t sketch):
-        cdef size_t segm_id = self.segments.size()
-        self.segments.push_back(sketch)
+    cdef _add(self, sketch_t sketch, pos_t size):
+        cdef size_t segm_id = self.segment_size.size()
+        self.segment_size.push_back(size)
         for pos in range(sketch.size()):
             kmer = sketch[pos]
             hit = RefPos(segm_id, pos)
@@ -120,16 +121,16 @@ cdef class Index:
             return 1 if self.hit_first.contains(hash) else 0
 
     def add(self, Sketch sketch):
-        self._add(sketch._sketch)
+        self._add(sketch._sketch, sketch.size)
 
     def state(self):
-        return (self.segments, self.hit_first, self.hit_rest)
+        return (self.hit_first, self.hit_rest)
 
 
 cdef struct Mapping:
     segm_t segm
     pos_t pos
-    
+
 cdef bool compare_hits((hash_t, pos_t) a, (hash_t, pos_t) b):
     if a[1] == b[1]:
         # TODO: Add random order for equal hits
@@ -138,6 +139,11 @@ cdef bool compare_hits((hash_t, pos_t) a, (hash_t, pos_t) b):
     else:
         return a[1] < b[1]
 
+cdef bool compare_matches((hash_t, RefPos) a, (hash_t, RefPos) b):
+    if a[1].segm == b[1].segm:
+        return a[1].pos < b[1].pos
+    else:
+        return a[1].segm < b[1].segm
 
 cdef extern from "pdqsort.h" nogil:
     void pdqsort[Iter, Compare](Iter begin, Iter end, Compare comp) except +
@@ -146,6 +152,8 @@ cdef extern from "pdqsort.h" nogil:
 
 cdef class DiffHist:
     """
+    Intersection of two histograms. 
+
     H1
     value: +1       I += min(max(-D, 0), value)
         D>=0 => 0
@@ -170,9 +178,7 @@ cdef class DiffHist:
     def __cinit__(self):
         self.intersection = 0
 
-    cpdef update(self, hash_t key, int value, int hist):
-        assert hist in (1, -1)
-
+    cdef update(self, hash_t key, int value, int hist):
         cdef unordered_map[hash_t, int].iterator iter = self.diff.insert(pair[hash_t, int](key, 0)).first
         cdef int d = deref(iter).second
 
@@ -183,28 +189,38 @@ cdef class DiffHist:
         
         deref(iter).second = d + hist*value
 
-    cpdef update1(self, hash_t key, int value):
+    cdef update_first(self, hash_t key, int value):
         self.update(key, value, 1)
 
-    cpdef update2(self, hash_t key, int value):
+    cdef update_second(self, hash_t key, int value):
         self.update(key, value, -1)
 
+    cdef reserve(self, size_t size):
+        self.diff.reserve(size)
 
-def sweep_map(Index reference_index, Sketch pattern_sketch_, pos_t max_hashes):
+
+cpdef sweep_map(Index reference_index, Sketch pattern_sketch_, pos_t max_hashes, pos_t width):
     cdef sketch_t pattern_sketch = pattern_sketch_._sketch
     cdef vector[Mapping] mapping
 
     # Build a limited set of Kmer hashes from the pattern.
     # We pick a random subset of hashes with the lowest hits in the reference index.
-    cdef vector[(hash_t, pos_t)] hash_with_hits  # (hash, hits in reference)
-    cdef unordered_set[hash_t] hash_added        # whether a hash has been added to hash_with_hits
+    cdef vector[(hash_t, pos_t)] hash_with_hits          # (hash, hits in reference)
+    cdef unordered_map[hash_t, pos_t] hash_pattern_hits  # whether a hash has been added to hash_with_hits
     hash_with_hits.reserve(pattern_sketch.size())
+    hash_pattern_hits.reserve(pattern_sketch.size())
+
+    cdef unordered_map[hash_t, pos_t].iterator iter
+    cdef pos_t hits
+
     for pos in range(pattern_sketch.size()):
         hash = pattern_sketch[pos].hash
-        # TODO: use emplace()
-        if not hash_added.count(hash):
-            hash_added.insert(hash)
-            hash_with_hits.push_back((hash, reference_index.hits_count(hash)))
+        hits = reference_index.hits_count(hash)
+        if hits > 0:
+            iter = hash_pattern_hits.insert(pair[hash_t, pos_t](hash, 0)).first
+            if deref(iter).second == 0:
+                hash_with_hits.push_back((hash, hits))
+            deref(iter).second = deref(iter).second + 1
 
     cdef size_t total_hashes = hash_with_hits.size()
     if total_hashes > max_hashes:
@@ -228,24 +244,59 @@ def sweep_map(Index reference_index, Sketch pattern_sketch_, pos_t max_hashes):
         selected_hashes.insert(hash_with_hits[i][0])
 
     # Build the list of matched kmers in the reference sorted by position
-    cdef vector[(hash_t, pos_t)] reference_matches  # (hash, ref_pos)
+    cdef vector[(hash_t, RefPos)] reference_matches  # (hash, ref_pos)
     reference_matches.reserve(total_matches)
     for hash in selected_hashes:
+        # TODO: remove unnecessary lookups
         if reference_index.hit_first.contains(hash):
-            reference_matches.push_back((hash, reference_index.hit_first[hash].pos))
-            for hit in reference_index.hit_rest[hash]:
-                reference_matches.push_back((hash, hit.pos))
+            reference_matches.push_back((hash, reference_index.hit_first[hash]))
+            for match in reference_index.hit_rest[hash]:
+                reference_matches.push_back((hash, match))
 
-    pdqsort_branchless(reference_matches.begin(), reference_matches.end(), compare_hits)    
+    pdqsort_branchless(reference_matches.begin(), reference_matches.end(), compare_matches)
 
-    # Initialize Pattern histogram (or whatever given selected_hashes)
-    cdef DiffHist pattern_hist
+    # Initialize diff-histogram with Pattern
+    cdef DiffHist hist = DiffHist()
+    hist.reserve(total_hashes)
     for i in range(total_hashes):
-        pass
+        h = hash_with_hits[i][0]
+        hist.update_first(h, hash_pattern_hits[h])
 
-    return reference_matches
+    cdef segm_t segm
+    cdef pos_t left_match_idx = 0
+    cdef pos_t right_match_idx = 0
 
-    # run sweep, collect mapping
+    cdef pos_t left_pos = 0
+    cdef pos_t right_pos = 0
 
-    # mapping.push_back(Mapping(0, 0))
+    cdef pos_t left = 0  # index in reference_matches
+    cdef pos_t right = 0  # index in pattern_sketch
+    
+    cdef pos_t best_intersection = 0
+    cdef pos_t best_left = 0, best_right = 0
+
+    for left in range(reference_matches.size()):
+        
+        # Extend the right end of the window
+        while (
+            right < reference_matches.size() and
+            reference_matches[left][1].segm == reference_matches[right][1].segm and
+            reference_matches[left][1].pos + width > reference_matches[right][1].pos
+        ):
+            # Add [right] to the window
+            hist.update_second(reference_matches[right][0], +1)
+
+            right += 1
+
+        if reference_matches[left][1].pos + width < reference_index.segment_size[reference_matches[left][1].segm]:
+            # Process the window
+            if hist.intersection > best_intersection:
+                best_intersection = hist.intersection
+                best_left = left
+                best_right = right
+
+        # Remove [left] from the window
+        hist.update_second(reference_matches[left][0], -1)
+
+    return (reference_matches[best_left][1].pos, reference_matches[best_left][1].pos + width, best_intersection)
     # return mapping
