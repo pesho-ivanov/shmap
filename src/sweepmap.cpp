@@ -1,6 +1,8 @@
 #include "index.h"
 #include "sweepmap.h"
 
+#include "../ext/edlib.h"
+
 using namespace sweepmap;
 
 void print_time_stats(Timers *T, Counters *C) {
@@ -28,6 +30,11 @@ void print_time_stats(Timers *T, Counters *C) {
 	printMemoryUsage();
 }
 
+//    EdlibAlignResult result = edlibAlign("hello", 5, "world!", 6, edlibDefaultAlignConfig());
+//    if (result.status == EDLIB_STATUS_OK) {
+//        printf("edit_distance('hello', 'world!') = %d\n", result.editDistance);
+//    }
+//    edlibFreeAlignResult(result);
 int main(int argc, char **argv) {
 	Counters C;
 	Timers T;

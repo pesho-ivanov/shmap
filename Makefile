@@ -77,7 +77,7 @@ Rs = 0.01 0.05 0.1 0.15 0.2
 all: sweepmap
 
 $(SWEEPMAP_BIN): $(SRCS)
-	$(CC) $(CXX_STANDARD) $(CFLAGS) $< -o $@ $(LIBS)
+	$(CC) $(CXX_STANDARD) $(CFLAGS) $< ext/edlib.cpp -o $@ $(LIBS) -I ../ext/
 
 simulate_SVs:
 	cd $(REF_DIR);\
