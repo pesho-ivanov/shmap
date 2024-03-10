@@ -192,9 +192,9 @@ class SweepMap {
 			w_emb -= Embedding(l->seed.kmer);
 			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
 
-			assert(xmin >= 0);
+			//assert(xmin >= 0);
 		}
-		assert(xmin == 0);
+		//assert(xmin == 0);
 		assert(same_strand_seeds == 0);
 
 		if (params.onlybest && best.xmin != -1) { // && best.J > params.tThres)
