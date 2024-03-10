@@ -103,16 +103,28 @@ cdef class Index:
     cdef unordered_map[hash_t, RefPos] hit_first
     cdef unordered_map[hash_t, vector[RefPos]] hit_rest
 
-    cdef _add(self, sketch_t sketch, pos_t size):
+    cdef _add(self, sketch_t sketch, pos_t size, pos_t max_matches=0):
         cdef size_t segm_id = self.segment_size.size()
         self.segment_size.push_back(size)
-        for pos in range(sketch.size()):
-            kmer = sketch[pos]
-            hit = RefPos(segm_id, pos)
+        for i in range(sketch.size()):
+            kmer = sketch[i]
+            hit = RefPos(segm_id, kmer.pos)
             if not self.hit_first.contains(kmer.hash):
                 self.hit_first[kmer.hash] = hit
             else:
                 self.hit_rest[kmer.hash].push_back(hit)
+
+        # Apply max_matches
+        cdef vector[hash_t] to_remove
+        cdef hash_t h
+        if max_matches > 0:
+            for (h, _) in self.hit_rest:
+                if self.hit_rest[h].size() > max_matches:
+                    to_remove.push_back(h)
+            for i in range(to_remove.size()):
+                h = to_remove[i]
+                self.hit_first.erase(h)
+                self.hit_rest.erase(h)
 
     cdef pos_t hits_count(self, hash_t hash):
         if self.hit_first.contains(hash):
@@ -120,8 +132,8 @@ cdef class Index:
         else:
             return 1 if self.hit_first.contains(hash) else 0
 
-    def add(self, Sketch sketch):
-        self._add(sketch._sketch, sketch.size)
+    def add(self, Sketch sketch, max_matches=None):
+        self._add(sketch._sketch, sketch.size, max_matches=max_matches if isinstance(max_matches, int) else 0)
 
     def state(self):
         return (self.hit_first, self.hit_rest)
@@ -262,18 +274,13 @@ cpdef sweep_map(Index reference_index, Sketch pattern_sketch_, pos_t max_hashes,
         h = hash_with_hits[i][0]
         hist.update_first(h, hash_pattern_hits[h])
 
-    cdef segm_t segm
-    cdef pos_t left_match_idx = 0
-    cdef pos_t right_match_idx = 0
-
-    cdef pos_t left_pos = 0
-    cdef pos_t right_pos = 0
-
-    cdef pos_t left = 0  # index in reference_matches
-    cdef pos_t right = 0  # index in pattern_sketch
+    # index in reference_matches
+    cdef pos_t left = 0
+    cdef pos_t right = 0 
     
     cdef pos_t best_intersection = 0
-    cdef pos_t best_left = 0, best_right = 0
+    cdef pos_t best_left = 0
+    #all_mappings = []
 
     for left in range(reference_matches.size()):
         
@@ -293,10 +300,11 @@ cpdef sweep_map(Index reference_index, Sketch pattern_sketch_, pos_t max_hashes,
             if hist.intersection > best_intersection:
                 best_intersection = hist.intersection
                 best_left = left
-                best_right = right
+            #all_mappings.append((reference_matches[left][1].pos, hist.intersection))
 
         # Remove [left] from the window
         hist.update_second(reference_matches[left][0], -1)
 
-    return (reference_matches[best_left][1].pos, reference_matches[best_left][1].pos + width, best_intersection)
+    return reference_matches[best_left][1].pos, best_intersection
+    #return (reference_matches[best_left][1].pos, best_intersection), all_mappings
     # return mapping
