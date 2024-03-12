@@ -30,12 +30,19 @@ void print_time_stats(Timers *T, Counters *C) {
 	printMemoryUsage();
 }
 
-//    EdlibAlignResult result = edlibAlign("hello", 5, "world!", 6, edlibDefaultAlignConfig());
+//	auto cfg = edlibNewAlignConfig(42, EDLIB_MODE_NW, EDLIB_TASK_PATH, NULL, 0);
+//    EdlibAlignResult result = edlibAlign("hello", 5, "world!", 6, cfg);
 //    if (result.status == EDLIB_STATUS_OK) {
 //        printf("edit_distance('hello', 'world!') = %d\n", result.editDistance);
 //    }
+//	char* cigar = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_STANDARD);
+//	printf("%s\n", cigar);
+//	free(cigar);
+//
 //    edlibFreeAlignResult(result);
+//	return 0;
 int main(int argc, char **argv) {
+
 	Counters C;
 	Timers T;
 	params_t params;
