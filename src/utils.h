@@ -158,4 +158,29 @@ void printMemoryUsage() {
     }
 }
 
+std::string reverseComplement(const std::string& seq) {
+    std::string revComp;
+    revComp.reserve(seq.size());
+    for (int i = seq.size() - 1; i >= 0; --i) {
+        switch (seq[i]) {
+            case 'A':
+                revComp.push_back('T');
+                break;
+            case 'C':
+                revComp.push_back('G');
+                break;
+            case 'G':
+                revComp.push_back('C');
+                break;
+            case 'T':
+                revComp.push_back('A');
+                break;
+            default:
+                revComp.push_back('N');
+                break;
+        }
+    }
+    return revComp;
+}
+
 } // namespace sweepmap

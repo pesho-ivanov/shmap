@@ -6,7 +6,9 @@
 #include <iomanip>
 #include <set>
 
+#include "../ext/edlib.h"
 #include "../ext/pdqsort.h"
+
 #include "index.h"
 #include "io.h"
 #include "sketch.h"
@@ -61,6 +63,46 @@ struct Mapping {
 			<< "\t" << "J2:f:" << J2   // second best mapping Jaccard similarity [0; 1]
 			<< "\t" << "t:f:" << map_time
 			<< endl;
+	}
+
+    int print_sam(const string &query_id, const RefSegment &segm, const int matches, const char *query, const size_t query_size) const {
+		int T_start = std::max(T_l-k-P_start, 0);
+		int T_end = std::max(T_r, T_l-k-P_start+P_sz);
+		int T_d = T_end - T_start;
+		string s = segm.seq.substr(T_start, T_d);
+		if (strand == '-')
+		   s = reverseComplement(s);
+		assert(T_d >= 0);
+		auto max_edit_dist = -1; //10000;
+		auto cfg = edlibNewAlignConfig(max_edit_dist, EDLIB_MODE_NW, EDLIB_TASK_PATH, NULL, 0);
+		EdlibAlignResult result = edlibAlign(query, query_size, s.c_str(), T_d, cfg);
+		assert(result.status == EDLIB_STATUS_OK);
+		char* cigar = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_STANDARD);
+		//printf("query=%s, s=%s, ", query, s.c_str());
+		//printf("ed=%d, cigar=%s\n", result.editDistance, cigar);
+
+		int ed = result.editDistance;
+		int flag = 0;
+		if (strand == '-') flag |= 0x10;
+		std::cout << query_id 				// 1 QNAME String [!-?A-~]{1,254} Query template NAME
+			<< "\t" << flag 				// 2 FLAG Int [0, 216 − 1] bitwise FLAG
+			<< "\t" << segm.name  			// 3 RNAME String \*|[:rname:∧*=][:rname:]* Reference sequence NAME11
+			<< "\t" << T_start+1  			// 4 POS Int [0, 231 − 1] 1-based leftmost mapping POSition
+			<< "\t" << mapq  				// 5 MAPQ Int [0, 28 − 1] MAPping Quality
+			<< "\t" << cigar  				// 6 CIGAR String \*|([0-9]+[MIDNSHPX=])+ CIGAR string
+			<< "\t" << "="  				// 7 RNEXT String \*|=|[:rname:∧*=][:rname:]* Reference name of the mate/next read
+			<< "\t" << 0  					// 8 PNEXT Int [0, 231 − 1] Position of the mate/next read
+			<< "\t" << 0  					// 9 TLEN Int [−231 + 1, 231 − 1] observed Template LENgth
+			<< "\t" << query  				// 10 SEQ String \*|[A-Za-z=.]+ segment SEQuence
+			<< "\t" << "!"  				// 11 QUAL String [!-~]+ ASCII of Phred-scaled base QUALity+33
+			<< "\t" << "NM:i:" << ed  		// edit distance
+//			<< "\t" << "q:s:" << query		// query string
+//			<< "\t" << "s:s:" << s			// window string in T
+			<< endl;
+
+		free(cigar);
+		edlibFreeAlignResult(result);
+		return ed;
 	}
 };
 
@@ -291,6 +333,7 @@ class SweepMap {
 		C->inc("J", 0);
 		C->inc("mappings", 0);
 		C->inc("sketched_kmers", 0);
+		C->inc("total_edit_distance", 0);
 
 		T->start("mapping");
 		T->start("query_reading");
@@ -329,7 +372,11 @@ class SweepMap {
 			for (auto &m: mappings) {
 				const auto &segm = tidx.T[m.segm_id];
 				m.map_time = read_mapping_time.secs() / (double)mappings.size();
-				m.print_paf(query_id, segm, (int)matches.size());
+				if (params.sam) {
+					auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
+					C->inc("total_edit_distance", ed);
+				}
+				else m.print_paf(query_id, segm, (int)matches.size());
                 C->inc("spurious_matches", spurious_matches(m, matches));
 				C->inc("J", int(10000.0*m.J));
 				C->inc("mappings");
@@ -362,6 +409,7 @@ class SweepMap {
 		cerr << " | Discarded seeds:       " << C->count("discarded_seeds") << " (" << C->perc("discarded_seeds", "collected_seeds") << "%)" << endl;
 		cerr << " | Unmapped reads:        " << C->count("unmapped_reads") << " (" << C->perc("unmapped_reads", "reads") << "%)" << endl;
 		cerr << " | Average Jaccard:       " << C->frac("J", "mappings") / 10000.0 << endl;
+		cerr << " | Average edit dist:     " << C->frac("total_edit_distance", "mappings") << endl;
 	}
 };
 

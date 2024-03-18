@@ -20,7 +20,7 @@ using std::pair;
 using std::ifstream;
 using std::endl;
 
-#define T_HOM_OPTIONS "p:s:k:r:S:M:t:z:onxh"
+#define T_HOM_OPTIONS "p:s:k:r:S:M:t:z:aonxh"
 
 struct params_t {
 	// required
@@ -35,13 +35,14 @@ struct params_t {
 	string paramsFile;
 
 	// no arguments
+	bool sam; 				// Output in SAM format (PAF by default)
 	bool overlaps;			// Permit overlapping mappings 
 	bool normalize; 		// Flag to save that scores are to be normalized
 	bool onlybest;			// Output up to one (best) mapping (if above the threshold)
 
 	params_t() :
 		k(15), hFrac(0.05), max_seeds(10000), max_matches(1000000), tThres(0.9),
-		overlaps(false), normalize(false), onlybest(false) {}
+		sam(false), overlaps(false), normalize(false), onlybest(false) {}
 
 	void print(std::ostream& out, bool human) {
 		std::vector<pair<string, string>> m;
@@ -53,6 +54,8 @@ struct params_t {
 		m.push_back({"max_matches", std::to_string(max_matches)});
 		m.push_back({"tThres", std::to_string(tThres)});
 		m.push_back({"paramsFile", paramsFile});
+
+		m.push_back({"sam", std::to_string(sam)});
 		m.push_back({"overlaps", std::to_string(overlaps)});
 		m.push_back({"normalize", std::to_string(normalize)});
 		m.push_back({"onlybest", std::to_string(onlybest)});
@@ -78,6 +81,8 @@ struct params_t {
 		out << " | hFrac:                 " << hFrac << endl;
 		out << " | max_seeds (S):         " << max_seeds << endl;
 		out << " | max_matches (M):       " << max_matches << endl;
+		out << " | sam:                   " << sam << endl;
+		out << " | overlaps:              " << overlaps << endl;
 		out << " | onlybest:              " << onlybest << endl;
 		out << " | tThres:                " << tThres << endl;
 	}
@@ -91,8 +96,8 @@ inline void dsHlp() {
 	cerr << "Find sketch-based pattern similarity in text." << endl;
 	cerr << endl;
 	cerr << "Required parameters:" << endl;
-	cerr << "   -p   --pattern  Pattern sequences file (FASTA format)" << endl;
-	cerr << "   -s   --text     Text sequence file (FASTA format)" << endl;
+	cerr << "   -p   --pattern           Pattern sequences file (FASTA format)" << endl;
+	cerr << "   -s   --text              Text sequence file (FASTA format)" << endl;
 	cerr << endl;
 	cerr << "Optional parameters with an argument:" << endl;
 	cerr << "   -k   --ksize             K-mer length to be used for sketches" << endl;
@@ -101,12 +106,13 @@ inline void dsHlp() {
 	cerr << "   -M   --max_matches       Max seed matches in a sketch" << endl;
 	cerr << "   -t   --hom_thres         Homology threshold" << endl;
 	cerr << "   -z   --params     		 Output file with parameters (tsv)" << endl;
-	cerr << "   -o   --overlaps          Permit overlapping mappings" << endl;
 	cerr << endl;
 	cerr << "Optional parameters without an argument:" << endl;
-	cerr << "   -n   --normalize  Normalize scores by length" << endl;
-	cerr << "   -x   --onlybest   Output the best alignment if above threshold (otherwise none)" << endl;
-	cerr << "   -h   --help       Display this help message" << endl;
+	cerr << "   -a                       Output in SAM format (PAF by default)" << endl;
+	cerr << "   -o   --overlaps          Permit overlapping mappings" << endl;
+	cerr << "   -n   --normalize         Normalize scores by length" << endl;
+	cerr << "   -x   --onlybest          Output the best alignment if above threshold (otherwise none)" << endl;
+	cerr << "   -h   --help              Display this help message" << endl;
 }
 
 //This function parses the program parameters. Returns false if given arguments are not valid
@@ -169,6 +175,9 @@ bool prsArgs(int& nArgs, char** argList, params_t *params) {
 				break;
 			case 'z':
 				params->paramsFile = optarg;
+				break;
+			case 'a':
+				params->sam = true;
 				break;
 			case 'o':
 				params->overlaps = true;

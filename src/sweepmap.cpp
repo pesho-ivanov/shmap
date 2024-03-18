@@ -1,18 +1,16 @@
 #include "index.h"
 #include "sweepmap.h"
 
-#include "../ext/edlib.h"
-
 using namespace sweepmap;
 
 void print_time_stats(Timers *T, Counters *C) {
 	cerr << std::fixed << std::setprecision(1);
-	cerr << "Time [sec]:           "             << setw(5) << right << T->secs("total")             << " (" << setw(4) << right << C->count("reads") / T->secs("total")      << " reads per sec)" << endl;
+	cerr << "Time [sec]:           "             << setw(5) << right << T->secs("total")             << endl;
 	cerr << " | Index:                 "         << setw(5) << right << T->secs("indexing")          << " (" << setw(4) << right << T->perc("indexing", "total")              << "\%)" << endl;
 	cerr << " |  | loading:                "     << setw(5) << right << T->secs("index_reading")     << " (" << setw(4) << right << T->perc("index_reading", "indexing")      << "\%)" << endl;
 	cerr << " |  | sketch:                 "     << setw(5) << right << T->secs("index_sketching")   << " (" << setw(4) << right << T->perc("index_sketching", "indexing")    << "\%)" << endl;
 	cerr << " |  | initialize:             "     << setw(5) << right << T->secs("index_initializing")<< " (" << setw(4) << right << T->perc("index_initializing", "indexing") << "\%)" << endl;
-	cerr << " | Map:                   "         << setw(5) << right << T->secs("mapping")           << " (" << setw(4) << right << T->perc("mapping", "total")               << "\%, " << setw(5) << right << T->range_ratio("query_mapping") << "x)" << endl;
+	cerr << " | Map:                   "         << setw(5) << right << T->secs("mapping")           << " (" << setw(4) << right << T->perc("mapping", "total")               << "\%, " << setw(5) << right << T->range_ratio("query_mapping") << "x, " << setw(4) << right << C->count("reads") / T->secs("total") << " reads per sec)" << endl;
 	cerr << " |  | load queries:           "     << setw(5) << right << T->secs("query_reading")     << " (" << setw(4) << right << T->perc("query_reading", "mapping")       << "\%, " << setw(5) << right << T->range_ratio("query_reading") << "x)" << endl;
 	cerr << " |  | sketch reads:           "     << setw(5) << right << T->secs("sketching")         << " (" << setw(4) << right << T->perc("sketching", "mapping")           << "\%, " << setw(5) << right << T->range_ratio("sketching") << "x)" << endl;
 	cerr << " |  | seeding:                "     << setw(5) << right << T->secs("seeding")           << " (" << setw(4) << right << T->perc("seeding", "mapping")             << "\%, " << setw(5) << right << T->range_ratio("seeding") << "x)" << endl;
@@ -30,17 +28,6 @@ void print_time_stats(Timers *T, Counters *C) {
 	printMemoryUsage();
 }
 
-//	auto cfg = edlibNewAlignConfig(42, EDLIB_MODE_NW, EDLIB_TASK_PATH, NULL, 0);
-//    EdlibAlignResult result = edlibAlign("hello", 5, "world!", 6, cfg);
-//    if (result.status == EDLIB_STATUS_OK) {
-//        printf("edit_distance('hello', 'world!') = %d\n", result.editDistance);
-//    }
-//	char* cigar = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_STANDARD);
-//	printf("%s\n", cigar);
-//	free(cigar);
-//
-//    edlibFreeAlignResult(result);
-//	return 0;
 int main(int argc, char **argv) {
 
 	Counters C;

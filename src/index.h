@@ -46,9 +46,10 @@ struct Match {
 struct RefSegment {
 	Sketch::sketch_t kmers;
 	std::string name;
+	std::string seq;   // empty if only mapping and no alignment
 	int sz;
-	RefSegment(const Sketch &sk, const std::string &name, const int sz)
-		: kmers(sk.kmers), name(name), sz(sz) {}
+	RefSegment(const Sketch &sk, const std::string &name, const std::string &seq, const int sz)
+		: kmers(sk.kmers), name(name), seq(seq), sz(sz) {}
 };
 
 class SketchIndex {
@@ -124,10 +125,13 @@ public:
 		}
 	}
 
-	void add_segment(const Sketch& sketch, const std::string &name, int T_sz) {
-		T.push_back(RefSegment(sketch, name, T_sz));
+	void add_segment(const kseq_t *seq, const Sketch& sketch) {
+		string segm_name = seq->name.s;
+		string segm_seq = seq->seq.s;
+		int segm_size = seq->seq.l;
+		T.push_back(RefSegment(sketch, segm_name, segm_seq, segm_size));
 		C->inc("segments");
-		C->inc("total_nucls", T_sz);
+		C->inc("total_nucls", segm_size);
 		populate_h2pos(sketch, T.size()-1);
 	}
 
@@ -145,7 +149,7 @@ public:
 			timer->stop("index_sketching");
 
 			timer->start("index_initializing");
-			add_segment(t, seq->name.s, seq->seq.l);
+			add_segment(seq, t);
 			timer->stop("index_initializing");
 
 			timer->start("index_reading");

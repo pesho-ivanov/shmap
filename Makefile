@@ -134,10 +134,17 @@ eval_thinning: sweepmap gen_reads
 		done \
     done
 
+eval_sweepmap_sam: sweepmap gen_reads
+	@mkdir -p $(shell dirname $(SWEEPMAP_PREF))
+	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) -a 2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).sam
+	-paftools.js mapeval $(SWEEPMAP_PREF).sam | tee $(SWEEPMAP_PREF).eval
+	@-paftools.js mapeval -Q 60 $(SWEEPMAP_PREF).sam >$(SWEEPMAP_PREF).wrong
+
 eval_sweepmap: sweepmap gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_PREF))
 	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>/dev/null >/dev/null
-	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).paf
+	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M)    2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).paf
 	-paftools.js mapeval $(SWEEPMAP_PREF).paf | tee $(SWEEPMAP_PREF).eval
 	@-paftools.js mapeval -Q 60 $(SWEEPMAP_PREF).paf >$(SWEEPMAP_PREF).wrong
 
@@ -161,7 +168,8 @@ eval_winnowmap: gen_reads
 eval_minimap: gen_reads
 	@mkdir -p $(shell dirname $(MINIMAP_PREF))
 	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(ONE_READ) >/dev/null 2>/dev/null
-	$(TIME_CMD) -o $(MINIMAP_PREF).time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).paf 
+#	$(TIME_CMD) -o $(MINIMAP_PREF).time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -a $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).sam
+	$(TIME_CMD) -o $(MINIMAP_PREF).time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).paf
 	-paftools.js mapeval $(MINIMAP_PREF).paf | tee $(MINIMAP_PREF).eval
 
 eval_blend: gen_reads
