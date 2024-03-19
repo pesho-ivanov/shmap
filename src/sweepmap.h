@@ -167,7 +167,8 @@ class SweepMap {
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			double xmin = p_emb.dot(w_emb);
+			//double xmin = p_emb.dot(w_emb);
+			double xmin = p_emb.l2(w_emb);
 			auto m = Mapping(params.k, P_len, thin_seeds_cnt, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), xmin, same_strand_seeds, l->seed.kmer.r);
 
 			// second best without guarantees

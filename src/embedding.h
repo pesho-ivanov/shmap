@@ -56,6 +56,15 @@ public:
 			sum += v[i] * other.v[i];
 		return sum;
 	}
+
+	float l2(const Embedding &other) const {
+		float sum = 0.0;
+		for (int i = 0; i < D; ++i) {
+            float d = v[i] - other.v[i];
+			sum += d*d;
+        }
+		return 1.0/sum;
+	}
 };
 
 }
