@@ -10,6 +10,7 @@
 
 namespace sweepmap {
 
+// Kmer -- a kmer with metadata (a position in the sequence, hash, strand)
 struct Kmer {
 	pos_t r;      // kmer resides [l, r), where l+k=r
 	hash_t h;

@@ -33,30 +33,42 @@ struct Mapping {
 	int mapq;
 	char strand;    // '+' or '-'
 	bool unreasonable;  // reserved for filtering matches
-	int P_start;
+	vector<Match>::const_iterator l, r;
 
     Mapping() {}
-	Mapping(int k, pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, segm_t segm_id, pos_t s_sz, int xmin, int same_strand_seeds, int P_start)
-		: k(k), P_sz(P_sz), seeds(seeds), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), xmin(xmin), J(double(xmin) / std::max(seeds, s_sz)), mapq(255), strand(same_strand_seeds > 0 ? '+' : '-'), unreasonable(false), P_start(P_start) {}
+	Mapping(int k, pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, segm_t segm_id, pos_t s_sz, int xmin, int same_strand_seeds, vector<Match>::const_iterator l, vector<Match>::const_iterator r)
+		: k(k), P_sz(P_sz), seeds(seeds), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), xmin(xmin), J(double(xmin) / std::max(seeds, s_sz)), mapq(255), strand(same_strand_seeds > 0 ? '+' : '-'), unreasonable(false), l(l), r(r) {}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
-    void print_paf(const string &query_id, const RefSegment &segm, const int matches) const {
+    void print_paf(const string &query_id, const RefSegment &segm, vector<Match> matches) const {
+		int P_start = P_sz, P_end = -1;
+		for (auto m = l; m != r; ++m) {
+			P_start = std::min(P_start, m->seed.r_first);
+			P_end = std::max(P_end, m->seed.r_last);
+		}
+		if (!(0 <= P_start && P_start <= P_end && P_end <= P_sz))
+			std::cerr << "P_start=" << P_start << " P_end=" << P_end << " P_sz=" << P_sz << std::endl;
+		assert(0 <= P_start && P_start <= P_end && P_end <= P_sz);
+
+		auto T_l_predicted = std::max(T_l-P_start, 0);  // -P_start -- P_start too big
+		auto T_r_predicted = std::min(T_r+(P_sz-P_end), segm.sz);  // +(P_sz-P_end) too big
+
 		std::cout << query_id  			// Query sequence name
 			<< "\t" << P_sz     // query sequence length
-			<< "\t" << 0   // query start (0-based; closed)
-			<< "\t" << P_sz  // query end (0-based; open)
+			<< "\t" << P_start   // query start (0-based; closed)
+			<< "\t" << P_end  // query end (0-based; open)
 			<< "\t" << strand   // '+' or '-'
 			<< "\t" << segm.name // reference segment name
 			<< "\t" << segm.sz // T_sz -- target sequence length
-			<< "\t" << std::max(T_l-k-P_start, 0)  // target start on original strand (0-based)
-			<< "\t" << std::max(T_r, T_l-k-P_start+P_sz)  // target start on original strand (0-based)
+			<< "\t" << T_l_predicted  // target start on original strand (0-based)
+			<< "\t" << T_r_predicted  // target start on original strand (0-based)
 			<< "\t" << P_sz  // TODO: fix; Number of residue matches (number of nucleotide matches)
 			<< "\t" << P_sz  // TODO: fix; Alignment block length: total number of sequence matches, mismatches, insertions and deletions in the alignment
 			<< "\t" << mapq  // Mapping quality (0-255; 255 for missing)
 // ----- end of required PAF fields -----
 			<< "\t" << "k:i:" << k
 			<< "\t" << "p:i:" << seeds  // sketches
-			<< "\t" << "M:i:" << matches // kmer matches in T
+			<< "\t" << "M:i:" << matches.size() // kmer matches in T
 			<< "\t" << "s:i:" << s_sz
 			<< "\t" << "I:i:" << xmin  // intersection of `p` and `s` [kmers]
 			<< "\t" << "J:f:" << J   // Jaccard similarity [0; 1]
@@ -66,8 +78,8 @@ struct Mapping {
 	}
 
     int print_sam(const string &query_id, const RefSegment &segm, const int matches, const char *query, const size_t query_size) const {
-		int T_start = std::max(T_l-k-P_start, 0);
-		int T_end = std::max(T_r, T_l-k-P_start+P_sz);
+		int T_start = std::max(T_l-k, 0);
+		int T_end = std::max(T_r, T_l-k+P_sz);
 		int T_d = T_end - T_start;
 		string s = segm.seq.substr(T_start, T_d);
 		if (strand == '-')
@@ -124,7 +136,7 @@ class SweepMap {
 			const auto &kmer = p.kmers[ppos];
 			const auto count = tidx.count(kmer.h);
 			if (count > 0)
-				seeds.push_back(Seed(kmer, ppos, count));
+				seeds.push_back(Seed(kmer, p.kmers[ppos].r, p.kmers[ppos].r, count));
 		}
 		T->stop("collect_seed_info");
         C->inc("collected_seeds", seeds.size());
@@ -150,13 +162,21 @@ class SweepMap {
 		T->start("unique_seeds");
 		vector<Seed> thin_seeds;
 		thin_seeds.reserve(total_seeds);
-		hist->reserve(total_seeds);
-		for (int i=0; i<total_seeds; i++) {
-			if (i==0 || seeds[i-1].kmer.h != seeds[i].kmer.h) {
-				hist->push_back(1);
+		hist->reserve(total_seeds+1);
+		hist->push_back(0);
+		int min_r = p.kmers.size(), max_r = -1;
+		for (int i=0; i<total_seeds-1; i++) {
+			min_r = std::min(min_r, seeds[i].r_first);
+			max_r = std::max(max_r, seeds[i].r_last);
+			++(hist->back());
+			if (seeds[i].kmer.h != seeds[i+1].kmer.h) {
+				assert(min_r <= max_r);
+				seeds[i].r_first = min_r;
+				seeds[i].r_last = max_r;
+				min_r = p.kmers.size(), max_r = -1;
+				hist->push_back(0);
 				thin_seeds.push_back(seeds[i]);
 			}
-			else ++(hist->back());
 		}
 
 		T->stop("unique_seeds");
@@ -194,14 +214,14 @@ class SweepMap {
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
 
 		int xmin = 0;
-		Mapping best(params.k, P_len, 0, -1, -1, -1, -1, -1, 0, -1);
+		Mapping best(params.k, P_len, 0, -1, -1, -1, -1, -1, 0, M.end(), M.end());
 		Mapping second = best;
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 
 		// Increase the left point end of the window [l,r) one by one. O(matches)
 		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l) {
 			// Increase the right end of the window [l,r) until it gets out.
-		for(;  r != M.end()
+			for(;  r != M.end()
 				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
 				&& r->hit.r + params.k <= l->hit.r + P_len
 				; ++r) {
@@ -213,7 +233,7 @@ class SweepMap {
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			auto m = Mapping(params.k, P_len, thin_seeds_cnt, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), xmin, same_strand_seeds, l->seed.kmer.r);
+			auto m = Mapping(params.k, P_len, thin_seeds_cnt, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), xmin, same_strand_seeds, l, r);
 
 			// second best without guarantees
 			// Wrong invariant:
@@ -376,7 +396,7 @@ class SweepMap {
 					auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
 					C->inc("total_edit_distance", ed);
 				}
-				else m.print_paf(query_id, segm, (int)matches.size());
+				else m.print_paf(query_id, segm, matches);
                 C->inc("spurious_matches", spurious_matches(m, matches));
 				C->inc("J", int(10000.0*m.J));
 				C->inc("mappings");
