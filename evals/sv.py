@@ -10,6 +10,14 @@ from vcfpy.exceptions import FieldInfoNotFound
 
 warnings.filterwarnings('ignore', '.*dup_num.*', category=FieldInfoNotFound)
 
+# returns a dict
+def read_fasta_file(fasta_file):
+    sequences = {}
+    for record in SeqIO.parse(fasta_file, "fasta"):
+        sequences[record.id] = str(record.seq)
+    return sequences
+
+# returns a df
 def read_vcf(vcf_file_path):
     reader = vcfpy.Reader.from_path(vcf_file_path)
     records = []
@@ -34,12 +42,7 @@ def read_vcf(vcf_file_path):
 
     return pd.DataFrame(records)
 
-def read_fasta_file(fasta_file):
-    sequences = {}
-    for record in SeqIO.parse(fasta_file, "fasta"):
-        sequences[record.id] = str(record.seq)
-    return sequences
-
+# for debugging
 def are_equal(fa1: dict, fa2: dict):
     if fa1.keys() != fa2.keys():
         print('different chromosomes:')
@@ -57,10 +60,18 @@ def are_equal(fa1: dict, fa2: dict):
             return False
     return True
 
-def sum_len(d: dict):
-    return sum(len(value) for value in d.values())
+def gen_unique_labels(d: dict):
+    first_label = 1
+    l = dict()
+    for ch in d.keys():
+        l[ch] = list(range(first_label, first_label + len(d[ch])))
+        first_label += len(d[ch])
+    return l
 
-def mutate(fa, l, vcf_df):
+def mutate(fa: dict, vcf_df: pd.DataFrame):
+    def sum_len(d: dict):
+        return sum(len(value) for value in d.values())
+    l = gen_unique_labels(fa)
     assert(sum_len(fa) == sum_len(l))
     fa = OrderedDict(sorted(fa.items()))
     res_fa = {}
@@ -130,11 +141,3 @@ def mutate(fa, l, vcf_df):
     print(sum_len(res_fa), sum_len(res_l))
     assert(sum_len(res_fa) == sum_len(res_l))
     return res_fa, res_l
-
-def gen_unique_labels(d: dict):
-    first_label = 1
-    l = dict()
-    for ch in d.keys():
-        l[ch] = list(range(first_label, first_label + len(d[ch])))
-        first_label += len(d[ch])
-    return l
