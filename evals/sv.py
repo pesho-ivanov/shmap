@@ -68,17 +68,16 @@ def gen_unique_labels(d: dict):
         first_label += len(d[ch])
     return l
 
-def mutate(fa: dict, vcf_df: pd.DataFrame):
+def mutate(fa: dict, l, vcf_df: pd.DataFrame):
     def sum_len(d: dict):
         return sum(len(value) for value in d.values())
-    l = gen_unique_labels(fa)
     assert(sum_len(fa) == sum_len(l))
     fa = OrderedDict(sorted(fa.items()))
     res_fa = {}
     res_l = {}
     new_labels = 1
     vcf_df = vcf_df.sort_values(by=['CHROM', 'POS'])
-    display(vcf_df)
+    #display(vcf_df)
 
     iter_fa = iter(fa.items())
     fa_chrom, fa_seq = next(iter_fa)
@@ -86,12 +85,12 @@ def mutate(fa: dict, vcf_df: pd.DataFrame):
     for index, sv in itertools.chain(vcf_df.iterrows(), [('!!fake_index!!', pd.Series({'CHROM': '!!fake_chrom!!'}))]):
         try:
             assert(sum_len(res_fa) == sum_len(res_l))
-            display(sv)
+            #display(sv)
             while sv.empty or fa_chrom != sv.CHROM:
                 if fa_chrom not in res_fa:
                     res_fa[fa_chrom] = ''
                     res_l[fa_chrom] = []
-                print(f'1. add {curr_pos}: of len {len(fa_seq[curr_pos:])}')
+                #print(f'1. add {curr_pos}: of len {len(fa_seq[curr_pos:])}')
                 res_fa[fa_chrom] += fa_seq[curr_pos:]
                 res_l[fa_chrom] += l[fa_chrom][curr_pos:]
                 fa_chrom, fa_seq = next(iter_fa)
@@ -101,19 +100,19 @@ def mutate(fa: dict, vcf_df: pd.DataFrame):
                 res_fa[sv.CHROM] = ''
                 assert(sv.CHROM not in res_l)
                 res_l[sv.CHROM] = []
-            print(f'2. add {curr_pos}:{sv.POS} of len {len(fa_seq[curr_pos:sv.POS])}')
+            #print(f'2. add {curr_pos}:{sv.POS} of len {len(fa_seq[curr_pos:sv.POS])}')
             assert(curr_pos <= sv.POS)
             res_fa[sv.CHROM] += fa_seq[curr_pos:sv.POS]
             res_l[sv.CHROM] += l[sv.CHROM][curr_pos:sv.POS]
             curr_pos = sv.POS
             if sv.SVTYPE == 'DUP':
                 segm = fa_seq[sv.POS:sv.END]
-                print(f'3. dup at {sv.POS} {len(segm)}*{int(sv.dup_num)} of len {len(segm)*int(sv.dup_num)}')
+                #print(f'3. dup at {sv.POS} {len(segm)}*{int(sv.dup_num)} of len {len(segm)*int(sv.dup_num)}')
                 res_fa[sv.CHROM] += segm*int(sv.dup_num)
                 res_l[sv.CHROM] += l[sv.CHROM][sv.POS:sv.END]*int(sv.dup_num)
                 curr_pos = sv.POS
             elif sv.SVTYPE == 'INS':
-                print(f'4. ins of len {len(sv.ALT)}')
+                #print(f'4. ins of len {len(sv.ALT)}')
                 res_fa[sv.CHROM] += sv.ALT
                 res_l[sv.CHROM] += range(-new_labels, -new_labels-len(sv.ALT), -1)
                 new_labels += len(sv.ALT)
@@ -123,11 +122,11 @@ def mutate(fa: dict, vcf_df: pd.DataFrame):
                     print(sv.REF)
                     print(fa_seq[sv.POS:sv.END])
                     assert(False)
-                print(f'5. delete {sv.POS}:{sv.END} of len {len(fa_seq[sv.POS:sv.END])}')
+                #print(f'5. delete {sv.POS}:{sv.END} of len {len(fa_seq[sv.POS:sv.END])}')
                 curr_pos = sv.END
             elif sv.SVTYPE == 'INV':
                 segm = Seq(fa_seq[sv.POS:sv.END])
-                print(f'6. inv {sv.POS}:{sv.END} of len {len(segm)}')
+                #print(f'6. inv {sv.POS}:{sv.END} of len {len(segm)}')
                 res_fa[sv.CHROM] += str(segm.reverse_complement())
                 res_l[sv.CHROM] += l[sv.CHROM][sv.POS:sv.END][::-1]
                 curr_pos = sv.END
@@ -138,6 +137,6 @@ def mutate(fa: dict, vcf_df: pd.DataFrame):
         except StopIteration:
             break
     assert(len(fa) == len(res_fa))
-    print(sum_len(res_fa), sum_len(res_l))
+    #print(sum_len(res_fa), sum_len(res_l))
     assert(sum_len(res_fa) == sum_len(res_l))
     return res_fa, res_l
