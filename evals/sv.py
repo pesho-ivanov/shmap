@@ -68,6 +68,23 @@ def gen_unique_labels(d: dict):
         first_label += len(d[ch])
     return l
 
+def overlap(sv1, sv2):
+    if sv1.CHROM != sv2.CHROM:
+        return False
+    return sv1.POS < sv2.END and sv2.POS < sv1.END
+
+def svs_not_overlappings(vcf_df: pd.DataFrame):
+    vcf_df = vcf_df.sort_values(by=['CHROM', 'POS'])
+    for index, sv1 in vcf_df.iterrows():
+        if index == len(vcf_df) - 1:
+            break
+        sv2 = vcf_df.iloc[index + 1]
+        if overlap(sv1, sv2):
+            print(sv1)
+            print(sv2)
+            return False
+    return True
+
 def mutate(fa: dict, l, vcf_df: pd.DataFrame):
     def sum_len(d: dict):
         return sum(len(value) for value in d.values())
@@ -77,6 +94,8 @@ def mutate(fa: dict, l, vcf_df: pd.DataFrame):
     res_l = {}
     new_labels = 1
     vcf_df = vcf_df.sort_values(by=['CHROM', 'POS'])
+
+    assert(svs_not_overlappings(vcf_df))
     #display(vcf_df)
 
     iter_fa = iter(fa.items())

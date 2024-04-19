@@ -193,10 +193,11 @@ eval_tools_on_datasets:
 	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb
 
 eval_sweepmap_on_SV:
-	make eval_sweepmap REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=1
+	make eval_sweepmap REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
+#	make eval_minimap  REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
 
 eval_tools_on_SV:
-	make eval_tools REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=1
+	make eval_tools REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
 
 eval_sweepmap_on_datasets:
 	make eval_sweepmap REFNAME=t2tChrY DEPTH=10
