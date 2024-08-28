@@ -35,6 +35,7 @@ struct params_t {
 	int max_matches; 				// Maximum seed matches in a sketch
 	double tThres; 					// The t-homology threshold
 	string paramsFile;
+	string mapper;                  // The name of the mapper
 
 	// no arguments
 	bool sam; 				// Output in SAM format (PAF by default)
@@ -43,7 +44,7 @@ struct params_t {
 	bool onlybest;			// Output up to one (best) mapping (if above the threshold)
 
 	params_t() :
-		k(15), hFrac(0.05), max_seeds(10000), max_matches(1000000), tThres(0.9),
+		k(15), hFrac(0.05), max_seeds(10000), max_matches(1000000), tThres(0.9), mapper("sweep"),
 		sam(false), overlaps(false), normalize(false), onlybest(false) {}
 
 	void print(std::ostream& out, bool human) const {
@@ -56,6 +57,7 @@ struct params_t {
 		m.push_back({"max_matches", std::to_string(max_matches)});
 		m.push_back({"tThres", std::to_string(tThres)});
 		m.push_back({"paramsFile", paramsFile});
+		m.push_back({"mapper", mapper});
 
 		m.push_back({"sam", std::to_string(sam)});
 		m.push_back({"overlaps", std::to_string(overlaps)});
@@ -79,6 +81,7 @@ struct params_t {
 		out << "Params:" << endl;
 		out << " | reference:             " << tFile << endl;
 		out << " | queries:               " << pFile << endl;
+		out << " | mapper:                " << mapper << endl;
 		out << " | k:                     " << k << endl;
 		out << " | hFrac:                 " << hFrac << endl;
 		out << " | max_seeds (S):         " << max_seeds << endl;
@@ -100,6 +103,7 @@ struct params_t {
 		cerr << "   -s   --text              Text sequence file (FASTA format)" << endl;
 		cerr << endl;
 		cerr << "Optional parameters with an argument:" << endl;
+		cerr << "   -m   --mapper            Mapper name {sweep, bucket} (default: sweep)" << endl;
 		cerr << "   -k   --ksize             K-mer length to be used for sketches" << endl;
 		cerr << "   -r   --ratio   			 FracMinHash ratio in [0; 1] [0.1]" << endl;
 		cerr << "   -S   --max_seeds         Max seeds in a sketch" << endl;
@@ -126,6 +130,7 @@ struct params_t {
 			{"max_matches",        required_argument,  0, 'M'},
 			{"hom_thres",          required_argument,  0, 't'},
 			{"params",             required_argument,  0, 'z'},
+			{"mapper",             required_argument,  0, 'm'},
 			{"overlaps",           no_argument,        0, 'o'},
 			{"normalize",          no_argument,        0, 'n'},
 			{"onlybest",           no_argument,        0, 'x'},
@@ -141,6 +146,9 @@ struct params_t {
 					break;
 				case 's':
 					tFile = optarg;
+					break;
+				case 'm':
+					pFile = optarg;
 					break;
 				case 'k':
 					if(atoi(optarg) <= 0) {
