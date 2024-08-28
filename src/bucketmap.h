@@ -22,7 +22,7 @@ using std::setw;
 using std::right;
 using std::vector;
 
-class SweepMapper : public Mapper {
+class BucketMapper : public Mapper {
 	const SketchIndex &tidx;
 	Handler *H;
 
@@ -240,14 +240,14 @@ class SweepMapper : public Mapper {
     }
 
   public:
-	SweepMapper(const SketchIndex &tidx, Handler *H) : tidx(tidx), H(H) {
-		H->C.inc("seeds_limit_reached", 0);
-		H->C.inc("unmapped_reads", 0);
-		if (H->params.tThres < 0.0 || H->params.tThres > 1.0) {
-			cerr << "tThres = " << H->params.tThres << " outside of [0,1]." << endl;
-			exit(1);
-		}
-	}
+	BucketMapper(const SketchIndex &tidx, Handler *H) : tidx(tidx), H(H) {
+        H->C.inc("seeds_limit_reached", 0);
+        H->C.inc("unmapped_reads", 0);
+        if (H->params.tThres < 0.0 || H->params.tThres > 1.0) {
+            cerr << "tThres = " << H->params.tThres << " outside of [0,1]." << endl;
+            exit(1);
+        }
+    }
 
 	void map(const string &pFile) {
 		cerr << "Mapping reads " << pFile << "..." << endl;

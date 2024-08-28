@@ -3,7 +3,7 @@ CC = g++
 CXX_STANDARD = -std=c++20
 DEBUG_FLAGS = -g -DDEBUG
 RELEASE_FLAGS = -O2 -DNDEBUG
-CFLAGS = -march=native -lm -lpthread -Igtl/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive #-Wconversion 
+CFLAGS = -march=native -lm -lpthread -Igtl/ -Iext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive #-Wconversion 
 ifeq ($(DEBUG), 1)
     CFLAGS += $(DEBUG_FLAGS)
 else
@@ -14,7 +14,8 @@ DEPFLAGS = -MMD -MP
 
 TIME_CMD = /usr/bin/time -f "%U\t%M"
 
-SRCS = src/sweepmap.cpp src/sweepmap.h src/io.h src/sketch.h src/utils.h src/index.h src/handler.h ext/kseq.h
+SRCS = src/sweepmap.cpp src/mapper.cpp src/io.cpp ext/edlib.cpp
+OBJS = $(SRCS:.cpp=.o)
 SWEEPMAP_BIN = ./sweepmap
 MINIMAP_BIN = minimap2
 BLEND_BIN = ~/libs/blend/bin/blend
@@ -74,10 +75,16 @@ MAX_MATCHES = 100 300 1000 3000 10000 30000 100000 300000
 Ks = 14 16 18 20 22 24 26
 Rs = 0.01 0.05 0.1 0.15 0.2
 
-all: sweepmap
+all: $(SWEEPMAP_BIN)
 
-$(SWEEPMAP_BIN): $(SRCS)
-	$(CC) $(CXX_STANDARD) $(CFLAGS) $< ext/edlib.cpp -o $@ $(LIBS) -I ../ext/
+$(SWEEPMAP_BIN): $(OBJS)
+	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $@ $^ $(LIBS)
+
+%.o: %.cpp
+	$(CXX) $(CXX_STANDARD) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -f $(OBJS) $(SWEEPMAP_BIN)
 
 simulate_SVs:
 	cd $(REF_DIR);\
@@ -210,9 +217,6 @@ eval_sweepmap_slow_on_datasets:
 	make eval_sweepmap_slow REFNAME=chm13   DEPTH=0.1
 	make eval_sweepmap_slow REFNAME=t2tChrY DEPTH=1 	MEANLEN=24000
 	make eval_sweepmap_slow REFNAME=chm13   READS_PREFIX=HG002_24kb
-
-clean:
-	rm -r $(SWEEPMAP_BIN)
 
 clean_evals:
 	rm -r $(ALLREADS_DIR)

@@ -26,7 +26,6 @@ public:
         } else {
             params.print(cerr, true);
         }
-
     }
 
     ~Handler() {
@@ -46,6 +45,23 @@ public:
 		cerr << " | Kmers:                 " << C.count("sketched_kmers") << endl;
 		//cerr << " |  | original:               " << C.count("original_kmers") << " (" << C.perc("original_kmers", "sketched_kmers") << "%)" << endl;
 	}
+
+    void printMemoryUsage() {
+        std::ifstream statusFile("/proc/self/status");
+        std::string line;
+
+        if (statusFile.is_open()) {
+            while (getline(statusFile, line)) {
+                // Check for memory usage lines
+                if (line.find("VmSize:") != std::string::npos || line.find("VmRSS:") != std::string::npos) {
+                    std::cerr << line << std::endl;
+                }
+            }
+            statusFile.close();
+        } else {
+            std::cerr << "Unable to open /proc/self/status" << std::endl;
+        }
+    }
 
     void print_time_stats() {
         cerr << std::fixed << std::setprecision(1);

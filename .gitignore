@@ -13,7 +13,8 @@ evals/reads/
 *.err
 __pycache__/
 src/sweep.d
-src/sweep.o
+src/*.o
+ext/*.o
 sweep
 indexDump.idx
 newevals/eval_sweep-ChrY/

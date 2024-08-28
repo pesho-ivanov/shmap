@@ -6,6 +6,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace sweepmap {
 
@@ -140,47 +141,5 @@ public:
 		return 100.0 * frac(name, total);
 	}
 };
-
-void printMemoryUsage() {
-    std::ifstream statusFile("/proc/self/status");
-    std::string line;
-
-    if (statusFile.is_open()) {
-        while (getline(statusFile, line)) {
-            // Check for memory usage lines
-            if (line.find("VmSize:") != std::string::npos || line.find("VmRSS:") != std::string::npos) {
-                std::cerr << line << std::endl;
-            }
-        }
-        statusFile.close();
-    } else {
-        std::cerr << "Unable to open /proc/self/status" << std::endl;
-    }
-}
-
-std::string reverseComplement(const std::string& seq) {
-    std::string revComp;
-    revComp.reserve(seq.size());
-    for (int i = seq.size() - 1; i >= 0; --i) {
-        switch (seq[i]) {
-            case 'A':
-                revComp.push_back('T');
-                break;
-            case 'C':
-                revComp.push_back('G');
-                break;
-            case 'G':
-                revComp.push_back('C');
-                break;
-            case 'T':
-                revComp.push_back('A');
-                break;
-            default:
-                revComp.push_back('N');
-                break;
-        }
-    }
-    return revComp;
-}
 
 } // namespace sweepmap

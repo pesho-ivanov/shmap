@@ -121,6 +121,31 @@ struct Mapping {
 			<< endl;
 	}
 
+	std::string reverseComplement(const std::string& seq) const {
+		std::string revComp;
+		revComp.reserve(seq.size());
+		for (int i = seq.size() - 1; i >= 0; --i) {
+			switch (seq[i]) {
+				case 'A':
+					revComp.push_back('T');
+					break;
+				case 'C':
+					revComp.push_back('G');
+					break;
+				case 'G':
+					revComp.push_back('C');
+					break;
+				case 'T':
+					revComp.push_back('A');
+					break;
+				default:
+					revComp.push_back('N');
+					break;
+			}
+		}
+		return revComp;
+	}
+
     int print_sam(const string &query_id, const RefSegment &segm, const int matches, const char *query, const size_t query_size) const {
 		int T_start = std::max(T_l-k, 0);
 		int T_end = std::max(T_r, T_l-k+P_sz);
