@@ -18,16 +18,17 @@ struct Kmer {
 	Kmer(pos_t r, hash_t h, bool strand) : r(r), h(h), strand(strand) {}
 };
 
-class Sketch {
+using sketch_t = std::vector<Kmer>;
+
+class FracMinHash {
 public:
-	using sketch_t = std::vector<Kmer>;
+	hash_t LUT_fw[256], LUT_rc[256];
+	int k;
+	double hFrac;
+	Counters *C;
+	Timers *T;
 
-	inline static hash_t LUT_fw[256], LUT_rc[256];
-	inline static params_t *params;
-	inline static Timers *T;
-	inline static Counters *C;
-
-	static void initialize_LUT() {
+	void initialize_LUT() {
 		// https://gist.github.com/Daniel-Liu-c0deb0t/7078ebca04569068f15507aa856be6e8
 		LUT_fw['a'] = LUT_fw['A'] = 0x3c8b'fbb3'95c6'0474; // Daniel's
 		//LUT_fw['a'] = LUT_fw['A'] = 0x3c8bfbb395c60470;  // Ragnar's
@@ -42,10 +43,9 @@ public:
 		LUT_rc['t'] = LUT_rc['T'] = LUT_fw['A'];
 	}
 
-private:
 	// TODO: use either only forward or only reverse
 	// TODO: accept char*
-	const sketch_t buildFMHSketch(const std::string& s, int k, double hFrac) {
+	const sketch_t sketch(const std::string& s) const {
 		sketch_t kmers;
 		kmers.reserve((int)(1.1 * (double)s.size() * hFrac));
 
@@ -78,26 +78,17 @@ private:
 			++r;
 		}
 
-		return kmers;
-	}
-
-public:
-	sketch_t kmers;   // (kmer hash, kmer's left 0-based position)
-
-	Sketch(const std::string& s) {
-		kmers = buildFMHSketch(s, params->k, params->hFrac);
 		C->inc("sketched_seqs");
 		C->inc("sketched_len", s.size());
 		C->inc("original_kmers", kmers.size());
 		C->inc("sketched_kmers", kmers.size());
+
+		return kmers;
 	}
 
-	static void print_stats() {
-		cerr << std::fixed << std::setprecision(1);
-		cerr << "Sketching:" << endl;
-		cerr << " | Sketched sequences:    " << C->count("sketched_seqs") << " (" << C->count("sketched_len") << " nb)" << endl;
-		cerr << " | Kmers:                 " << C->count("sketched_kmers") << endl;
-		cerr << " |  | original:               " << C->count("original_kmers") << " (" << C->perc("original_kmers", "sketched_kmers") << "%)" << endl;
+	FracMinHash(int k, double hFrac, Counters *C, Timers *T)
+			: k(k), hFrac(hFrac), C(C), T(T) {
+        initialize_LUT();
 	}
 };
 

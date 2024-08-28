@@ -14,7 +14,7 @@ DEPFLAGS = -MMD -MP
 
 TIME_CMD = /usr/bin/time -f "%U\t%M"
 
-SRCS = src/sweepmap.cpp src/sweepmap.h src/io.h src/sketch.h src/utils.h src/index.h ext/kseq.h
+SRCS = src/sweepmap.cpp src/sweepmap.h src/io.h src/sketch.h src/utils.h src/index.h src/handler.h ext/kseq.h
 SWEEPMAP_BIN = ./sweepmap
 MINIMAP_BIN = minimap2
 BLEND_BIN = ~/libs/blend/bin/blend
@@ -167,10 +167,10 @@ eval_winnowmap: gen_reads
 
 eval_minimap: gen_reads
 	@mkdir -p $(shell dirname $(MINIMAP_PREF))
-	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no $(REF) $(ONE_READ) >/dev/null 2>/dev/null
-#	$(TIME_CMD) -o $(MINIMAP_PREF).time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -a $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).sam
-	$(TIME_CMD) -o $(MINIMAP_PREF).time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).paf
-	-paftools.js mapeval $(MINIMAP_PREF).paf | tee $(MINIMAP_PREF).eval
+	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level -a $(REF) $(ONE_READ) >/dev/null 2>/dev/null
+	$(TIME_CMD) -o $(MINIMAP_PREF).time       $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level -a $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).bam
+#	$(TIME_CMD) -o $(MINIMAP_PREF).time       $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).paf
+#	-paftools.js mapeval $(MINIMAP_PREF).paf | tee $(MINIMAP_PREF).eval
 
 eval_blend: gen_reads
 	@mkdir -p $(shell dirname $(BLEND_PREF))

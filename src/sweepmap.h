@@ -121,22 +121,23 @@ struct Mapping {
 class SweepMap {
 	const SketchIndex &tidx;
 	const params_t &params;
-	Timers *T;
 	Counters *C;
+	Timers *T;
+	const FracMinHash &sketcher;
 
 	using hist_t = vector<int>;
 
-	vector<Seed> select_seeds(const Sketch& p, hist_t *hist) {
+	vector<Seed> select_seeds(const sketch_t& p, hist_t *hist) {
 		T->start("collect_seed_info");
 		vector<Seed> seeds;
-		seeds.reserve(p.kmers.size());
+		seeds.reserve(p.size());
 
 		// TODO: limit The number of kmers in the pattern p
-		for (int ppos = 0; ppos < (int)p.kmers.size(); ++ppos) {
-			const auto &kmer = p.kmers[ppos];
+		for (int ppos = 0; ppos < (int)p.size(); ++ppos) {
+			const auto &kmer = p[ppos];
 			const auto count = tidx.count(kmer.h);
 			if (count > 0)
-				seeds.push_back(Seed(kmer, p.kmers[ppos].r, p.kmers[ppos].r, count));
+				seeds.push_back(Seed(kmer, p[ppos].r, p[ppos].r, count));
 		}
 		T->stop("collect_seed_info");
         C->inc("collected_seeds", seeds.size());
@@ -164,7 +165,7 @@ class SweepMap {
 		thin_seeds.reserve(total_seeds);
 		hist->reserve(total_seeds+1);
 		hist->push_back(0);
-		int min_r = p.kmers.size(), max_r = -1;
+		int min_r = p.size(), max_r = -1;
 		for (int i=0; i<total_seeds-1; i++) {
 			min_r = std::min(min_r, seeds[i].r_first);
 			max_r = std::max(max_r, seeds[i].r_last);
@@ -173,7 +174,7 @@ class SweepMap {
 				assert(min_r <= max_r);
 				seeds[i].r_first = min_r;
 				seeds[i].r_last = max_r;
-				min_r = p.kmers.size(), max_r = -1;
+				min_r = p.size(), max_r = -1;
 				hist->push_back(0);
 				thin_seeds.push_back(seeds[i]);
 			}
@@ -209,7 +210,7 @@ class SweepMap {
 
 	// vector<hash_t> diff_hist;  // diff_hist[kmer_hash] = #occurences in `p` - #occurences in `s`
 	// vector<Match> M;   	   // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
-	const vector<Mapping> sweep(hist_t &diff_hist, const Sketch &p, const vector<Match> &M, const pos_t P_len, const int thin_seeds_cnt) {
+	const vector<Mapping> sweep(hist_t &diff_hist, const sketch_t &p, const vector<Match> &M, const pos_t P_len, const int thin_seeds_cnt) {
 //		const int MAX_BL = 100;
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
 
@@ -338,8 +339,8 @@ class SweepMap {
     }
 
   public:
-	SweepMap(const SketchIndex &tidx, const params_t &params, Timers *T, Counters *C)
-		: tidx(tidx), params(params), T(T), C(C) {
+	SweepMap(const SketchIndex &tidx, const params_t &params, Counters *C, Timers *T, const FracMinHash &sketcher)
+		: tidx(tidx), params(params), C(C), T(T), sketcher(sketcher) {
 			C->inc("seeds_limit_reached", 0);
 			C->inc("unmapped_reads", 0);
 			if (params.tThres < 0.0 || params.tThres > 1.0) {
@@ -361,7 +362,7 @@ class SweepMap {
 			T->stop("query_reading");
 			T->start("query_mapping");
 			T->start("sketching");
-			Sketch p(seq->seq.s);
+			sketch_t p = sketcher.sketch(seq->seq.s);
 			T->stop("sketching");
 
 			string query_id = seq->name.s;
@@ -377,7 +378,7 @@ class SweepMap {
 			T->stop("seeding");
 
 			T->start("matching");
-			vector<Match> matches = match_seeds(p.kmers.size(), thin_seeds);
+			vector<Match> matches = match_seeds(p.size(), thin_seeds);
 			T->stop("matching");
 
 			T->start("sweep");

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <iostream>
 #include <string>
 #include <vector>
 
@@ -48,23 +47,25 @@ struct Match {
 };
 
 struct RefSegment {
-	Sketch::sketch_t kmers;
+	sketch_t kmers;
 	std::string name;
 	std::string seq;   // empty if only mapping and no alignment
 	int sz;
-	RefSegment(const Sketch &sk, const std::string &name, const std::string &seq, const int sz)
-		: kmers(sk.kmers), name(name), seq(seq), sz(sz) {}
+	RefSegment(const sketch_t &sk, const std::string &name, const std::string &seq, const int sz)
+		: kmers(sk), name(name), seq(seq), sz(sz) {}
 };
 
 class SketchIndex {
 
 public:
 	std::vector<RefSegment> T;
-	const params_t &params;
 	ankerl::unordered_dense::map<hash_t, Hit> h2single;               // all sketched kmers with =1 hit
 	ankerl::unordered_dense::map<hash_t, std::vector<Hit>> h2multi;   // all sketched kmers with >1 hits
-	Timers *timer;
+
+	const params_t &params;
 	Counters *C;
+	Timers *timer;
+	const FracMinHash &sketcher;
 
 	void get_kmer_stats() {
 		std::vector<int> hist(10, 0);
@@ -117,10 +118,10 @@ public:
 			h2multi.erase(h);
 	}
 
-	void populate_h2pos(const Sketch& sketch, int segm_id) {
+	void populate_h2pos(const sketch_t& sketch, int segm_id) {
 		// TODO: skip creating the sketch structure
-		for (size_t tpos = 0; tpos < sketch.kmers.size(); ++tpos) {
-			const Kmer& kmer = sketch.kmers[tpos];
+		for (size_t tpos = 0; tpos < sketch.size(); ++tpos) {
+			const Kmer& kmer = sketch[tpos];
 			const auto hit = Hit(kmer, tpos, segm_id);
 			if (!h2single.contains(kmer.h))
 				h2single[kmer.h] = hit; 
@@ -129,7 +130,7 @@ public:
 		}
 	}
 
-	void add_segment(const kseq_t *seq, const Sketch& sketch) {
+	void add_segment(const kseq_t *seq, const sketch_t& sketch) {
 		string segm_name = seq->name.s;
 		string segm_seq = seq->seq.s;
 		int segm_size = seq->seq.l;
@@ -139,8 +140,8 @@ public:
 		populate_h2pos(sketch, T.size()-1);
 	}
 
-	SketchIndex(const params_t &params, Timers *timer, Counters *C)
-		: params(params), timer(timer), C(C) {}
+	SketchIndex(const params_t &params, Counters *C, Timers *timer, FracMinHash &sketcher)
+		: params(params), C(C), timer(timer), sketcher(sketcher) {}
 
 	void build_index(const std::string &tFile) {
 		timer->start("indexing");
@@ -149,7 +150,7 @@ public:
 		read_fasta_klib(params.tFile, [this](kseq_t *seq) {
 			timer->stop("index_reading");
 			timer->start("index_sketching");
-			Sketch t(seq->seq.s);
+			sketch_t t = sketcher.sketch(seq->seq.s);
 			timer->stop("index_sketching");
 
 			timer->start("index_initializing");
