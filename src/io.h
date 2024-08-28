@@ -44,7 +44,7 @@ struct params_t {
 		k(15), hFrac(0.05), max_seeds(10000), max_matches(1000000), tThres(0.9),
 		sam(false), overlaps(false), normalize(false), onlybest(false) {}
 
-	void print(std::ostream& out, bool human) {
+	void print(std::ostream& out, bool human) const {
 		std::vector<pair<string, string>> m;
 		m.push_back({"pFile", pFile});
 		m.push_back({"tFile", tFile});

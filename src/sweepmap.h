@@ -13,6 +13,7 @@
 #include "io.h"
 #include "sketch.h"
 #include "utils.h"
+#include "handler.h"
 
 namespace sweepmap {
 
@@ -22,15 +23,12 @@ using std::vector;
 
 class SweepMap {
 	const SketchIndex &tidx;
-	const params_t &params;
-	Counters *C;
-	Timers *T;
-	const FracMinHash &sketcher;
+	Handler *H;
 
 	using hist_t = vector<int>;
 
 	vector<Seed> select_seeds(const sketch_t& p, hist_t *hist) {
-		T->start("collect_seed_info");
+		H->T.start("collect_seed_info");
 		vector<Seed> seeds;
 		seeds.reserve(p.size());
 
@@ -41,28 +39,28 @@ class SweepMap {
 			if (count > 0)
 				seeds.push_back(Seed(kmer, p[ppos].r, p[ppos].r, count));
 		}
-		T->stop("collect_seed_info");
-        C->inc("collected_seeds", seeds.size());
+		H->T.stop("collect_seed_info");
+        H->C.inc("collected_seeds", seeds.size());
 
-		T->start("thin_sketch");
+		H->T.start("thin_sketch");
 		// TODO: add all seeds to hist
 		int total_seeds = (int)seeds.size();
-		if ((int)params.max_seeds < total_seeds) {
-			total_seeds = (int)params.max_seeds;
-			C->inc("seeds_limit_reached");
+		if ((int)H->params.max_seeds < total_seeds) {
+			total_seeds = (int)H->params.max_seeds;
+			H->C.inc("seeds_limit_reached");
 		}
         std::nth_element(seeds.begin(), seeds.begin() + total_seeds, seeds.end(), [](const Seed &a, const Seed &b) {
             return a.hits_in_T < b.hits_in_T;
         });
-		T->stop("thin_sketch");
+		H->T.stop("thin_sketch");
 
-		T->start("sort_seeds");
+		H->T.start("sort_seeds");
 		pdqsort_branchless(seeds.begin(), seeds.begin() + total_seeds, [](const Seed &a, const Seed &b) {
 			return a.kmer.h < b.kmer.h;
 		});
-		T->stop("sort_seeds");
+		H->T.stop("sort_seeds");
 
-		T->start("unique_seeds");
+		H->T.start("unique_seeds");
 		vector<Seed> thin_seeds;
 		thin_seeds.reserve(total_seeds);
 		hist->reserve(total_seeds+1);
@@ -82,21 +80,21 @@ class SweepMap {
 			}
 		}
 
-		T->stop("unique_seeds");
-        C->inc("discarded_seeds", seeds.size() - thin_seeds.size());
+		H->T.stop("unique_seeds");
+        H->C.inc("discarded_seeds", seeds.size() - thin_seeds.size());
 		return thin_seeds;
 	}
 
 	// Initializes the histogram of the pattern and the list of matches
 	vector<Match> match_seeds(pos_t p_sz, const vector<Seed> &seeds) {
-		T->start("collect_matches");
+		H->T.start("collect_matches");
 		vector<Match> matches;
 		matches.reserve(2*(int)seeds.size());
 		for (int seed_num=0; seed_num<(int)seeds.size(); seed_num++)
 			tidx.add_matches(&matches, seeds[seed_num], seed_num);
-		T->stop("collect_matches");
+		H->T.stop("collect_matches");
 
-		T->start("sort_matches");
+		H->T.start("sort_matches");
 		//sort
 		pdqsort_branchless(matches.begin(), matches.end(), [](const Match &a, const Match &b) {
 			// Preparation for sweeping: sort M by ascending positions within one reference segment.
@@ -105,7 +103,7 @@ class SweepMap {
 				return a.hit.segm_id < b.hit.segm_id;
 			return a.hit.r < b.hit.r;
 		});
-		T->stop("sort_matches");
+		H->T.stop("sort_matches");
 
 		return matches;
 	}
@@ -117,7 +115,7 @@ class SweepMap {
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
 
 		int xmin = 0;
-		Mapping best(params.k, P_len, 0, -1, -1, -1, -1, -1, 0, M.end(), M.end());
+		Mapping best(H->params.k, P_len, 0, -1, -1, -1, -1, -1, 0, M.end(), M.end());
 		Mapping second = best;
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 
@@ -126,7 +124,7 @@ class SweepMap {
 			// Increase the right end of the window [l,r) until it gets out.
 			for(;  r != M.end()
 				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
-				&& r->hit.r + params.k <= l->hit.r + P_len
+				&& r->hit.r + H->params.k <= l->hit.r + P_len
 				; ++r) {
 				same_strand_seeds += r->is_same_strand() ? +1 : -1;  // change to r inside the loop
 				// If taking this kmer from T increases the intersection with P.
@@ -136,13 +134,13 @@ class SweepMap {
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			auto m = Mapping(params.k, P_len, thin_seeds_cnt, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), xmin, same_strand_seeds, l, r);
+			auto m = Mapping(H->params.k, P_len, thin_seeds_cnt, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), xmin, same_strand_seeds, l, r);
 
 			// second best without guarantees
 			// Wrong invariant:
 			// best[l,r) -- a mapping best.l<=l with maximal J
 			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
-			if (params.onlybest) {
+			if (H->params.onlybest) {
 				if (m.xmin > best.xmin) {  // if (xmin > best.xmin)
 					if (best.T_l < m.T_l - 0.9*P_len)
 						second = best;
@@ -151,7 +149,7 @@ class SweepMap {
 					second = m;
 				}
 			} else {
-				if (m.J > params.tThres) {
+				if (m.J > H->params.tThres) {
 					mappings.push_back(m);
 				}
 			}
@@ -166,7 +164,7 @@ class SweepMap {
 		assert(xmin == 0);
 		assert(same_strand_seeds == 0);
 
-		if (params.onlybest && best.xmin != -1) { // && best.J > params.tThres)
+		if (H->params.onlybest && best.xmin != -1) { // && best.J > H->params.tThres)
 			best.mapq = (best.xmin > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
 			best.J2 = second.J;
 			mappings.push_back(best);
@@ -182,7 +180,7 @@ class SweepMap {
 		std::deque<Mapping> recent;
 
 		// Minimal separation between mappings to be considered reasonable
-		pos_t sep = pos_t((1.0 - params.tThres) * double(P_len));
+		pos_t sep = pos_t((1.0 - H->params.tThres) * double(P_len));
 
 		// The deque `recent' is sorted decreasingly by J
 		//					  _________`recent'_________
@@ -241,81 +239,82 @@ class SweepMap {
     }
 
   public:
-	SweepMap(const SketchIndex &tidx, const params_t &params, Counters *C, Timers *T, const FracMinHash &sketcher)
-		: tidx(tidx), params(params), C(C), T(T), sketcher(sketcher) {
-			C->inc("seeds_limit_reached", 0);
-			C->inc("unmapped_reads", 0);
-			if (params.tThres < 0.0 || params.tThres > 1.0) {
-				cerr << "tThres = " << params.tThres << " outside of [0,1]." << endl;
+	SweepMap(const SketchIndex &tidx, Handler *H) : tidx(tidx), H(H) {
+			H->C.inc("seeds_limit_reached", 0);
+			H->C.inc("unmapped_reads", 0);
+			if (H->params.tThres < 0.0 || H->params.tThres > 1.0) {
+				cerr << "tThres = " << H->params.tThres << " outside of [0,1]." << endl;
 				exit(1);
 			}
 		}
 
 	void map(const string &pFile) {
-		C->inc("spurious_matches", 0);
-		C->inc("J", 0);
-		C->inc("mappings", 0);
-		C->inc("sketched_kmers", 0);
-		C->inc("total_edit_distance", 0);
+		cerr << "Mapping reads " << pFile << "..." << endl;
 
-		T->start("mapping");
-		T->start("query_reading");
+		H->C.inc("spurious_matches", 0);
+		H->C.inc("J", 0);
+		H->C.inc("mappings", 0);
+		H->C.inc("sketched_kmers", 0);
+		H->C.inc("total_edit_distance", 0);
+
+		H->T.start("mapping");
+		H->T.start("query_reading");
 		read_fasta_klib(pFile, [this](kseq_t *seq) {
-			T->stop("query_reading");
-			T->start("query_mapping");
-			T->start("sketching");
-			sketch_t p = sketcher.sketch(seq->seq.s);
-			T->stop("sketching");
+			H->T.stop("query_reading");
+			H->T.start("query_mapping");
+			H->T.start("sketching");
+			sketch_t p = H->sketcher.sketch(seq->seq.s);
+			H->T.stop("sketching");
 
 			string query_id = seq->name.s;
 			pos_t P_sz = (pos_t)seq->seq.l;
 
-			C->inc("read_len", P_sz);
+			H->C.inc("read_len", P_sz);
 			hist_t p_hist;
 
 			Timer read_mapping_time;
 			read_mapping_time.start();
-			T->start("seeding");
+			H->T.start("seeding");
 			vector<Seed> thin_seeds = select_seeds(p, &p_hist);
-			T->stop("seeding");
+			H->T.stop("seeding");
 
-			T->start("matching");
+			H->T.start("matching");
 			vector<Match> matches = match_seeds(p.size(), thin_seeds);
-			T->stop("matching");
+			H->T.stop("matching");
 
-			T->start("sweep");
+			H->T.start("sweep");
 			vector<Mapping> mappings = sweep(p_hist, p, matches, P_sz, thin_seeds.size());
-			T->stop("sweep");
+			H->T.stop("sweep");
 
-			T->start("postproc");
-			if (!params.overlaps)
+			H->T.start("postproc");
+			if (!H->params.overlaps)
 				mappings = filter_reasonable(mappings, P_sz);
 			read_mapping_time.stop();
 
 			for (auto &m: mappings) {
 				const auto &segm = tidx.T[m.segm_id];
 				m.map_time = read_mapping_time.secs() / (double)mappings.size();
-				if (params.sam) {
+				if (H->params.sam) {
 					auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
-					C->inc("total_edit_distance", ed);
+					H->C.inc("total_edit_distance", ed);
 				}
 				else m.print_paf(query_id, segm, matches);
-                C->inc("spurious_matches", spurious_matches(m, matches));
-				C->inc("J", int(10000.0*m.J));
-				C->inc("mappings");
-				C->inc("sketched_kmers", m.seeds);
+                H->C.inc("spurious_matches", spurious_matches(m, matches));
+				H->C.inc("J", int(10000.0*m.J));
+				H->C.inc("mappings");
+				H->C.inc("sketched_kmers", m.seeds);
 			}
-			C->inc("matches", matches.size());
-			C->inc("reads");
+			H->C.inc("matches", matches.size());
+			H->C.inc("reads");
 			if (mappings.empty())
-				C->inc("unmapped_reads");
-			T->stop("postproc");
+				H->C.inc("unmapped_reads");
+			H->T.stop("postproc");
 
-			T->stop("query_mapping");
-			T->start("query_reading");
+			H->T.stop("query_mapping");
+			H->T.start("query_reading");
 		});
-		T->stop("query_reading");
-		T->stop("mapping");
+		H->T.stop("query_reading");
+		H->T.stop("mapping");
 
 		print_stats();
 	}
@@ -323,16 +322,16 @@ class SweepMap {
 	void print_stats() {
 		cerr << std::fixed << std::setprecision(1);
 		cerr << "Mapping stats:" << endl;
-		cerr << " | Total reads:           " << C->count("reads") << " (~" << 1.0*C->count("read_len") / C->count("reads") << " nb per read)" << endl;
-		cerr << " | Sketched read kmers:   " << C->count("sketched_kmers") << " (" << C->frac("sketched_kmers", "reads") << " per read)" << endl;
-		cerr << " | Kmer matches:          " << C->count("matches") << " (" << C->frac("matches", "reads") << " per read)" << endl;
-		cerr << " | Seed limit reached:    " << C->count("seeds_limit_reached") << " (" << C->perc("seeds_limit_reached", "reads") << "%)" << endl;
-		//cerr << " | Matches limit reached: " << C->count("matches_limit_reached") << " (" << C->perc("matches_limit_reached", "reads") << "%)" << endl;
-		cerr << " | Spurious matches:      " << C->count("spurious_matches") << " (" << C->perc("spurious_matches", "matches") << "%)" << endl;
-		cerr << " | Discarded seeds:       " << C->count("discarded_seeds") << " (" << C->perc("discarded_seeds", "collected_seeds") << "%)" << endl;
-		cerr << " | Unmapped reads:        " << C->count("unmapped_reads") << " (" << C->perc("unmapped_reads", "reads") << "%)" << endl;
-		cerr << " | Average Jaccard:       " << C->frac("J", "mappings") / 10000.0 << endl;
-		cerr << " | Average edit dist:     " << C->frac("total_edit_distance", "mappings") << endl;
+		cerr << " | Total reads:           " << H->C.count("reads") << " (~" << 1.0*H->C.count("read_len") / H->C.count("reads") << " nb per read)" << endl;
+		cerr << " | Sketched read kmers:   " << H->C.count("sketched_kmers") << " (" << H->C.frac("sketched_kmers", "reads") << " per read)" << endl;
+		cerr << " | Kmer matches:          " << H->C.count("matches") << " (" << H->C.frac("matches", "reads") << " per read)" << endl;
+		cerr << " | Seed limit reached:    " << H->C.count("seeds_limit_reached") << " (" << H->C.perc("seeds_limit_reached", "reads") << "%)" << endl;
+		//cerr << " | Matches limit reached: " << H->C.count("matches_limit_reached") << " (" << H->C.perc("matches_limit_reached", "reads") << "%)" << endl;
+		cerr << " | Spurious matches:      " << H->C.count("spurious_matches") << " (" << H->C.perc("spurious_matches", "matches") << "%)" << endl;
+		cerr << " | Discarded seeds:       " << H->C.count("discarded_seeds") << " (" << H->C.perc("discarded_seeds", "collected_seeds") << "%)" << endl;
+		cerr << " | Unmapped reads:        " << H->C.count("unmapped_reads") << " (" << H->C.perc("unmapped_reads", "reads") << "%)" << endl;
+		cerr << " | Average Jaccard:       " << H->C.frac("J", "mappings") / 10000.0 << endl;
+		cerr << " | Average edit dist:     " << H->C.frac("total_edit_distance", "mappings") << endl;
 	}
 };
 

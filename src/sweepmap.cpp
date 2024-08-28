@@ -12,20 +12,9 @@ int main(int argc, char **argv) {
 	}
 
 	Handler H(params);
-
-	SketchIndex tidx(H.params, &H.C, &H.T, H.sketcher);
+	SketchIndex tidx(&H);
 	tidx.build_index(H.params.tFile);
-
-	if (!H.params.paramsFile.empty()) {
-		cerr << "Writing parameters to " << H.params.paramsFile << "..." << endl;
-		auto fout = std::ofstream(H.params.paramsFile);
-		H.params.print(fout, false);
-	} else {
-		H.params.print(cerr, true);
-	}
-
-	cerr << "Mapping reads " << H.params.pFile << "..." << endl;
-	SweepMap sweepmap(tidx, H.params, &H.C, &H.T, H.sketcher);
+	SweepMap sweepmap(tidx, &H);
 	sweepmap.map(H.params.pFile);
 
 	return 0;

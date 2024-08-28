@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+using namespace std;
 
 #include "io.h"
 #include "utils.h"
@@ -18,6 +19,14 @@ public:
     Handler(const params_t &params) : params(params), sketcher(params.k, params.hFrac, &C, &T) {
         T.start("total");
         this->params.print_display(std::cerr);
+        if (!params.paramsFile.empty()) {
+            cerr << "Writing parameters to " << params.paramsFile << "..." << endl;
+            auto fout = std::ofstream(params.paramsFile);
+            params.print(fout, false);
+        } else {
+            params.print(cerr, true);
+        }
+
     }
 
     ~Handler() {
