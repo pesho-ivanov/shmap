@@ -12,7 +12,7 @@ evals/reads/
 *.out
 *.err
 __pycache__/
-src/sweep.d
+src/*.d
 src/*.o
 ext/*.o
 sweep

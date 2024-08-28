@@ -320,6 +320,30 @@ class SweepMapper : public Mapper {
 		print_stats();
 	}
 
+    void print_time_stats() {
+        cerr << std::fixed << std::setprecision(1);
+        cerr << "Time [sec]:           "             << setw(5) << right << H->T.secs("total")             << endl;
+        cerr << " | Index:                 "         << setw(5) << right << H->T.secs("indexing")          << " (" << setw(4) << right << H->T.perc("indexing", "total")              << "\%)" << endl;
+        cerr << " |  | loading:                "     << setw(5) << right << H->T.secs("index_reading")     << " (" << setw(4) << right << H->T.perc("index_reading", "indexing")      << "\%)" << endl;
+        cerr << " |  | sketch:                 "     << setw(5) << right << H->T.secs("index_sketching")   << " (" << setw(4) << right << H->T.perc("index_sketching", "indexing")    << "\%)" << endl;
+        cerr << " |  | initialize:             "     << setw(5) << right << H->T.secs("index_initializing")<< " (" << setw(4) << right << H->T.perc("index_initializing", "indexing") << "\%)" << endl;
+        cerr << " | Map:                   "         << setw(5) << right << H->T.secs("mapping")           << " (" << setw(4) << right << H->T.perc("mapping", "total")               << "\%, " << setw(5) << right << H->T.range_ratio("query_mapping") << "x, " << setw(4) << right << H->C.count("reads") / H->T.secs("total") << " reads per sec)" << endl;
+        cerr << " |  | load queries:           "     << setw(5) << right << H->T.secs("query_reading")     << " (" << setw(4) << right << H->T.perc("query_reading", "mapping")       << "\%, " << setw(5) << right << H->T.range_ratio("query_reading") << "x)" << endl;
+        cerr << " |  | sketch reads:           "     << setw(5) << right << H->T.secs("sketching")         << " (" << setw(4) << right << H->T.perc("sketching", "mapping")           << "\%, " << setw(5) << right << H->T.range_ratio("sketching") << "x)" << endl;
+        cerr << " |  | seeding:                "     << setw(5) << right << H->T.secs("seeding")           << " (" << setw(4) << right << H->T.perc("seeding", "mapping")             << "\%, " << setw(5) << right << H->T.range_ratio("seeding") << "x)" << endl;
+        cerr << " |  |  | collect seed info:       " << setw(5) << right << H->T.secs("collect_seed_info") << " (" << setw(4) << right << H->T.perc("collect_seed_info", "seeding")   << "\%, " << setw(5) << right << H->T.range_ratio("collect_seed_info") << "x)" << endl;
+        cerr << " |  |  | thin sketch:             " << setw(5) << right << H->T.secs("thin_sketch")       << " (" << setw(4) << right << H->T.perc("thin_sketch", "seeding")         << "\%, " << setw(5) << right << H->T.range_ratio("thin_sketch") << "x)" << endl;
+        cerr << " |  |  | sort seeds:              " << setw(5) << right << H->T.secs("sort_seeds")        << " (" << setw(4) << right << H->T.perc("sort_seeds", "seeding")          << "\%, " << setw(5) << right << H->T.range_ratio("sort_seeds") << "x)" << endl;
+        cerr << " |  |  | unique seeds:            " << setw(5) << right << H->T.secs("unique_seeds")      << " (" << setw(4) << right << H->T.perc("unique_seeds", "seeding")        << "\%, " << setw(5) << right << H->T.range_ratio("unique_seeds") << "x)" << endl;
+        cerr << " |  | matching seeds:         "     << setw(5) << right << H->T.secs("matching")          << " (" << setw(4) << right << H->T.perc("matching", "mapping")            << "\%, " << setw(5) << right << H->T.range_ratio("matching") << "x)" << endl;
+        cerr << " |  |  | collect matches:         " << setw(5) << right << H->T.secs("collect_matches")   << " (" << setw(4) << right << H->T.perc("collect_matches", "matching")    << "\%, " << setw(5) << right << H->T.range_ratio("collect_matches") << "x)" << endl;
+        cerr << " |  |  | sort matches:            " << setw(5) << right << H->T.secs("sort_matches")      << " (" << setw(4) << right << H->T.perc("sort_matches", "matching")       << "\%, " << setw(5) << right << H->T.range_ratio("sort_matches") << "x)" << endl;
+        cerr << " |  | sweep:                  "     << setw(5) << right << H->T.secs("sweep")             << " (" << setw(4) << right << H->T.perc("sweep", "mapping")               << "\%, " << setw(5) << right << H->T.range_ratio("sweep") << "x)" << endl;
+        cerr << " |  | post proc:              "     << setw(5) << right << H->T.secs("postproc")          << " (" << setw(4) << right << H->T.perc("postproc", "mapping")            << "\%, " << setw(5) << right << H->T.range_ratio("postproc") << "x)" << endl;
+    //		cerr << "Virtual memory [MB]:  "             << setw(5) << right << C.count("total_memory_MB")  << endl;
+    //		cerr << " | Index:                 "         << setw(5) << right << C.count("index_memory_MB") << " (" << setw(4) << right << C.perc("index_memory_MB", "total_memory_MB") << "\%)" << endl;
+    }
+
 	void print_stats() {
 		cerr << std::fixed << std::setprecision(1);
 		cerr << "Mapping stats:" << endl;
@@ -333,6 +357,8 @@ class SweepMapper : public Mapper {
 		cerr << " | Unmapped reads:        " << H->C.count("unmapped_reads") << " (" << H->C.perc("unmapped_reads", "reads") << "%)" << endl;
 		cerr << " | Average Jaccard:       " << H->C.frac("J", "mappings") / 10000.0 << endl;
 		cerr << " | Average edit dist:     " << H->C.frac("total_edit_distance", "mappings") << endl;
+		print_time_stats();
+        //printMemoryUsage();
 	}
 };
 

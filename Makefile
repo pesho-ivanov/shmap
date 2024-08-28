@@ -12,10 +12,13 @@ endif
 LIBS = -lz
 DEPFLAGS = -MMD -MP
 
+-include $(DEPS)
+
 TIME_CMD = /usr/bin/time -f "%U\t%M"
 
 SRCS = src/sweepmap.cpp src/mapper.cpp src/io.cpp ext/edlib.cpp
 OBJS = $(SRCS:.cpp=.o)
+DEPS = $(OBJS:.o=.d)
 SWEEPMAP_BIN = ./sweepmap
 MINIMAP_BIN = minimap2
 BLEND_BIN = ~/libs/blend/bin/blend
@@ -78,10 +81,10 @@ Rs = 0.01 0.05 0.1 0.15 0.2
 all: $(SWEEPMAP_BIN)
 
 $(SWEEPMAP_BIN): $(OBJS)
-	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $@ $^ $(LIBS)
+	$(CXX) $(CXX_STANDARD) $(CFLAGS) $(DEPFLAGS) -o $@ $^ $(LIBS)
 
 %.o: %.cpp
-	$(CXX) $(CXX_STANDARD) $(CFLAGS) -c $< -o $@
+	$(CXX) $(CXX_STANDARD) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 clean:
 	rm -f $(OBJS) $(SWEEPMAP_BIN)
