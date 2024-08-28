@@ -11,50 +11,6 @@
 
 namespace sweepmap {
 
-class SketchIndex;
-
-// Hit -- a kmer hit in the reference T
-struct Hit {  // TODO: compress into a 32bit field
-	pos_t r;            // right end of the kmer [l, r), where l+k=r
-	pos_t tpos;		    // position in the reference sketch
-	bool strand;
-	segm_t segm_id;
-	Hit() {}
-	Hit(const Kmer &kmer, pos_t tpos, segm_t segm_id)
-		: r(kmer.r), tpos(tpos), strand(kmer.strand), segm_id(segm_id) {}
-};
-
-// Seed -- a kmer with metadata (a position in the queyr P and number of hits in the reference T)
-struct Seed {
-	Kmer kmer;
-	int r_first, r_last;
-	int hits_in_T;
-	Seed(const Kmer &kmer, pos_t r_first, pos_t r_last, int hits_in_T) :
-		kmer(kmer), r_first(r_first), r_last(r_last), hits_in_T(hits_in_T) {}	
-};
-
-// Match -- a pair of a seed and a hit
-struct Match {
-	Seed seed;
-	Hit hit;
-	int seed_num; // seed number among the chosen seeds, used for indexing the histogram
-	Match(const Seed &seed, const Hit &hit, int seed_num)
-		: seed(seed), hit(hit), seed_num(seed_num) {}
-	
-	inline bool is_same_strand() const {
-		return seed.kmer.strand == hit.strand;
-	}
-};
-
-struct RefSegment {
-	sketch_t kmers;
-	std::string name;
-	std::string seq;   // empty if only mapping and no alignment
-	int sz;
-	RefSegment(const sketch_t &sk, const std::string &name, const std::string &seq, const int sz)
-		: kmers(sk), name(name), seq(seq), sz(sz) {}
-};
-
 class SketchIndex {
 
 public:
