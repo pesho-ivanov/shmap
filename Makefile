@@ -12,14 +12,12 @@ endif
 LIBS = -lz
 DEPFLAGS = -MMD -MP
 
--include $(DEPS)
-
 TIME_CMD = /usr/bin/time -f "%U\t%M"
 
-SRCS = src/sweepmap.cpp src/mapper.cpp src/io.cpp ext/edlib.cpp
+SRCS = src/map.cpp src/mapper.cpp src/io.cpp ext/edlib.cpp
 OBJS = $(SRCS:.cpp=.o)
 DEPS = $(OBJS:.o=.d)
-SWEEPMAP_BIN = ./sweepmap
+SWEEPMAP_BIN = ./map
 MINIMAP_BIN = minimap2
 BLEND_BIN = ~/libs/blend/bin/blend
 MAPQUIK_BIN = mapquik
@@ -81,13 +79,15 @@ Rs = 0.01 0.05 0.1 0.15 0.2
 all: $(SWEEPMAP_BIN)
 
 $(SWEEPMAP_BIN): $(OBJS)
-	$(CXX) $(CXX_STANDARD) $(CFLAGS) $(DEPFLAGS) -o $@ $^ $(LIBS)
+	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $@ $^ $(LIBS)
 
 %.o: %.cpp
 	$(CXX) $(CXX_STANDARD) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
+-include $(DEPS)
+
 clean:
-	rm -f $(OBJS) $(SWEEPMAP_BIN)
+	rm -f $(OBJS) $(SWEEPMAP_BIN) $(DEPS)
 
 simulate_SVs:
 	cd $(REF_DIR);\
@@ -144,21 +144,21 @@ eval_thinning: sweepmap gen_reads
 		done \
     done
 
-eval_sweepmap_sam: sweepmap gen_reads
+eval_sweepmap_sam: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_PREF))
 	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) -a 2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).sam
 	-paftools.js mapeval $(SWEEPMAP_PREF).sam | tee $(SWEEPMAP_PREF).eval
 	@-paftools.js mapeval -Q 60 $(SWEEPMAP_PREF).sam >$(SWEEPMAP_PREF).wrong
 
-eval_sweepmap: sweepmap gen_reads
+eval_sweepmap: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_PREF))
 	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M)    2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).paf
 	-paftools.js mapeval -r 0.1 $(SWEEPMAP_PREF).paf | tee $(SWEEPMAP_PREF).eval
 	@-paftools.js mapeval -r 0.1 -Q 60 $(SWEEPMAP_PREF).paf >$(SWEEPMAP_PREF).wrong
 
-eval_sweepmap_slow: sweepmap gen_reads
+eval_sweepmap_slow: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_SLOW_PREF))
 	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) 2> >(tee $(SWEEPMAP_SLOW_PREF).log) >$(SWEEPMAP_SLOW_PREF).paf 
