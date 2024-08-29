@@ -14,8 +14,8 @@ evals/reads/
 __pycache__/
 src/*.d
 src/*.o
+ext/*.d
 ext/*.o
-sweep
 indexDump.idx
 newevals/eval_sweep-ChrY/
 newevals/eval_sweep-ChrY-K22/
@@ -28,5 +28,5 @@ gtl/
 .vscode/c_cpp_properties.json
 simulations/
 *.fai
-sweepmap
+map
 evals/refs/

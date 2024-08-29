@@ -78,7 +78,7 @@ Rs = 0.01 0.05 0.1 0.15 0.2
 
 all: $(SWEEPMAP_BIN)
 
-$(SWEEPMAP_BIN): $(OBJS)
+$(SWEEPMAP_BIN): $(OBJS) 
 	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $@ $^ $(LIBS)
 
 %.o: %.cpp
@@ -153,7 +153,7 @@ eval_sweepmap_sam: $(SWEEPMAP_BIN) gen_reads
 
 eval_sweepmap: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_PREF))
-	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>/dev/null >/dev/null
+#	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M)    2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).paf
 	-paftools.js mapeval -r 0.1 $(SWEEPMAP_PREF).paf | tee $(SWEEPMAP_PREF).eval
 	@-paftools.js mapeval -r 0.1 -Q 60 $(SWEEPMAP_PREF).paf >$(SWEEPMAP_PREF).wrong

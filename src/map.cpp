@@ -1,6 +1,8 @@
 #include "index.h"
 #include "mapper.h"
 #include "handler.h"
+#include "sweepmap.h"
+#include "bucketmap.h"
 
 using namespace sweepmap;
 

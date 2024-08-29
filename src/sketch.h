@@ -17,6 +17,7 @@ struct Kmer {
 	hash_t h;
 	bool strand;  // false: forward, true: reverse
 	Kmer(pos_t r, hash_t h, bool strand) : r(r), h(h), strand(strand) {}
+	bool operator==(const Kmer &other) const { return h == other.h; }
 };
 
 using sketch_t = std::vector<Kmer>;

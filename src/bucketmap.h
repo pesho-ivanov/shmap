@@ -28,7 +28,14 @@ class BucketMapper : public Mapper {
 
 	using hist_t = vector<int>;
 
-	vector<Seed> select_seeds(const sketch_t& p, hist_t *hist) {
+	vector<Seed> select_seeds(sketch_t& p, hist_t *hist) {
+		H->T.start("unique_kmers");
+		pdqsort_branchless(p.begin(), p.end(), [](const Kmer &a, const Kmer &b) {
+            return a.h < b.h;
+		});
+		p.erase(std::unique(p.begin(), p.end()), p.end());
+		H->T.stop("unique_kmers");
+
 		H->T.start("collect_seed_info");
 		vector<Seed> seeds;
 		seeds.reserve(p.size());
@@ -43,47 +50,13 @@ class BucketMapper : public Mapper {
 		H->T.stop("collect_seed_info");
         H->C.inc("collected_seeds", seeds.size());
 
-		H->T.start("thin_sketch");
-		// TODO: add all seeds to hist
-		int total_seeds = (int)seeds.size();
-		if ((int)H->params.max_seeds < total_seeds) {
-			total_seeds = (int)H->params.max_seeds;
-			H->C.inc("seeds_limit_reached");
-		}
-        std::nth_element(seeds.begin(), seeds.begin() + total_seeds, seeds.end(), [](const Seed &a, const Seed &b) {
-            return a.hits_in_T < b.hits_in_T;
-        });
-		H->T.stop("thin_sketch");
-
 		H->T.start("sort_seeds");
-		pdqsort_branchless(seeds.begin(), seeds.begin() + total_seeds, [](const Seed &a, const Seed &b) {
-			return a.kmer.h < b.kmer.h;
+		pdqsort_branchless(seeds.begin(), seeds.end(), [](const Seed &a, const Seed &b) {
+            return a.hits_in_T < b.hits_in_T;
 		});
 		H->T.stop("sort_seeds");
 
-		H->T.start("unique_seeds");
-		vector<Seed> thin_seeds;
-		thin_seeds.reserve(total_seeds);
-		hist->reserve(total_seeds+1);
-		hist->push_back(0);
-		int min_r = p.size(), max_r = -1;
-		for (int i=0; i<total_seeds-1; i++) {
-			min_r = std::min(min_r, seeds[i].r_first);
-			max_r = std::max(max_r, seeds[i].r_last);
-			++(hist->back());
-			if (seeds[i].kmer.h != seeds[i+1].kmer.h) {
-				assert(min_r <= max_r);
-				seeds[i].r_first = min_r;
-				seeds[i].r_last = max_r;
-				min_r = p.size(), max_r = -1;
-				hist->push_back(0);
-				thin_seeds.push_back(seeds[i]);
-			}
-		}
-
-		H->T.stop("unique_seeds");
-        H->C.inc("discarded_seeds", seeds.size() - thin_seeds.size());
-		return thin_seeds;
+		return seeds;
 	}
 
 	// Initializes the histogram of the pattern and the list of matches
