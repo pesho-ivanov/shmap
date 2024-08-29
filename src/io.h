@@ -22,7 +22,7 @@ using std::pair;
 using std::ifstream;
 using std::endl;
 
-#define T_HOM_OPTIONS "p:s:k:r:S:M:t:z:aonxh"
+#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:z:aonxh"
 
 struct params_t {
 	// required
@@ -148,7 +148,7 @@ struct params_t {
 					tFile = optarg;
 					break;
 				case 'm':
-					pFile = optarg;
+					mapper = optarg;
 					break;
 				case 'k':
 					if(atoi(optarg) <= 0) {

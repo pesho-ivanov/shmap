@@ -64,6 +64,7 @@ ALLOUT_DIR = $(DIR)/out
 OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 
 SWEEPMAP_PREF = $(OUTDIR)/sweepmap/sweepmap
+BUCKETMAP_PREF = $(OUTDIR)/bucketmap/bucketmap
 SWEEPMAP_SLOW_PREF = $(OUTDIR)/sweepmap-slow/sweepmap-slow
 MINIMAP_PREF = $(OUTDIR)/minimap/minimap
 BLEND_PREF = $(OUTDIR)/blend/blend
@@ -153,10 +154,17 @@ eval_sweepmap_sam: $(SWEEPMAP_BIN) gen_reads
 
 eval_sweepmap: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_PREF))
-#	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M)    2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).paf
 	-paftools.js mapeval -r 0.1 $(SWEEPMAP_PREF).paf | tee $(SWEEPMAP_PREF).eval
 	@-paftools.js mapeval -r 0.1 -Q 60 $(SWEEPMAP_PREF).paf >$(SWEEPMAP_PREF).wrong
+
+eval_bucketmap: $(SWEEPMAP_BIN) gen_reads
+	@mkdir -p $(shell dirname $(BUCKETMAP_PREF))
+#	$(TIME_CMD) -o $(BUCKETMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) -m bucket 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(BUCKETMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(BUCKETMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) -m bucket   2> >(tee $(BUCKETMAP_PREF).log) >$(BUCKETMAP_PREF).paf
+	-paftools.js mapeval -r 0.1 $(BUCKETMAP_PREF).paf | tee $(BUCKETMAP_PREF).eval
+	@-paftools.js mapeval -r 0.1 -Q 60 $(BUCKETMAP_PREF).paf >$(BUCKETMAP_PREF).wrong
 
 eval_sweepmap_slow: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_SLOW_PREF))

@@ -46,11 +46,35 @@ public:
 		else return 0;
 	}
 
+	bool intersect(const Hit &hit, const int from, const int to) const {
+		// TODO: account for segments
+		return hit.r >= from && hit.r < to;
+	}
+
+	bool is_matchInInterval(const Seed &s, const int from, const int to) const {
+		// assume matches of each seed are sorted by position in T
+		// TODO: account for segments
+		if (s.hits_in_T == 1) {
+			auto &hit = h2single.at(s.kmer.h);
+			return intersect(hit, from, to);
+		} else {
+			const vector<Hit> &hits = h2multi.at(s.kmer.h);
+			// TODO: account for segments
+			// TODO: careful with left and right ends
+			auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.r < pos; });
+			if (it == hits.end())
+				return false;
+			if (it->r >= to)
+				return false;
+			return true;
+		}	
+	}
+
 	void add_matches(std::vector<Match> *matches, const Seed &s, int seed_num) const {
+		matches->reserve(s.hits_in_T);
 		if (s.hits_in_T == 1) {
 			assert(h2single.contains(s.kmer.h));
 			matches->push_back(Match(s, h2single.at(s.kmer.h), seed_num));
-				
 		} else {
 			assert(s.hits_in_T > 1);
 			assert(h2multi.contains(s.kmer.h));

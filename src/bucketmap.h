@@ -28,7 +28,7 @@ class BucketMapper : public Mapper {
 
 	using hist_t = vector<int>;
 
-	vector<Seed> select_seeds(sketch_t& p, hist_t *hist) {
+	vector<Seed> select_seeds(sketch_t& p) {
 		H->T.start("unique_kmers");
 		pdqsort_branchless(p.begin(), p.end(), [](const Kmer &a, const Kmer &b) {
             return a.h < b.h;
@@ -59,148 +59,43 @@ class BucketMapper : public Mapper {
 		return seeds;
 	}
 
+	using bucket_t = int;
+
+	bool enoughKmersInBucket(const int bucket, vector<Seed>::const_iterator first_freq, vector<Seed>::const_iterator last_freq, unordered_map<bucket_t, int> *M, int t, pos_t h) const {
+		for (auto it = first_freq; it != last_freq; ++it)
+			if (tidx.is_matchInInterval(*it, bucket*h, (bucket+2)*h))
+				M->at(bucket)++;
+		return M->at(bucket) >= t;
+	}
+
 	// Initializes the histogram of the pattern and the list of matches
-	vector<Match> match_seeds(pos_t p_sz, const vector<Seed> &seeds) {
-		H->T.start("collect_matches");
-		vector<Match> matches;
-		matches.reserve(2*(int)seeds.size());
-		for (int seed_num=0; seed_num<(int)seeds.size(); seed_num++)
-			tidx.add_matches(&matches, seeds[seed_num], seed_num);
-		H->T.stop("collect_matches");
-
-		H->T.start("sort_matches");
-		//sort
-		pdqsort_branchless(matches.begin(), matches.end(), [](const Match &a, const Match &b) {
-			// Preparation for sweeping: sort M by ascending positions within one reference segment.
-			// NO SPEEDUP: return (int64_t(a.hit.segm_id) << 32 | a.hit.r) < (int64_t(b.hit.segm_id) << 32 | b.hit.r);
-			if (a.hit.segm_id != b.hit.segm_id)
-				return a.hit.segm_id < b.hit.segm_id;
-			return a.hit.r < b.hit.r;
-		});
-		H->T.stop("sort_matches");
-
-		return matches;
-	}
-
-	// vector<hash_t> diff_hist;  // diff_hist[kmer_hash] = #occurences in `p` - #occurences in `s`
-	// vector<Match> M;   	   // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
-	const vector<Mapping> sweep(hist_t &diff_hist, const sketch_t &p, const vector<Match> &M, const pos_t P_len, const int thin_seeds_cnt) {
-//		const int MAX_BL = 100;
-		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
-
-		int xmin = 0;
-		Mapping best(H->params.k, P_len, 0, -1, -1, -1, -1, -1, 0, M.end(), M.end());
-		Mapping second = best;
-		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
-
-		// Increase the left point end of the window [l,r) one by one. O(matches)
-		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l) {
-			// Increase the right end of the window [l,r) until it gets out.
-			for(;  r != M.end()
-				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
-				&& r->hit.r + H->params.k <= l->hit.r + P_len
-				; ++r) {
-				same_strand_seeds += r->is_same_strand() ? +1 : -1;  // change to r inside the loop
-				// If taking this kmer from T increases the intersection with P.
-				// TODO: iterate following seeds
-				if (--diff_hist[r->seed_num] >= 0)
-					++xmin;
-				assert (l->hit.r <= r->hit.r);
-			}
-
-			auto m = Mapping(H->params.k, P_len, thin_seeds_cnt, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), xmin, same_strand_seeds, l, r);
-
-			// second best without guarantees
-			// Wrong invariant:
-			// best[l,r) -- a mapping best.l<=l with maximal J
-			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
-			if (H->params.onlybest) {
-				if (m.xmin > best.xmin) {  // if (xmin > best.xmin)
-					if (best.T_l < m.T_l - 0.9*P_len)
-						second = best;
-					best = m;
-				} else if (m.xmin > second.xmin && m.T_l > best.T_l + 0.9*P_len) {
-					second = m;
-				}
-			} else {
-				if (m.J > H->params.tThres) {
-					mappings.push_back(m);
+	vector<bucket_t> match_seeds(pos_t h, pos_t p_sz, const vector<Seed> &seeds, int t) {
+		unordered_map<bucket_t, int> M(h);  // M[bucket] - number of unique kmers from p starting at T[h*bucket, h*(bucket+2))
+		int max_intersection = -1;
+		H->T.start("match_infrequent");
+		size_t seed;
+		for (seed=0; seed<seeds.size(); seed++) {
+			if (max_intersection >= t && (int)seeds.size() - (int)seed < t)	
+				break;
+			vector<Match> seed_matches;
+			tidx.add_matches(&seed_matches, seeds[seed], seed);
+			for (const auto &match: seed_matches) {
+				for (int shift=0; shift<2; ++shift) {
+					auto bucket = match.hit.r/h + shift;
+					if (++M[bucket] > max_intersection)
+						max_intersection = M[bucket];
 				}
 			}
-
-			// Prepare for the next step by moving `l` to the right.
-			if (++diff_hist[l->seed_num] > 0)
-				--xmin;
-			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
-
-			assert(xmin >= 0);
 		}
-		assert(xmin == 0);
-		assert(same_strand_seeds == 0);
+		H->T.stop("match_infrequent");
 
-		if (H->params.onlybest && best.xmin != -1) { // && best.J > H->params.tThres)
-			best.mapq = (best.xmin > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
-			best.J2 = second.J;
-			mappings.push_back(best);
-		}
-
-		return mappings;
-	}
-
-	// Return only reasonable matches (i.e. those that are not J-dominated by
-	// another overlapping match). Runs in O(|all|).
-	vector<Mapping> filter_reasonable(const vector<Mapping> &all, const pos_t P_len) {
-		vector<Mapping> reasonable;
-		std::deque<Mapping> recent;
-
-		// Minimal separation between mappings to be considered reasonable
-		pos_t sep = pos_t((1.0 - H->params.tThres) * double(P_len));
-
-		// The deque `recent' is sorted decreasingly by J
-		//					  _________`recent'_________
-		//                   /                          \
-		// ---------------- | High J ... Mid J ... Low J | current J
-		// already removed    deque.back ... deque.front    to add next
-		for (const auto &next: all) {
-			// 1. Prepare for adding `curr' by removing from the deque back all
-			//    mappings that are too far to the left. This keeps the deque
-			//    within |P| from back to front. A mapping can become reasonable
-			//    only after getting removed.
-			while(!recent.empty() && next.T_l - recent.back().T_l > sep) {
-				// If the mapping is not marked as unreasonable (coverted by a preivous better mapping)
-				if (!recent.back().unreasonable) {
-					// Take the leftmost mapping.
-					reasonable.push_back(recent.back());
-					// Mark the next closeby mappings as not reasonable
-					for (auto it=recent.rbegin(); it!=recent.rend() && it->T_l - recent.back().T_l < sep; ++it)
-						it->unreasonable = true;
-				}
-				// Remove the mapping that is already too much behind.
-				recent.pop_back();
-			}
-			assert(recent.empty() || (recent.back().T_r <= recent.front().T_r && recent.front().T_r <= next.T_r));
-
-			// Now all the mappings in `recent' are close to `curr' 
-			// 2. Remove from the deque front all mappings that are strictly
-			//    less similar than the current J. This keeps the deque sorted
-			//    descending in J from left to right
-			while(!recent.empty() && recent.front().xmin < next.xmin)
-				recent.pop_front();
-			assert(recent.empty() || (recent.back().xmin >= recent.front().xmin && recent.front().xmin >= next.xmin));
-
-			// 3. Add the next mapping to the front
-			recent.push_front(next);	 
-
-			// 4. If there is another mapping in the deque, it is near and better.
-			if (recent.size() > 1)
-				recent.front().unreasonable = true;
-		}
-
-		// 5. Add the last mapping if it is reasonable
-		if (!recent.empty() && !recent.back().unreasonable)
-			reasonable.push_back(recent.back());
-
-		return reasonable;
+		H->T.start("match_frequent");
+		vector<bucket_t> res;
+		for (const auto& it: M)
+			if (enoughKmersInBucket(it.first, seeds.begin()+seed, seeds.end(), &M, t, h))
+				res.push_back(it.first);
+		H->T.stop("match_frequent");
+		return res;
 	}
 
     // TODO: disable in release
@@ -244,45 +139,36 @@ class BucketMapper : public Mapper {
 			pos_t P_sz = (pos_t)seq->seq.l;
 
 			H->C.inc("read_len", P_sz);
-			hist_t p_hist;
 
 			Timer read_mapping_time;
 			read_mapping_time.start();
 			H->T.start("seeding");
-			vector<Seed> thin_seeds = select_seeds(p, &p_hist);
+			vector<Seed> thin_seeds = select_seeds(p);
 			H->T.stop("seeding");
 
 			H->T.start("matching");
-			vector<Match> matches = match_seeds(p.size(), thin_seeds);
+			int min_intersection = H->params.tThres * p.size();
+			vector<bucket_t> matches = match_seeds(P_sz, p.size(), thin_seeds, min_intersection);
 			H->T.stop("matching");
 
-			H->T.start("sweep");
-			vector<Mapping> mappings = sweep(p_hist, p, matches, P_sz, thin_seeds.size());
-			H->T.stop("sweep");
-
-			H->T.start("postproc");
-			if (!H->params.overlaps)
-				mappings = filter_reasonable(mappings, P_sz);
-			read_mapping_time.stop();
-
-			for (auto &m: mappings) {
-				const auto &segm = tidx.T[m.segm_id];
-				m.map_time = read_mapping_time.secs() / (double)mappings.size();
-				if (H->params.sam) {
-					auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
-					H->C.inc("total_edit_distance", ed);
-				}
-				else m.print_paf(query_id, segm, matches);
-                H->C.inc("spurious_matches", spurious_matches(m, matches));
-				H->C.inc("J", int(10000.0*m.J));
-				H->C.inc("mappings");
-				H->C.inc("sketched_kmers", m.seeds);
-			}
-			H->C.inc("matches", matches.size());
+			//for (auto &m: mappings) {
+			//	const auto &segm = tidx.T[m.segm_id];
+			//	m.map_time = read_mapping_time.secs() / (double)mappings.size();
+			//	if (H->params.sam) {
+			//		auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
+			//		H->C.inc("total_edit_distance", ed);
+			//	}
+			//	else m.print_paf(query_id, segm, matches);
+   			//  H->C.inc("spurious_matches", spurious_matches(m, matches));
+			//	H->C.inc("J", int(10000.0*m.J));
+			//	H->C.inc("mappings");
+			//	H->C.inc("sketched_kmers", m.seeds);
+			//}
+			//H->C.inc("matches", matches.size());
 			H->C.inc("reads");
-			if (mappings.empty())
-				H->C.inc("unmapped_reads");
-			H->T.stop("postproc");
+			//if (mappings.empty())
+			//	H->C.inc("unmapped_reads");
+			//H->T.stop("postproc");
 
 			H->T.stop("query_mapping");
 			H->T.start("query_reading");
@@ -290,8 +176,25 @@ class BucketMapper : public Mapper {
 		H->T.stop("query_reading");
 		H->T.stop("mapping");
 
-		print_stats();
+		//print_stats();
+		print_time_stats();
 	}
+
+    void print_time_stats() {
+        cerr << std::fixed << std::setprecision(1);
+        cerr << " | Map:                   "         << setw(5) << right << H->T.secs("mapping")           << " (" << setw(4) << right << H->T.perc("mapping", "total")               << "\%, " << setw(5) << right << H->T.range_ratio("query_mapping") << "x, " << setw(4) << right << H->C.count("reads") / H->T.secs("total") << " reads per sec)" << endl;
+        cerr << " |  | load queries:           "     << setw(5) << right << H->T.secs("query_reading")     << " (" << setw(4) << right << H->T.perc("query_reading", "mapping")       << "\%, " << setw(5) << right << H->T.range_ratio("query_reading") << "x)" << endl;
+        cerr << " |  | sketch reads:           "     << setw(5) << right << H->T.secs("sketching")         << " (" << setw(4) << right << H->T.perc("sketching", "mapping")           << "\%, " << setw(5) << right << H->T.range_ratio("sketching") << "x)" << endl;
+        cerr << " |  | seeding:                "     << setw(5) << right << H->T.secs("seeding")           << " (" << setw(4) << right << H->T.perc("seeding", "mapping")             << "\%, " << setw(5) << right << H->T.range_ratio("seeding") << "x)" << endl;
+        cerr << " |  |  | collect seed info:       " << setw(5) << right << H->T.secs("collect_seed_info") << " (" << setw(4) << right << H->T.perc("collect_seed_info", "seeding")   << "\%, " << setw(5) << right << H->T.range_ratio("collect_seed_info") << "x)" << endl;
+//        cerr << " |  |  | thin sketch:             " << setw(5) << right << H->T.secs("thin_sketch")       << " (" << setw(4) << right << H->T.perc("thin_sketch", "seeding")         << "\%, " << setw(5) << right << H->T.range_ratio("thin_sketch") << "x)" << endl;
+        cerr << " |  |  | unique seeds:            " << setw(5) << right << H->T.secs("unique_seeds")      << " (" << setw(4) << right << H->T.perc("unique_seeds", "seeding")        << "\%, " << setw(5) << right << H->T.range_ratio("unique_seeds") << "x)" << endl;
+        cerr << " |  |  | sort seeds:              " << setw(5) << right << H->T.secs("sort_seeds")        << " (" << setw(4) << right << H->T.perc("sort_seeds", "seeding")          << "\%, " << setw(5) << right << H->T.range_ratio("sort_seeds") << "x)" << endl;
+        cerr << " |  | matching seeds:         "     << setw(5) << right << H->T.secs("matching")          << " (" << setw(4) << right << H->T.perc("matching", "mapping")            << "\%, " << setw(5) << right << H->T.range_ratio("matching") << "x)" << endl;
+        cerr << " |  |  | match infrequent:        " << setw(5) << right << H->T.secs("match_infrequent")  << " (" << setw(4) << right << H->T.perc("match_infrequent", "matching")   << "\%, " << setw(5) << right << H->T.range_ratio("match_infrequent") << "x)" << endl;
+        cerr << " |  |  | match frequent:          " << setw(5) << right << H->T.secs("match_frequent")    << " (" << setw(4) << right << H->T.perc("match_frequent", "matching")     << "\%, " << setw(5) << right << H->T.range_ratio("match_frequent") << "x)" << endl;
+//        cerr << " |  | post proc:              "     << setw(5) << right << H->T.secs("postproc")          << " (" << setw(4) << right << H->T.perc("postproc", "mapping")            << "\%, " << setw(5) << right << H->T.range_ratio("postproc") << "x)" << endl;
+    }
 
 	void print_stats() {
 		cerr << std::fixed << std::setprecision(1);
