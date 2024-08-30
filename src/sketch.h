@@ -107,8 +107,8 @@ struct Mapping {
 			P_start = std::min(P_start, m->seed.r_first);
 			P_end = std::max(P_end, m->seed.r_last);
 		}
-		if (!(0 <= P_start && P_start <= P_end && P_end <= P_sz))
-			std::cerr << "P_start=" << P_start << " P_end=" << P_end << " P_sz=" << P_sz << std::endl;
+		//if (!(0 <= P_start && P_start <= P_end && P_end <= P_sz))
+		//	std::cerr << "P_start=" << P_start << " P_end=" << P_end << " P_sz=" << P_sz << std::endl;
 		assert(0 <= P_start && P_start <= P_end && P_end <= P_sz);
 
 		auto T_l_predicted = std::max(T_l-P_start, 0);  // -P_start -- P_start too big
