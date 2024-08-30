@@ -69,21 +69,27 @@ class BucketMapper : public Mapper {
 	}
 
 	// Initializes the histogram of the pattern and the list of matches
-	vector<bucket_t> match_seeds(pos_t h, pos_t p_sz, const vector<Seed> &seeds, int t) {
+	vector<bucket_t> match_seeds(pos_t h, pos_t p_sz, const vector<Seed> &seeds, double t_frac) {
+		int t_abs = t_frac * p_sz;
 		unordered_map<bucket_t, int> M(h);  // M[bucket] - number of unique kmers from p starting at T[h*bucket, h*(bucket+2))
-		int max_intersection = -1;
+		int best_intersection = -1;
 		H->T.start("match_infrequent");
 		size_t seed;
 		for (seed=0; seed<seeds.size(); seed++) {
-			if (max_intersection >= t && (int)seeds.size() - (int)seed < t)	
+			//cerr << best_intersection << " >= " << t << " (" << (best_intersection >= t) << "), " << seeds.size() << " - " << seed << " < " << t << " (" << ((int)seeds.size() - (int)seed < t) << ")" << endl;
+			if ((int)seeds.size() - (int)seed < t_abs)	
+			//if (best_intersection >= t_abs && (int)seeds.size() - (int)seed < t_abs)	
+			//cerr << "matches: " << seeds[seed].hits_in_T << ", " << "seed > 20 (" << (seed > 20) << "), " << best_intersection << " >= " << t_frac*seed << " (" << (best_intersection >= t_frac*seed) << "), " << seeds.size() << " - " << seed << " < " << t_abs << " (" << ((int)seeds.size() - (int)seed < t_abs) << ")" << endl;
+			//if (seed > 20 && best_intersection >= (t_frac*seed) && (int)seeds.size() - (int)seed < t_abs)	
 				break;
 			vector<Match> seed_matches;
-			tidx.add_matches(&seed_matches, seeds[seed], seed);
+			tidx.get_matches(&seed_matches, seeds[seed], seed);
+			//TODO: ignore duplicate buckets for different matches
 			for (const auto &match: seed_matches) {
 				for (int shift=0; shift<2; ++shift) {
 					auto bucket = match.hit.r/h + shift;
-					if (++M[bucket] > max_intersection)
-						max_intersection = M[bucket];
+					if (++M[bucket] > best_intersection)
+						best_intersection = M[bucket];
 				}
 			}
 		}
@@ -92,7 +98,7 @@ class BucketMapper : public Mapper {
 		H->T.start("match_frequent");
 		vector<bucket_t> res;
 		for (const auto& it: M)
-			if (enoughKmersInBucket(it.first, seeds.begin()+seed, seeds.end(), &M, t, h))
+			if (enoughKmersInBucket(it.first, seeds.begin()+seed, seeds.end(), &M, t_abs, h))
 				res.push_back(it.first);
 		H->T.stop("match_frequent");
 		return res;
@@ -147,8 +153,7 @@ class BucketMapper : public Mapper {
 			H->T.stop("seeding");
 
 			H->T.start("matching");
-			int min_intersection = H->params.tThres * p.size();
-			vector<bucket_t> matches = match_seeds(P_sz, p.size(), thin_seeds, min_intersection);
+			vector<bucket_t> matches = match_seeds(P_sz, p.size(), thin_seeds, H->params.tThres);
 			H->T.stop("matching");
 
 			//for (auto &m: mappings) {

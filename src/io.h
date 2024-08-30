@@ -44,7 +44,7 @@ struct params_t {
 	bool onlybest;			// Output up to one (best) mapping (if above the threshold)
 
 	params_t() :
-		k(15), hFrac(0.05), max_seeds(10000), max_matches(1000000), tThres(0.9), mapper("sweep"),
+		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), tThres(0.9), mapper("sweep"),
 		sam(false), overlaps(false), normalize(false), onlybest(false) {}
 
 	void print(std::ostream& out, bool human) const {
@@ -94,7 +94,7 @@ struct params_t {
 
 	void dsHlp() {
 		cerr << "sweep [-hn] [-p PATTERN_FILE] [-s TEXT_FILE] [-k KMER_LEN] [-r HASH_RATIO] [-b BLACKLIST] [-c COM_HASH_WGHT] [-u UNI\
-		_HASH_WGHT] [-t HOM_THRES] [-d DECENT] [-i INTERCEPT]" << endl;
+		_HASH_WGHT] [-t HOMOLOGY_THRESHOLD] [-d DECENT] [-i INTERCEPT]" << endl;
 		cerr << endl;
 		cerr << "Find sketch-based pattern similarity in text." << endl;
 		cerr << endl;
@@ -108,7 +108,7 @@ struct params_t {
 		cerr << "   -r   --ratio   			 FracMinHash ratio in [0; 1] [0.1]" << endl;
 		cerr << "   -S   --max_seeds         Max seeds in a sketch" << endl;
 		cerr << "   -M   --max_matches       Max seed matches in a sketch" << endl;
-		cerr << "   -t   --hom_thres         Homology threshold" << endl;
+		cerr << "   -t   --threshold         Homology percentage threshold [0, 1]" << endl;
 		cerr << "   -z   --params     		 Output file with parameters (tsv)" << endl;
 		cerr << endl;
 		cerr << "Optional parameters without an argument:" << endl;
@@ -131,6 +131,7 @@ struct params_t {
 			{"hom_thres",          required_argument,  0, 't'},
 			{"params",             required_argument,  0, 'z'},
 			{"mapper",             required_argument,  0, 'm'},
+			{"threshold",          required_argument,  0, 't'},
 			{"overlaps",           no_argument,        0, 'o'},
 			{"normalize",          no_argument,        0, 'n'},
 			{"onlybest",           no_argument,        0, 'x'},
@@ -179,6 +180,10 @@ struct params_t {
 					max_matches = atoi(optarg);
 					break;
 				case 't':
+					if(atoi(optarg) < 0 || atoi(optarg) > 1.0) {
+						cerr << "ERROR: The threshold t should be between 0 and 1." << endl;
+						return false;
+					}
 					tThres = atof(optarg);
 					break;
 				case 'z':

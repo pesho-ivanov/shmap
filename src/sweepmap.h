@@ -46,7 +46,7 @@ class SweepMapper : public Mapper {
 		H->T.start("thin_sketch");
 		// TODO: add all seeds to hist
 		int total_seeds = (int)seeds.size();
-		if ((int)H->params.max_seeds < total_seeds) {
+		if ((int)H->params.max_seeds != -1 && (int)H->params.max_seeds < total_seeds) {
 			total_seeds = (int)H->params.max_seeds;
 			H->C.inc("seeds_limit_reached");
 		}
@@ -92,7 +92,7 @@ class SweepMapper : public Mapper {
 		vector<Match> matches;
 		matches.reserve(2*(int)seeds.size());
 		for (int seed_num=0; seed_num<(int)seeds.size(); seed_num++)
-			tidx.add_matches(&matches, seeds[seed_num], seed_num);
+			tidx.get_matches(&matches, seeds[seed_num], seed_num);
 		H->T.stop("collect_matches");
 
 		H->T.start("sort_matches");

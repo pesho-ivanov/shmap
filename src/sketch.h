@@ -18,6 +18,10 @@ struct Kmer {
 	bool strand;  // false: forward, true: reverse
 	Kmer(pos_t r, hash_t h, bool strand) : r(r), h(h), strand(strand) {}
 	bool operator==(const Kmer &other) const { return h == other.h; }
+	friend std::ostream& operator<<(std::ostream& os, const Kmer& kmer) {
+		os << "Kmer(r=" << kmer.r << ", h=" << kmer.h << ", strand=" << kmer.strand << ")";
+		return os;
+	}
 };
 
 using sketch_t = std::vector<Kmer>;
@@ -31,6 +35,10 @@ struct Hit {  // TODO: compress into a 32bit field
 	Hit() {}
 	Hit(const Kmer &kmer, pos_t tpos, segm_t segm_id)
 		: r(kmer.r), tpos(tpos), strand(kmer.strand), segm_id(segm_id) {}
+	friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
+		os << "Hit(r=" << hit.r << ", tpos=" << hit.tpos << ", strand=" << hit.strand << ", segm_id=" << hit.segm_id << ")";
+		return os;
+	}
 };
 
 // Seed -- a kmer with metadata (a position in the queyr P and number of hits in the reference T)
@@ -40,6 +48,10 @@ struct Seed {
 	int hits_in_T;
 	Seed(const Kmer &kmer, pos_t r_first, pos_t r_last, int hits_in_T) :
 		kmer(kmer), r_first(r_first), r_last(r_last), hits_in_T(hits_in_T) {}	
+	friend std::ostream& operator<<(std::ostream& os, const Seed& seed) {
+		os << "Seed(" << seed.kmer << ", r_first=" << seed.r_first << ", r_last=" << seed.r_last << ", hits_in_T=" << seed.hits_in_T << ")";
+		return os;
+	}
 };
 
 // Match -- a pair of a seed and a hit
@@ -52,6 +64,10 @@ struct Match {
 	
 	inline bool is_same_strand() const {
 		return seed.kmer.strand == hit.strand;
+	}
+	friend std::ostream& operator<<(std::ostream& os, const Match& match) {
+		os << "Match(" << match.seed << ", " << match.hit << ", seed_num=" << match.seed_num << ")";
+		return os;
 	}
 };
 

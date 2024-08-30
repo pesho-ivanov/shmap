@@ -21,7 +21,7 @@ public:
 
 	Handler *H;
 
-	void get_kmer_stats() {
+	void get_kmer_stats() const {
 		std::vector<int> hist(10, 0);
 		int max_occ = 0;
         H->C.inc("indexed_hits", h2single.size());
@@ -70,23 +70,21 @@ public:
 		}	
 	}
 
-	void add_matches(std::vector<Match> *matches, const Seed &s, int seed_num) const {
+	void get_matches(std::vector<Match> *matches, const Seed &s, int seed_num) const {
 		matches->reserve(s.hits_in_T);
 		if (s.hits_in_T == 1) {
-			assert(h2single.contains(s.kmer.h));
 			matches->push_back(Match(s, h2single.at(s.kmer.h), seed_num));
 		} else {
-			assert(s.hits_in_T > 1);
-			assert(h2multi.contains(s.kmer.h));
 			for (const auto &hit: h2multi.at(s.kmer.h))
 				matches->push_back(Match(s, hit, seed_num));
 		}	
 	}
 
 	void erase_frequent_kmers() {
+		assert(H->params.max_matches != -1);
 		std::vector<hash_t> blacklisted_h;
 		for (const auto &[h, hits]: h2multi)
-			if (hits.size() > (size_t)H->params.max_matches) {
+			if ((int)hits.size() > H->params.max_matches) {
 				blacklisted_h.push_back(h);
 				H->C.inc("blacklisted_kmers");
 				H->C.inc("blacklisted_hits", hits.size());
@@ -103,7 +101,7 @@ public:
 			const auto hit = Hit(kmer, tpos, segm_id);
 			if (!h2single.contains(kmer.h))
 				h2single[kmer.h] = hit; 
-            else if (h2multi[kmer.h].size() < (size_t)H->params.max_matches + 1)
+            else if (H->params.max_matches == -1 || (int)h2multi[kmer.h].size() < H->params.max_matches + 1)
                 h2multi[kmer.h].push_back(hit);
 		}
 	}
@@ -143,6 +141,12 @@ public:
 				hits.push_back(h2single.at(h));
 				h2single.erase(h);
 			}
+			// sorting each list of matches allows for binary search
+			sort(hits.begin(), hits.end(), [](const Hit &a, const Hit &b) {
+				if (a.segm_id != b.segm_id)
+					return a.segm_id < b.segm_id;
+				return a.r < b.r;
+			});
 		}
 		H->T.stop("index_reading");
 		H->T.stop("indexing");
@@ -150,11 +154,12 @@ public:
 		get_kmer_stats();
         H->C.inc("blacklisted_kmers", 0);
         H->C.inc("blacklisted_hits", 0);
-		erase_frequent_kmers();
+		if (H->params.max_matches != -1)
+			erase_frequent_kmers();
 		print_stats();
 	}
 
-	void print_stats() {
+	void print_stats() const {
 		cerr << std::fixed << std::setprecision(1);
 		cerr << "Index stats:" << endl;
         //printMemoryUsage();

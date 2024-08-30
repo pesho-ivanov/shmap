@@ -6,8 +6,10 @@ RELEASE_FLAGS = -O2 -DNDEBUG
 CFLAGS = -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive #-Wconversion 
 ifeq ($(DEBUG), 1)
     CFLAGS += $(DEBUG_FLAGS)
+	SWEEPMAP_BIN = ./debug/map
 else
     CFLAGS += $(RELEASE_FLAGS)
+	SWEEPMAP_BIN = ./release/map
 endif
 LIBS = -lz
 DEPFLAGS = -MMD -MP
@@ -17,7 +19,6 @@ TIME_CMD = /usr/bin/time -f "%U\t%M"
 SRCS = src/map.cpp src/mapper.cpp src/io.cpp ext/edlib.cpp
 OBJS = $(SRCS:.cpp=.o)
 DEPS = $(OBJS:.o=.d)
-SWEEPMAP_BIN = ./map
 MINIMAP_BIN = minimap2
 BLEND_BIN = ~/libs/blend/bin/blend
 MAPQUIK_BIN = mapquik
@@ -37,7 +38,7 @@ K ?= 22
 R ?= 0.1
 S ?= 300
 M ?= 100
-T ?= 0.0
+T ?= 0.8
 
 K_SLOW ?= $(K) #22
 R_SLOW ?= $(R) #0.1
@@ -80,6 +81,7 @@ Rs = 0.01 0.05 0.1 0.15 0.2
 all: $(SWEEPMAP_BIN)
 
 $(SWEEPMAP_BIN): $(OBJS) 
+	mkdir -p $(shell dirname $@)
 	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $@ $^ $(LIBS)
 
 %.o: %.cpp
@@ -161,8 +163,8 @@ eval_sweepmap: $(SWEEPMAP_BIN) gen_reads
 
 eval_bucketmap: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(BUCKETMAP_PREF))
-#	$(TIME_CMD) -o $(BUCKETMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) -m bucket 2>/dev/null >/dev/null
-	$(TIME_CMD) -o $(BUCKETMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(BUCKETMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) -m bucket   2> >(tee $(BUCKETMAP_PREF).log) >$(BUCKETMAP_PREF).paf
+#	$(TIME_CMD) -o $(BUCKETMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -m bucket 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(BUCKETMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(BUCKETMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -M 100000 -m bucket   2> >(tee $(BUCKETMAP_PREF).log) >$(BUCKETMAP_PREF).paf
 	-paftools.js mapeval -r 0.1 $(BUCKETMAP_PREF).paf | tee $(BUCKETMAP_PREF).eval
 	@-paftools.js mapeval -r 0.1 -Q 60 $(BUCKETMAP_PREF).paf >$(BUCKETMAP_PREF).wrong
 
