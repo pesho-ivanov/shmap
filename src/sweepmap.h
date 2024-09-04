@@ -111,7 +111,7 @@ class SweepMapper : public Mapper {
 
 	// vector<hash_t> diff_hist;  // diff_hist[kmer_hash] = #occurences in `p` - #occurences in `s`
 	// vector<Match> M;   	   // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
-	const vector<Mapping> sweep(hist_t &diff_hist, const sketch_t &p, const vector<Match> &M, const pos_t P_len, const int thin_seeds_cnt) {
+	const vector<Mapping> sweep(hist_t &diff_hist, const vector<Match> &M, const pos_t P_len, const int thin_seeds_cnt) {
 //		const int MAX_BL = 100;
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
 
@@ -250,7 +250,7 @@ class SweepMapper : public Mapper {
 	}
 
 	void map(const string &pFile) {
-		cerr << "Mapping reads " << pFile << "..." << endl;
+		cerr << "Mapping reads using SweepMap " << pFile << "..." << endl;
 
 		H->C.inc("spurious_matches", 0);
 		H->C.inc("J", 0);
@@ -284,7 +284,7 @@ class SweepMapper : public Mapper {
 			H->T.stop("matching");
 
 			H->T.start("sweep");
-			vector<Mapping> mappings = sweep(p_hist, p, matches, P_sz, thin_seeds.size());
+			vector<Mapping> mappings = sweep(p_hist, matches, P_sz, thin_seeds.size());
 			H->T.stop("sweep");
 
 			H->T.start("postproc");
@@ -348,13 +348,13 @@ class SweepMapper : public Mapper {
 		cerr << std::fixed << std::setprecision(1);
 		cerr << "Mapping stats:" << endl;
 		cerr << " | Total reads:           " << H->C.count("reads") << " (~" << 1.0*H->C.count("read_len") / H->C.count("reads") << " nb per read)" << endl;
+		cerr << " |  | Unmapped reads:        " << H->C.count("unmapped_reads") << " (" << H->C.perc("unmapped_reads", "reads") << "%)" << endl;
 		cerr << " | Sketched read kmers:   " << H->C.count("sketched_kmers") << " (" << H->C.frac("sketched_kmers", "reads") << " per read)" << endl;
 		cerr << " | Kmer matches:          " << H->C.count("matches") << " (" << H->C.frac("matches", "reads") << " per read)" << endl;
 		cerr << " | Seed limit reached:    " << H->C.count("seeds_limit_reached") << " (" << H->C.perc("seeds_limit_reached", "reads") << "%)" << endl;
 		//cerr << " | Matches limit reached: " << H->C.count("matches_limit_reached") << " (" << H->C.perc("matches_limit_reached", "reads") << "%)" << endl;
 		cerr << " | Spurious matches:      " << H->C.count("spurious_matches") << " (" << H->C.perc("spurious_matches", "matches") << "%)" << endl;
 		cerr << " | Discarded seeds:       " << H->C.count("discarded_seeds") << " (" << H->C.perc("discarded_seeds", "collected_seeds") << "%)" << endl;
-		cerr << " | Unmapped reads:        " << H->C.count("unmapped_reads") << " (" << H->C.perc("unmapped_reads", "reads") << "%)" << endl;
 		cerr << " | Average Jaccard:       " << H->C.frac("J", "mappings") / 10000.0 << endl;
 		cerr << " | Average edit dist:     " << H->C.frac("total_edit_distance", "mappings") << endl;
 		print_time_stats();
