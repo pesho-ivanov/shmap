@@ -62,12 +62,14 @@ class BucketMapper : public Mapper {
 	}
 
 	// Initializes the histogram of the pattern and the list of matches
-	vector<Mapping> match_seeds(pos_t P_sz, pos_t p_sz, const vector<Seed> &seeds, double t_frac) {
+	Buckets match_seeds(pos_t P_sz, pos_t p_sz, const vector<Seed> &seeds, double t_frac) {
 		pos_t h = P_sz;
 		int t_abs = t_frac * p_sz;
 		Buckets M(h);  // M[bucket] - number of unique kmers from p starting at T[h*bucket, h*(bucket+2))
-		H->T.start("match_infrequent");
 		size_t seed;
+
+		H->T.start("match_infrequent");
+		// match infrequent seeds to all buckets
 		for (seed=0; seed<seeds.size(); seed++) {
 			if ((int)seeds.size() - (int)seed < t_abs)	
 				break;
@@ -82,41 +84,69 @@ class BucketMapper : public Mapper {
 		H->T.stop("match_infrequent");
 
 		H->T.start("match_frequent");
-		vector<bucket_t> full_buckets;
-		for (auto &[bucket, matches]: M) {
+		// match frequent seeds to all buckets with an infrequent seed
+		for (auto &[bucket, matches]: M)
 			for (auto seed_it = seeds.begin()+seed; seed_it != seeds.end(); ++seed_it)
 				for (const auto &match: tidx.get_matches_in_interval(*seed_it, bucket*h, (bucket+2)*h))
 					matches.push_back(match);
-			if ((int)matches.size() >= t_abs)
-				full_buckets.push_back(bucket);
-		}
 		H->T.stop("match_frequent");
+		
+		// filter the promising buckets
+		H->T.start("filter_promising_buckets");
+		Buckets promising_buckets;
+		for (const auto &[bucket, matches]: M)
+			if ((int)matches.size() >= t_abs)
+				promising_buckets[bucket] = matches;
+		H->T.stop("filter_promising_buckets");
+		return promising_buckets;
+	}
 
+	vector<Mapping> sweep(Buckets &promising_buckets, pos_t P_len, const vector<Seed> &seeds) {
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
-		H->T.start("sweep");
-		for (auto bucket: full_buckets) {
-			auto &matches = M[bucket];
+		if (promising_buckets.empty())
+			return mappings;
+
+		Mapping best(H->params.k, P_len, 0, -1, -1, -1, -1, -1, 0, promising_buckets.begin()->second.begin(), promising_buckets.begin()->second.end());
+		Mapping second = best;
+
+		for (auto &[bucket, matches]: promising_buckets) {
 			sort(matches.begin(), matches.end(), [](const Match &a, const Match &b) {
 				return a.hit.r < b.hit.r;
 			}); 
 			int same_strand_seeds = 0;
-			for(const auto &m: M[bucket])
+			for(const auto &m: matches)
 				same_strand_seeds += m.is_same_strand() ? +1 : -1;
-			auto P_len = P_sz;
 			auto thin_seeds_cnt = seeds.size();
 			auto l = matches.front().hit.r;
 			auto r = matches.back().hit.r;
 			auto segm_id = matches.front().hit.segm_id;
-			auto xmin = -1;
-			vector<Match>::const_iterator l_it = matches.begin();
-			vector<Match>::const_iterator r_it = matches.begin();
+			auto xmin = matches.size();
 
-			auto m = Mapping(H->params.k, P_len, thin_seeds_cnt, l, r, segm_id, matches.size(), xmin, same_strand_seeds, l_it, r_it);
+			auto m = Mapping(H->params.k, P_len, thin_seeds_cnt, l, r, segm_id, matches.size(), xmin, same_strand_seeds, matches.begin(), matches.end());
 			//Mapping(       int k,    pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, segm_t segm_id, pos_t s_sz, int xmin, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r)
 
-			mappings.push_back(m);
+			//cerr << "Bucket: " << bucket << " " << m << endl;
+
+			if (H->params.onlybest) {
+				if (m.xmin > best.xmin) {  // if (xmin > best.xmin)
+					if (best.T_l < m.T_l - 0.9*P_len)
+						second = best;
+					best = m;
+				} else if (m.xmin > second.xmin && m.T_l > best.T_l + 0.9*P_len) {
+					second = m;
+				}
+			} else {
+				if (m.J > H->params.tThres) {
+					mappings.push_back(m);
+				}
+			}
 		}
-		H->T.stop("sweep");
+
+		if (H->params.onlybest && best.xmin != -1) { // && best.J > H->params.tThres)
+			best.mapq = (best.xmin > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
+			best.J2 = second.J;
+			mappings.push_back(best);
+		}
 
 		return mappings;
 	}
@@ -141,7 +171,7 @@ class BucketMapper : public Mapper {
     }
 
 	void map(const string &pFile) {
-		cerr << "Mapping reads " << pFile << "..." << endl;
+		cerr << "Mapping reads using BucketMap " << pFile << "..." << endl;
 
 		H->C.inc("spurious_matches", 0);
 		H->C.inc("J", 0);
@@ -170,8 +200,16 @@ class BucketMapper : public Mapper {
 			H->T.stop("seeding");
 
 			H->T.start("matching");
-			vector<Mapping> mappings = match_seeds(P_sz, p.size(), seeds, H->params.tThres);
+			Buckets promising_buckets = match_seeds(P_sz, p.size(), seeds, H->params.tThres);
 			H->T.stop("matching");
+
+			H->T.start("sweep");
+			vector<Mapping> mappings = sweep(promising_buckets, P_sz, seeds);
+			H->T.stop("sweep");
+
+			std::vector<Match> all_matches;
+			for (const auto &[bucket, matches]: promising_buckets)
+				all_matches.insert(all_matches.end(), matches.begin(), matches.end());
 
 			for (auto &m: mappings) {
 //				m.map_time = read_mapping_time.secs() / (double)mappings.size();
@@ -181,8 +219,8 @@ class BucketMapper : public Mapper {
 //					H->C.inc("total_edit_distance", ed);
 //				}
 //				else
-				std::vector<Match> matches;
-					m.print_paf(query_id, segm, matches);
+
+					m.print_paf(query_id, segm, all_matches);
 				//  H->C.inc("spurious_matches", spurious_matches(m, matches));
 				H->C.inc("J", int(10000.0*m.J));
 				H->C.inc("mappings");
@@ -190,8 +228,8 @@ class BucketMapper : public Mapper {
 			}
 //			H->C.inc("matches", matches.size());
 			H->C.inc("reads");
-			//if (mappings.empty())
-			//	H->C.inc("unmapped_reads");
+			if (mappings.empty())
+				H->C.inc("unmapped_reads");
 			//H->T.stop("postproc");
 
 			H->T.stop("query_mapping");
@@ -200,8 +238,25 @@ class BucketMapper : public Mapper {
 		H->T.stop("query_reading");
 		H->T.stop("mapping");
 
-		//print_stats();
+		print_stats();
 		print_time_stats();
+	}
+	
+	void print_stats() {
+		cerr << std::fixed << std::setprecision(1);
+		cerr << "Mapping stats:" << endl;
+		cerr << " | Total reads:           " << H->C.count("reads") << " (~" << 1.0*H->C.count("read_len") / H->C.count("reads") << " nb per read)" << endl;
+		cerr << " |  | Unmapped reads:        " << H->C.count("unmapped_reads") << " (" << H->C.perc("unmapped_reads", "reads") << "%)" << endl;
+		cerr << " | Sketched read kmers:   " << H->C.count("sketched_kmers") << " (" << H->C.frac("sketched_kmers", "reads") << " per read)" << endl;
+		//cerr << " | Kmer matches:          " << H->C.count("matches") << " (" << H->C.frac("matches", "reads") << " per read)" << endl;
+		//cerr << " | Seed limit reached:    " << H->C.count("seeds_limit_reached") << " (" << H->C.perc("seeds_limit_reached", "reads") << "%)" << endl;
+		//cerr << " | Matches limit reached: " << H->C.count("matches_limit_reached") << " (" << H->C.perc("matches_limit_reached", "reads") << "%)" << endl;
+		//cerr << " | Spurious matches:      " << H->C.count("spurious_matches") << " (" << H->C.perc("spurious_matches", "matches") << "%)" << endl;
+		//cerr << " | Discarded seeds:       " << H->C.count("discarded_seeds") << " (" << H->C.perc("discarded_seeds", "collected_seeds") << "%)" << endl;
+		//cerr << " | Average Jaccard:       " << H->C.frac("J", "mappings") / 10000.0 << endl;
+		//cerr << " | Average edit dist:     " << H->C.frac("total_edit_distance", "mappings") << endl;
+		//print_time_stats();
+        //printMemoryUsage();
 	}
 
     void print_time_stats() {
@@ -217,23 +272,10 @@ class BucketMapper : public Mapper {
         cerr << " |  | matching seeds:         "     << setw(5) << right << H->T.secs("matching")          << " (" << setw(4) << right << H->T.perc("matching", "mapping")            << "\%, " << setw(5) << right << H->T.range_ratio("matching") << "x)" << endl;
         cerr << " |  |  | match infrequent:        " << setw(5) << right << H->T.secs("match_infrequent")  << " (" << setw(4) << right << H->T.perc("match_infrequent", "matching")   << "\%, " << setw(5) << right << H->T.range_ratio("match_infrequent") << "x)" << endl;
         cerr << " |  |  | match frequent:          " << setw(5) << right << H->T.secs("match_frequent")    << " (" << setw(4) << right << H->T.perc("match_frequent", "matching")     << "\%, " << setw(5) << right << H->T.range_ratio("match_frequent") << "x)" << endl;
+        cerr << " |  |  | filter promising buckets:" << setw(5) << right << H->T.secs("filter_promising_buckets")    << " (" << setw(4) << right << H->T.perc("filter_promising_buckets", "matching")     << "\%, " << setw(5) << right << H->T.range_ratio("match_frequent") << "x)" << endl;
+        cerr << " |  | sweep:                  "     << setw(5) << right << H->T.secs("sweep")             << " (" << setw(4) << right << H->T.perc("sweep", "mapping")               << "\%, " << setw(5) << right << H->T.range_ratio("sweep") << "x)" << endl;
 //        cerr << " |  | post proc:              "     << setw(5) << right << H->T.secs("postproc")          << " (" << setw(4) << right << H->T.perc("postproc", "mapping")            << "\%, " << setw(5) << right << H->T.range_ratio("postproc") << "x)" << endl;
     }
-
-	void print_stats() {
-		cerr << std::fixed << std::setprecision(1);
-		cerr << "Mapping stats:" << endl;
-		cerr << " | Total reads:           " << H->C.count("reads") << " (~" << 1.0*H->C.count("read_len") / H->C.count("reads") << " nb per read)" << endl;
-		cerr << " | Sketched read kmers:   " << H->C.count("sketched_kmers") << " (" << H->C.frac("sketched_kmers", "reads") << " per read)" << endl;
-		cerr << " | Kmer matches:          " << H->C.count("matches") << " (" << H->C.frac("matches", "reads") << " per read)" << endl;
-		cerr << " | Seed limit reached:    " << H->C.count("seeds_limit_reached") << " (" << H->C.perc("seeds_limit_reached", "reads") << "%)" << endl;
-		//cerr << " | Matches limit reached: " << H->C.count("matches_limit_reached") << " (" << H->C.perc("matches_limit_reached", "reads") << "%)" << endl;
-		cerr << " | Spurious matches:      " << H->C.count("spurious_matches") << " (" << H->C.perc("spurious_matches", "matches") << "%)" << endl;
-		cerr << " | Discarded seeds:       " << H->C.count("discarded_seeds") << " (" << H->C.perc("discarded_seeds", "collected_seeds") << "%)" << endl;
-		cerr << " | Unmapped reads:        " << H->C.count("unmapped_reads") << " (" << H->C.perc("unmapped_reads", "reads") << "%)" << endl;
-		cerr << " | Average Jaccard:       " << H->C.frac("J", "mappings") / 10000.0 << endl;
-		cerr << " | Average edit dist:     " << H->C.frac("total_edit_distance", "mappings") << endl;
-	}
 };
 
 }  // namespace sweepmap
