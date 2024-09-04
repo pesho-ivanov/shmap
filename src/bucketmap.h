@@ -61,6 +61,10 @@ class BucketMapper : public Mapper {
 		return seeds;
 	}
 
+	bucket_t pos2bucket(pos_t pos, pos_t half_bucket, bool which_bucket) {
+		return pos/half_bucket + (int)which_bucket;
+	}
+
 	// Initializes the histogram of the pattern and the list of matches
 	Buckets match_seeds(pos_t P_sz, pos_t p_sz, const vector<Seed> &seeds, double t_frac) {
 		pos_t h = P_sz;
@@ -76,8 +80,8 @@ class BucketMapper : public Mapper {
 			vector<Match> seed_matches;
 			tidx.get_matches(&seed_matches, seeds[seed], seed);
 			for (const auto &match: seed_matches)
-				for (int shift=0; shift<2; ++shift) {
-					auto bucket = match.hit.r/h + shift;
+				for (int which_bucket=0; which_bucket<2; ++which_bucket) {
+					auto bucket = pos2bucket(match.hit.r, h, bool(which_bucket));
 					M[bucket].push_back(match);
 				}
 		}
@@ -150,15 +154,6 @@ class BucketMapper : public Mapper {
 
 		return mappings;
 	}
-
-//    // TODO: disable in release
-//    int spurious_matches(const Mapping &m, const vector<Match> &matches) {
-//        int included = 0;
-//        for (auto &match: matches)
-//            if (match.hit.segm_id == m.segm_id && match.hit.r >= m.T_l && match.hit.r <= m.T_r)
-//                included++;
-//        return matches.size() - included;
-//    }
 
   public:
 	BucketMapper(const SketchIndex &tidx, Handler *H) : tidx(tidx), H(H) {
