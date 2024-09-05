@@ -65,6 +65,10 @@ class BucketMapper : public Mapper {
 		return pos/half_bucket + (int)which_bucket;
 	}
 
+	pair<pos_t, pos_t> bucket2interval(bucket_t bucket, pos_t half_bucket) {
+		return {bucket*half_bucket, (bucket+2)*half_bucket};
+	}
+
 	// Initializes the histogram of the pattern and the list of matches
 	Buckets match_seeds(pos_t P_sz, pos_t p_sz, const vector<Seed> &seeds, double t_frac) {
 		pos_t h = P_sz;
@@ -89,10 +93,12 @@ class BucketMapper : public Mapper {
 
 		H->T.start("match_frequent");
 		// match frequent seeds to all buckets with an infrequent seed
-		for (auto &[bucket, matches]: M)
+		for (auto &[bucket, matches]: M) {
+			auto bucket_interval = bucket2interval(bucket, h);
 			for (auto seed_it = seeds.begin()+seed; seed_it != seeds.end(); ++seed_it)
-				for (const auto &match: tidx.get_matches_in_interval(*seed_it, bucket*h, (bucket+2)*h))
+				for (const auto &match: tidx.get_matches_in_interval(*seed_it, bucket_interval.first, bucket_interval.second))
 					matches.push_back(match);
+		}
 		H->T.stop("match_frequent");
 		
 		// filter the promising buckets
@@ -124,19 +130,19 @@ class BucketMapper : public Mapper {
 			auto l = matches.front().hit.r;
 			auto r = matches.back().hit.r;
 			auto segm_id = matches.front().hit.segm_id;
-			auto xmin = matches.size();
+			auto intersection = matches.size();
 
-			auto m = Mapping(H->params.k, P_len, thin_seeds_cnt, l, r, segm_id, matches.size(), xmin, same_strand_seeds, matches.begin(), matches.end());
-			//Mapping(       int k,    pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, segm_t segm_id, pos_t s_sz, int xmin, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r)
+			auto m = Mapping(H->params.k, P_len, thin_seeds_cnt, l, r, segm_id, matches.size(), intersection, same_strand_seeds, matches.begin(), matches.end());
+			//Mapping(       int k,    pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, segm_t segm_id, pos_t s_sz, int intersection, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r)
 
 			//cerr << "Bucket: " << bucket << " " << m << endl;
 
 			if (H->params.onlybest) {
-				if (m.xmin > best.xmin) {  // if (xmin > best.xmin)
+				if (m.intersection > best.intersection) {  // if (intersection > best.intersection)
 					if (best.T_l < m.T_l - 0.9*P_len)
 						second = best;
 					best = m;
-				} else if (m.xmin > second.xmin && m.T_l > best.T_l + 0.9*P_len) {
+				} else if (m.intersection > second.intersection && m.T_l > best.T_l + 0.9*P_len) {
 					second = m;
 				}
 			} else {
@@ -146,8 +152,8 @@ class BucketMapper : public Mapper {
 			}
 		}
 
-		if (H->params.onlybest && best.xmin != -1) { // && best.J > H->params.tThres)
-			best.mapq = (best.xmin > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
+		if (H->params.onlybest && best.intersection != -1) { // && best.J > H->params.tThres)
+			best.mapq = (best.intersection > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
 			best.J2 = second.J;
 			mappings.push_back(best);
 		}
@@ -207,7 +213,7 @@ class BucketMapper : public Mapper {
 				all_matches.insert(all_matches.end(), matches.begin(), matches.end());
 
 			for (auto &m: mappings) {
-//				m.map_time = read_mapping_time.secs() / (double)mappings.size();
+				m.map_time = read_mapping_time.secs() / (double)mappings.size();
 				const auto &segm = tidx.T[m.segm_id];
 //				if (H->params.sam) {
 //					auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
@@ -219,7 +225,7 @@ class BucketMapper : public Mapper {
 				//  H->C.inc("spurious_matches", spurious_matches(m, matches));
 				H->C.inc("J", int(10000.0*m.J));
 				H->C.inc("mappings");
-				H->C.inc("sketched_kmers", m.seeds);
+				H->C.inc("sketched_kmers", m.p_sz);
 			}
 //			H->C.inc("matches", matches.size());
 			H->C.inc("reads");
@@ -267,7 +273,7 @@ class BucketMapper : public Mapper {
         cerr << " |  | matching seeds:         "     << setw(5) << right << H->T.secs("matching")          << " (" << setw(4) << right << H->T.perc("matching", "mapping")            << "\%, " << setw(5) << right << H->T.range_ratio("matching") << "x)" << endl;
         cerr << " |  |  | match infrequent:        " << setw(5) << right << H->T.secs("match_infrequent")  << " (" << setw(4) << right << H->T.perc("match_infrequent", "matching")   << "\%, " << setw(5) << right << H->T.range_ratio("match_infrequent") << "x)" << endl;
         cerr << " |  |  | match frequent:          " << setw(5) << right << H->T.secs("match_frequent")    << " (" << setw(4) << right << H->T.perc("match_frequent", "matching")     << "\%, " << setw(5) << right << H->T.range_ratio("match_frequent") << "x)" << endl;
-        cerr << " |  |  | filter promising buckets:" << setw(5) << right << H->T.secs("filter_promising_buckets")    << " (" << setw(4) << right << H->T.perc("filter_promising_buckets", "matching")     << "\%, " << setw(5) << right << H->T.range_ratio("match_frequent") << "x)" << endl;
+        cerr << " |  |  | filter promising buckets:" << setw(5) << right << H->T.secs("filter_promising_buckets")    << " (" << setw(4) << right << H->T.perc("filter_promising_buckets", "matching")     << "\%, " << setw(5) << right << H->T.range_ratio("filter_promising_buckets") << "x)" << endl;
         cerr << " |  | sweep:                  "     << setw(5) << right << H->T.secs("sweep")             << " (" << setw(4) << right << H->T.perc("sweep", "mapping")               << "\%, " << setw(5) << right << H->T.range_ratio("sweep") << "x)" << endl;
 //        cerr << " |  | post proc:              "     << setw(5) << right << H->T.secs("postproc")          << " (" << setw(4) << right << H->T.perc("postproc", "mapping")            << "\%, " << setw(5) << right << H->T.range_ratio("postproc") << "x)" << endl;
     }

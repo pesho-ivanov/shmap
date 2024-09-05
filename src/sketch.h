@@ -83,12 +83,12 @@ struct RefSegment {
 struct Mapping {
 	int k; 	   // kmer size
 	pos_t P_sz;     // pattern size |P| bp 
-	pos_t seeds;     // number of seeds (subset of the sketch kmers)
+	pos_t p_sz;     // number of seeds (subset of the sketch kmers)
 	pos_t T_l;      // the position of the leftmost nucleotide of the mapping
 	pos_t T_r;      // the position of the rightmost nucleotide of the mapping
 	segm_t segm_id;
 	pos_t s_sz;      // the position of the rightmost nucleotide of the mapping
-	int xmin;     // the number of kmers in the intersection between the pattern and its mapping in `t'
+	int intersection;     // the number of kmers in the intersection between the pattern and its mapping in `t'
 	double J, J2;     // Jaccard similarity in [0;1] for the best and for the second best mapping
 	double map_time;
 	int mapq;
@@ -97,8 +97,8 @@ struct Mapping {
 	std::vector<Match>::const_iterator l, r;
 
     Mapping() {}
-	Mapping(int k, pos_t P_sz, int seeds, pos_t T_l, pos_t T_r, segm_t segm_id, pos_t s_sz, int xmin, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r)
-		: k(k), P_sz(P_sz), seeds(seeds), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), xmin(xmin), J(double(xmin) / std::max(seeds, s_sz)), mapq(255), strand(same_strand_seeds > 0 ? '+' : '-'), unreasonable(false), l(l), r(r) {}
+	Mapping(int k, pos_t P_sz, int p_sz, pos_t T_l, pos_t T_r, segm_t segm_id, pos_t s_sz, int intersection, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r)
+		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), intersection(intersection), J(double(intersection) / std::max(p_sz, s_sz)), mapq(255), strand(same_strand_seeds > 0 ? '+' : '-'), unreasonable(false), l(l), r(r) {}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
     void print_paf(const string &query_id, const RefSegment &segm, std::vector<Match> matches) const {
@@ -128,10 +128,10 @@ struct Mapping {
 			<< "\t" << mapq  // Mapping quality (0-255; 255 for missing)
 // ----- end of required PAF fields -----
 			<< "\t" << "k:i:" << k
-			<< "\t" << "p:i:" << seeds  // sketches
+			<< "\t" << "p:i:" << p_sz  // sketches
 			<< "\t" << "M:i:" << matches.size() // kmer matches in T
 			<< "\t" << "s:i:" << s_sz
-			<< "\t" << "I:i:" << xmin  // intersection of `p` and `s` [kmers]
+			<< "\t" << "I:i:" << intersection  // intersection of `p` and `s` [kmers]
 			<< "\t" << "J:f:" << J   // Jaccard similarity [0; 1]
 			<< "\t" << "J2:f:" << J2   // second best mapping Jaccard similarity [0; 1]
 			<< "\t" << "t:f:" << map_time

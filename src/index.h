@@ -60,12 +60,18 @@ public:
 			if (intersect(hit, from, to))
 				matches.push_back(Match(s, hit, -1));
 		} else {
-			const vector<Hit> &hits = h2multi.at(s.kmer.h);
 			// TODO: account for segments
 			// TODO: careful with left and right ends
-			auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.r < pos; });
-			for (; it != hits.end() && it->r < to; ++it)
-				matches.push_back(Match(s, *it, -1));
+			const vector<Hit> &hits = h2multi.at(s.kmer.h);
+			if (hits.size() < 1000) {
+				for (const Hit &hit: hits)
+					if (hit.r >= from && hit.r < to)
+						matches.push_back(Match(s, hit, -1));
+			} else {
+				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.r < pos; });
+				for (; it != hits.end() && it->r < to; ++it)
+					matches.push_back(Match(s, *it, -1));
+			}
 		}	
 		return matches;
 	}

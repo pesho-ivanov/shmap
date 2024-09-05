@@ -67,11 +67,11 @@ class SweepMapper : public Mapper {
 		hist->reserve(total_seeds+1);
 		hist->push_back(0);
 		int min_r = p.size(), max_r = -1;
-		for (int i=0; i<total_seeds-1; i++) {
+		for (int i=0; i<total_seeds; i++) {
 			min_r = std::min(min_r, seeds[i].r_first);
 			max_r = std::max(max_r, seeds[i].r_last);
 			++(hist->back());
-			if (seeds[i].kmer.h != seeds[i+1].kmer.h) {
+			if (i==total_seeds-1 || seeds[i].kmer.h != seeds[i+1].kmer.h) {
 				assert(min_r <= max_r);
 				seeds[i].r_first = min_r;
 				seeds[i].r_last = max_r;
@@ -115,7 +115,7 @@ class SweepMapper : public Mapper {
 //		const int MAX_BL = 100;
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
 
-		int xmin = 0;
+		int intersection = 0;
 		Mapping best(H->params.k, P_len, 0, -1, -1, -1, -1, -1, 0, M.end(), M.end());
 		Mapping second = best;
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
@@ -131,22 +131,22 @@ class SweepMapper : public Mapper {
 				// If taking this kmer from T increases the intersection with P.
 				// TODO: iterate following seeds
 				if (--diff_hist[r->seed_num] >= 0)
-					++xmin;
+					++intersection;
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			auto m = Mapping(H->params.k, P_len, thin_seeds_cnt, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), xmin, same_strand_seeds, l, r);
+			auto m = Mapping(H->params.k, P_len, thin_seeds_cnt, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), intersection, same_strand_seeds, l, r);
 
 			// second best without guarantees
 			// Wrong invariant:
 			// best[l,r) -- a mapping best.l<=l with maximal J
 			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
 			if (H->params.onlybest) {
-				if (m.xmin > best.xmin) {  // if (xmin > best.xmin)
+				if (m.intersection > best.intersection) {  // if (intersection > best.intersection)
 					if (best.T_l < m.T_l - 0.9*P_len)
 						second = best;
 					best = m;
-				} else if (m.xmin > second.xmin && m.T_l > best.T_l + 0.9*P_len) {
+				} else if (m.intersection > second.intersection && m.T_l > best.T_l + 0.9*P_len) {
 					second = m;
 				}
 			} else {
@@ -157,16 +157,16 @@ class SweepMapper : public Mapper {
 
 			// Prepare for the next step by moving `l` to the right.
 			if (++diff_hist[l->seed_num] > 0)
-				--xmin;
+				--intersection;
 			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
 
-			assert(xmin >= 0);
+			assert(intersection >= 0);
 		}
-		assert(xmin == 0);
+		assert(intersection == 0);
 		assert(same_strand_seeds == 0);
 
-		if (H->params.onlybest && best.xmin != -1) { // && best.J > H->params.tThres)
-			best.mapq = (best.xmin > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
+		if (H->params.onlybest && best.intersection != -1) { // && best.J > H->params.tThres)
+			best.mapq = (best.intersection > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
 			best.J2 = second.J;
 			mappings.push_back(best);
 		}
@@ -211,9 +211,9 @@ class SweepMapper : public Mapper {
 			// 2. Remove from the deque front all mappings that are strictly
 			//    less similar than the current J. This keeps the deque sorted
 			//    descending in J from left to right
-			while(!recent.empty() && recent.front().xmin < next.xmin)
+			while(!recent.empty() && recent.front().intersection < next.intersection)
 				recent.pop_front();
-			assert(recent.empty() || (recent.back().xmin >= recent.front().xmin && recent.front().xmin >= next.xmin));
+			assert(recent.empty() || (recent.back().intersection >= recent.front().intersection && recent.front().intersection >= next.intersection));
 
 			// 3. Add the next mapping to the front
 			recent.push_front(next);	 
@@ -303,7 +303,7 @@ class SweepMapper : public Mapper {
                 H->C.inc("spurious_matches", spurious_matches(m, matches));
 				H->C.inc("J", int(10000.0*m.J));
 				H->C.inc("mappings");
-				H->C.inc("sketched_kmers", m.seeds);
+				H->C.inc("sketched_kmers", m.p_sz);
 			}
 			H->C.inc("matches", matches.size());
 			H->C.inc("reads");
