@@ -98,7 +98,7 @@ struct Mapping {
 
     Mapping() {}
 	Mapping(int k, pos_t P_sz, int p_sz, pos_t T_l, pos_t T_r, segm_t segm_id, pos_t s_sz, int intersection, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r)
-		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), intersection(intersection), J(double(intersection) / std::max(p_sz, s_sz)), mapq(255), strand(same_strand_seeds > 0 ? '+' : '-'), unreasonable(false), l(l), r(r) {}
+		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), intersection(intersection), J(1.0*intersection / p_sz), mapq(255), strand(same_strand_seeds > 0 ? '+' : '-'), unreasonable(false), l(l), r(r) {}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
     void print_paf(const string &query_id, const RefSegment &segm, std::vector<Match> matches) const {
@@ -201,6 +201,11 @@ struct Mapping {
 		free(cigar);
 		edlibFreeAlignResult(result);
 		return ed;
+	}
+
+	friend std::ostream& operator<<(std::ostream& os, const Mapping& mapping) {
+		os << "Mapping(k=" << mapping.k << ", P_sz=" << mapping.P_sz << ", p_sz=" << mapping.p_sz << ", T_l=" << mapping.T_l << ", T_r=" << mapping.T_r << ", segm_id=" << mapping.segm_id << ", s_sz=" << mapping.s_sz << ", intersection=" << mapping.intersection << ", J=" << mapping.J << ", J2=" << mapping.J2 << ", map_time=" << mapping.map_time << ", mapq=" << mapping.mapq << ", strand=" << mapping.strand << ", unreasonable=" << mapping.unreasonable << ")";
+		return os;
 	}
 };
 

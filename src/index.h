@@ -51,14 +51,14 @@ public:
 		return hit.r >= from && hit.r < to;
 	}
 
-	std::vector<Match> get_matches_in_interval(const Seed &s, const int from, const int to) const {
+	std::vector<Match> get_matches_in_interval(const Seed &s, const int from, const int to, int seed_num) const {
 		// assume matches of each seed are sorted by position in T
 		// TODO: account for segments
 		std::vector<Match> matches;
 		if (s.hits_in_T == 1) {
 			auto &hit = h2single.at(s.kmer.h);
 			if (intersect(hit, from, to))
-				matches.push_back(Match(s, hit, -1));
+				matches.push_back(Match(s, hit, seed_num));
 		} else {
 			// TODO: account for segments
 			// TODO: careful with left and right ends
@@ -66,11 +66,11 @@ public:
 			if (hits.size() < 1000) {
 				for (const Hit &hit: hits)
 					if (hit.r >= from && hit.r < to)
-						matches.push_back(Match(s, hit, -1));
+						matches.push_back(Match(s, hit, seed_num));
 			} else {
 				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.r < pos; });
 				for (; it != hits.end() && it->r < to; ++it)
-					matches.push_back(Match(s, *it, -1));
+					matches.push_back(Match(s, *it, seed_num));
 			}
 		}	
 		return matches;

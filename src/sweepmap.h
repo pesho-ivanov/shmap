@@ -109,14 +109,15 @@ class SweepMapper : public Mapper {
 		return matches;
 	}
 
+	// TODO: limit diff_hist to 0s and 1s to support Jaccard (no repetitions)
 	// vector<hash_t> diff_hist;  // diff_hist[kmer_hash] = #occurences in `p` - #occurences in `s`
 	// vector<Match> M;   	   // for all kmers from P in T: <kmer_hash, last_kmer_pos_in_T> * |P| sorted by second
-	const vector<Mapping> sweep(hist_t &diff_hist, const vector<Match> &M, const pos_t P_len, const int thin_seeds_cnt) {
+	const vector<Mapping> sweep(hist_t &diff_hist, const vector<Match> &M, const pos_t P_sz, const int p_sz) {
 //		const int MAX_BL = 100;
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
 
 		int intersection = 0;
-		Mapping best(H->params.k, P_len, 0, -1, -1, -1, -1, -1, 0, M.end(), M.end());
+		Mapping best(H->params.k, P_sz, 0, -1, -1, -1, -1, -1, 0, M.end(), M.end());
 		Mapping second = best;
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 
@@ -125,38 +126,38 @@ class SweepMapper : public Mapper {
 			// Increase the right end of the window [l,r) until it gets out.
 			for(;  r != M.end()
 				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
-				&& r->hit.r + H->params.k <= l->hit.r + P_len
+				&& r->hit.r + H->params.k <= l->hit.r + P_sz
 				; ++r) {
 				same_strand_seeds += r->is_same_strand() ? +1 : -1;  // change to r inside the loop
 				// If taking this kmer from T increases the intersection with P.
 				// TODO: iterate following seeds
-				if (--diff_hist[r->seed_num] >= 0)
+				if (--diff_hist[r->seed_num] == 0)
 					++intersection;
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			auto m = Mapping(H->params.k, P_len, thin_seeds_cnt, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), intersection, same_strand_seeds, l, r);
+			auto m = Mapping(H->params.k, P_sz, p_sz, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), intersection, same_strand_seeds, l, r);
 
 			// second best without guarantees
 			// Wrong invariant:
 			// best[l,r) -- a mapping best.l<=l with maximal J
 			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
-			if (H->params.onlybest) {
-				if (m.intersection > best.intersection) {  // if (intersection > best.intersection)
-					if (best.T_l < m.T_l - 0.9*P_len)
-						second = best;
-					best = m;
-				} else if (m.intersection > second.intersection && m.T_l > best.T_l + 0.9*P_len) {
-					second = m;
-				}
-			} else {
-				if (m.J > H->params.tThres) {
+			if (m.J >= H->params.tThres) {
+				if (H->params.onlybest) {
+					if (m.intersection > best.intersection) {  // if (intersection > best.intersection)
+						if (best.T_l < m.T_l - 0.9*P_sz)
+							second = best;
+						best = m;
+					} else if (m.intersection > second.intersection && m.T_l > best.T_l + 0.9*P_sz) {
+						second = m;
+					}
+				} else {
 					mappings.push_back(m);
 				}
 			}
 
 			// Prepare for the next step by moving `l` to the right.
-			if (++diff_hist[l->seed_num] > 0)
+			if (++diff_hist[l->seed_num] == 1)
 				--intersection;
 			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
 
