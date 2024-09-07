@@ -101,7 +101,7 @@ struct Mapping {
 		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), intersection(intersection), J(1.0*intersection / p_sz), mapq(255), strand(same_strand_seeds > 0 ? '+' : '-'), unreasonable(false), l(l), r(r) {}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
-    void print_paf(const string &query_id, const RefSegment &segm, std::vector<Match> matches) const {
+    void print_paf(const string &query_id, const RefSegment &segm, int total_matches) const {
 		int P_start = P_sz, P_end = -1;
 		for (auto m = l; m != r; ++m) {
 			P_start = std::min(P_start, m->seed.r_first);
@@ -129,8 +129,8 @@ struct Mapping {
 // ----- end of required PAF fields -----
 			<< "\t" << "k:i:" << k
 			<< "\t" << "p:i:" << p_sz  // sketches
-			<< "\t" << "M:i:" << matches.size() // kmer matches in T
-			<< "\t" << "s:i:" << s_sz
+			<< "\t" << "M:i:" << total_matches // kmer matches in T
+			//<< "\t" << "s:i:" << s_sz
 			<< "\t" << "I:i:" << intersection  // intersection of `p` and `s` [kmers]
 			<< "\t" << "J:f:" << J   // Jaccard similarity [0; 1]
 			<< "\t" << "J2:f:" << J2   // second best mapping Jaccard similarity [0; 1]

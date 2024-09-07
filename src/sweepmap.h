@@ -70,7 +70,8 @@ class SweepMapper : public Mapper {
 		for (int i=0; i<total_seeds; i++) {
 			min_r = std::min(min_r, seeds[i].r_first);
 			max_r = std::max(max_r, seeds[i].r_last);
-			++(hist->back());
+			//++(hist->back());
+			hist->back() = 1;
 			if (i==total_seeds-1 || seeds[i].kmer.h != seeds[i+1].kmer.h) {
 				assert(min_r <= max_r);
 				seeds[i].r_first = min_r;
@@ -87,12 +88,13 @@ class SweepMapper : public Mapper {
 	}
 
 	// Initializes the histogram of the pattern and the list of matches
-	vector<Match> match_seeds(pos_t p_sz, const vector<Seed> &seeds) {
+	vector<Match> match_seeds(const vector<Seed> &seeds) {
 		H->T.start("collect_matches");
 		vector<Match> matches;
 		matches.reserve(2*(int)seeds.size());
 		for (int seed_num=0; seed_num<(int)seeds.size(); seed_num++)
-			tidx.get_matches(&matches, seeds[seed_num], seed_num);
+			if (seeds[seed_num].hits_in_T > 0)
+				tidx.get_matches(&matches, seeds[seed_num], seed_num);
 		H->T.stop("collect_matches");
 
 		H->T.start("sort_matches");
@@ -131,7 +133,7 @@ class SweepMapper : public Mapper {
 				same_strand_seeds += r->is_same_strand() ? +1 : -1;  // change to r inside the loop
 				// If taking this kmer from T increases the intersection with P.
 				// TODO: iterate following seeds
-				if (--diff_hist[r->seed_num] == 0)
+				if (--diff_hist[r->seed_num] >= 0)
 					++intersection;
 				assert (l->hit.r <= r->hit.r);
 			}
@@ -157,7 +159,7 @@ class SweepMapper : public Mapper {
 			}
 
 			// Prepare for the next step by moving `l` to the right.
-			if (++diff_hist[l->seed_num] == 1)
+			if (++diff_hist[l->seed_num] >= 1)
 				--intersection;
 			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
 
@@ -253,10 +255,12 @@ class SweepMapper : public Mapper {
 	void map(const string &pFile) {
 		cerr << "Mapping reads using SweepMap " << pFile << "..." << endl;
 
+		H->C.inc("kmers", 0);
+		H->C.inc("seeds", 0);
+		H->C.inc("matches", 0);
 		H->C.inc("spurious_matches", 0);
 		H->C.inc("J", 0);
 		H->C.inc("mappings", 0);
-		H->C.inc("sketched_kmers", 0);
 		H->C.inc("total_edit_distance", 0);
 
 		H->T.start("mapping");
@@ -270,18 +274,19 @@ class SweepMapper : public Mapper {
 
 			string query_id = seq->name.s;
 			pos_t P_sz = (pos_t)seq->seq.l;
-
+			H->C.inc("kmers", p.size());
 			H->C.inc("read_len", P_sz);
-			hist_t p_hist;
 
+			hist_t p_hist;
 			Timer read_mapping_time;
 			read_mapping_time.start();
 			H->T.start("seeding");
 			vector<Seed> thin_seeds = select_seeds(p, &p_hist);
 			H->T.stop("seeding");
+			H->C.inc("seeds", thin_seeds.size());
 
 			H->T.start("matching");
-			vector<Match> matches = match_seeds(p.size(), thin_seeds);
+			vector<Match> matches = match_seeds(thin_seeds);
 			H->T.stop("matching");
 
 			H->T.start("sweep");
@@ -300,11 +305,10 @@ class SweepMapper : public Mapper {
 					auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
 					H->C.inc("total_edit_distance", ed);
 				}
-				else m.print_paf(query_id, segm, matches);
+				else m.print_paf(query_id, segm, matches.size());
                 H->C.inc("spurious_matches", spurious_matches(m, matches));
 				H->C.inc("J", int(10000.0*m.J));
 				H->C.inc("mappings");
-				H->C.inc("sketched_kmers", m.p_sz);
 			}
 			H->C.inc("matches", matches.size());
 			H->C.inc("reads");
@@ -319,6 +323,24 @@ class SweepMapper : public Mapper {
 		H->T.stop("mapping");
 
 		print_stats();
+		print_time_stats();
+	}
+
+	void print_stats() {
+		cerr << std::fixed << std::setprecision(1);
+		cerr << "Mapping stats:" << endl;
+		cerr << " | Total reads:           " << H->C.count("reads") << " (~" << 1.0*H->C.count("read_len") / H->C.count("reads") << " nb per read)" << endl;
+		cerr << " |  | Unmapped reads:        " << H->C.count("unmapped_reads") << " (" << H->C.perc("unmapped_reads", "reads") << "%)" << endl;
+		cerr << " | Read kmers (total):    " << H->C.count("kmers") << " (" << H->C.frac("kmers", "reads") << " per read)" << endl;
+		cerr << " |  | unique:                 " << H->C.count("seeds") << " (" << H->C.frac("seeds", "kmers") << ")" << endl;
+		cerr << " | Matches:               " << H->C.count("matches") << " (" << H->C.frac("matches", "reads") << " per read)" << endl;
+		cerr << " | Seed limit reached:    " << H->C.count("seeds_limit_reached") << " (" << H->C.perc("seeds_limit_reached", "reads") << "%)" << endl;
+		//cerr << " | Matches limit reached: " << H->C.count("matches_limit_reached") << " (" << H->C.perc("matches_limit_reached", "reads") << "%)" << endl;
+		cerr << " | Spurious matches:      " << H->C.count("spurious_matches") << " (" << H->C.perc("spurious_matches", "matches") << "%)" << endl;
+		cerr << " | Discarded seeds:       " << H->C.count("discarded_seeds") << " (" << H->C.perc("discarded_seeds", "collected_seeds") << "%)" << endl;
+		cerr << " | Average Jaccard:       " << H->C.frac("J", "mappings") / 10000.0 << endl;
+		cerr << " | Average edit dist:     " << H->C.frac("total_edit_distance", "mappings") << endl;
+        //printMemoryUsage();
 	}
 
     void print_time_stats() {
@@ -345,22 +367,6 @@ class SweepMapper : public Mapper {
     //		cerr << " | Index:                 "         << setw(5) << right << C.count("index_memory_MB") << " (" << setw(4) << right << C.perc("index_memory_MB", "total_memory_MB") << "\%)" << endl;
     }
 
-	void print_stats() {
-		cerr << std::fixed << std::setprecision(1);
-		cerr << "Mapping stats:" << endl;
-		cerr << " | Total reads:           " << H->C.count("reads") << " (~" << 1.0*H->C.count("read_len") / H->C.count("reads") << " nb per read)" << endl;
-		cerr << " |  | Unmapped reads:        " << H->C.count("unmapped_reads") << " (" << H->C.perc("unmapped_reads", "reads") << "%)" << endl;
-		cerr << " | Sketched read kmers:   " << H->C.count("sketched_kmers") << " (" << H->C.frac("sketched_kmers", "reads") << " per read)" << endl;
-		cerr << " | Kmer matches:          " << H->C.count("matches") << " (" << H->C.frac("matches", "reads") << " per read)" << endl;
-		cerr << " | Seed limit reached:    " << H->C.count("seeds_limit_reached") << " (" << H->C.perc("seeds_limit_reached", "reads") << "%)" << endl;
-		//cerr << " | Matches limit reached: " << H->C.count("matches_limit_reached") << " (" << H->C.perc("matches_limit_reached", "reads") << "%)" << endl;
-		cerr << " | Spurious matches:      " << H->C.count("spurious_matches") << " (" << H->C.perc("spurious_matches", "matches") << "%)" << endl;
-		cerr << " | Discarded seeds:       " << H->C.count("discarded_seeds") << " (" << H->C.perc("discarded_seeds", "collected_seeds") << "%)" << endl;
-		cerr << " | Average Jaccard:       " << H->C.frac("J", "mappings") / 10000.0 << endl;
-		cerr << " | Average edit dist:     " << H->C.frac("total_edit_distance", "mappings") << endl;
-		print_time_stats();
-        //printMemoryUsage();
-	}
 };
 
 }  // namespace sweepmap

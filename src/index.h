@@ -63,7 +63,7 @@ public:
 			// TODO: account for segments
 			// TODO: careful with left and right ends
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
-			if (hits.size() < 1000) {
+			if (hits.size() < 100) {
 				for (const Hit &hit: hits)
 					if (hit.r >= from && hit.r < to)
 						matches.push_back(Match(s, hit, seed_num));
