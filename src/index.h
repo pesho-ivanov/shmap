@@ -51,29 +51,42 @@ public:
 		return hit.r >= from && hit.r < to;
 	}
 
-	std::vector<Match> get_matches_in_interval(const Seed &s, const int from, const int to, int seed_num) const {
+	bool get_matches_in_interval(std::vector<Match> *matches, const Seed &s, const int from, const int to, int seed_num) const {
 		// assume matches of each seed are sorted by position in T
 		// TODO: account for segments
-		std::vector<Match> matches;
 		if (s.hits_in_T == 1) {
 			auto &hit = h2single.at(s.kmer.h);
-			if (intersect(hit, from, to))
-				matches.push_back(Match(s, hit, seed_num));
+			if (intersect(hit, from, to)) {
+				matches->push_back(Match(s, hit, seed_num));
+				return true;
+			}
 		} else {
 			// TODO: account for segments
 			// TODO: careful with left and right ends
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
-			if (hits.size() < 100) {
-				for (const Hit &hit: hits)
-					if (hit.r >= from && hit.r < to)
-						matches.push_back(Match(s, hit, seed_num));
+			if (hits.size() < 10) {
+				for (int i=0; i<(int)hits.size(); i++)
+					if (hits[i].r >= from) {
+						matches->push_back(Match(s, hits[i], seed_num));
+						for (int j=(int)hits.size()-1; j>i; j--)
+							if (hits[j].r < to) {
+								matches->push_back(Match(s, hits[j], seed_num));
+								break;
+							}
+						return true;
+					}
 			} else {
-				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.r < pos; });
-				for (; it != hits.end() && it->r < to; ++it)
-					matches.push_back(Match(s, *it, seed_num));
+				auto it_l = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.r < pos; });
+				auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, int pos) { return hit.r > pos; });
+				matches->push_back(Match(s, *it_l, seed_num));
+				matches->push_back(Match(s, *it_r, seed_num));
+				return true;
+
+				//for (; it != hits.end() && it->r < to; ++it)
+				//	matches.push_back(Match(s, *it, seed_num));
 			}
 		}	
-		return matches;
+		return false;
 	}
 
 	void get_matches(std::vector<Match> *matches, const Seed &s, int seed_num) const {
