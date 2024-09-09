@@ -9,6 +9,7 @@
 #include "utils.h"
 #include "io.h"
 #include "handler.h"
+#include "rmq.h"
 
 namespace sweepmap {
 
@@ -76,17 +77,47 @@ public:
 						return true;
 					}
 			} else {
-				auto it_l = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.r < pos; });
+				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.r < pos; });
 				auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, int pos) { return hit.r > pos; });
-				matches->push_back(Match(s, *it_l, seed_num));
+
+				matches->push_back(Match(s, *it, seed_num));
 				matches->push_back(Match(s, *it_r, seed_num));
-				return true;
 
 				//for (; it != hits.end() && it->r < to; ++it)
 				//	matches.push_back(Match(s, *it, seed_num));
+
+				return true;
 			}
 		}	
 		return false;
+	}
+
+	// returns the number of hits in the interval from, to
+	int match_seed_around_hit(SegmentTree *hist, const Seed &s, const Hit &hit, int seed_num, vector<Match> *matches_freq) const {
+		// assume matches of each seed are sorted by position in T
+		if (s.hits_in_T == 1) {
+			auto &hit = h2single.at(s.kmer.h);
+			return hist->incRange(hit);
+		} else {
+			const vector<Hit> &hits = h2multi.at(s.kmer.h);
+			auto it = lower_bound(hits.begin(), hits.end(), hist->from(hit), [](const Hit &hit, int pos) { return hit.r < pos; });
+			if (it == hits.end()) return 0;
+
+			auto it_begin = it;
+			int res = 0;
+			int l=hist->from(*it), r=hist->to(*it);
+			for (++it; it != hits.end() && it->r < hist->to(hit); ++it) {
+				matches_freq->push_back(Match(s, *it, seed_num));
+				if (hist->from(*it) > r) {  // if there will be a gap, push the current range
+					res = max(res, hist->incRange(l, r));
+					l = hist->from(*it);
+				} else {  // prolong the range to the right
+					r = hist->to(*it);
+				}
+			}
+			res = max(res, hist->incRange(l, r));
+			return res;
+		}	
 	}
 
 	void get_matches(std::vector<Match> *matches, const Seed &s, int seed_num) const {
