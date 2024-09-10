@@ -38,12 +38,10 @@ K ?= 22
 R ?= 0.1
 S ?= 300
 M ?= 100
-T ?= 0.8
+T ?= 0.85
 
 K_SLOW ?= $(K) #22
 R_SLOW ?= $(R) #0.1
-S_SLOW ?= $(INF) #300
-M_SLOW ?= $(INF) #100
 T_SLOW ?= $(T) #0.0
 
 DIR = evals
@@ -66,6 +64,7 @@ OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 
 SWEEPMAP_PREF = $(OUTDIR)/sweepmap/sweepmap
 BUCKETMAP_PREF = $(OUTDIR)/bucketmap/bucketmap
+RMQMAP_PREF = $(OUTDIR)/rmqmap/rmqmap
 SWEEPMAP_SLOW_PREF = $(OUTDIR)/sweepmap-slow/sweepmap-slow
 MINIMAP_PREF = $(OUTDIR)/minimap/minimap
 BLEND_PREF = $(OUTDIR)/blend/blend
@@ -156,24 +155,31 @@ eval_sweepmap_sam: $(SWEEPMAP_BIN) gen_reads
 
 eval_sweepmap: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_PREF))
-	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>/dev/null >/dev/null
-	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M)    2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).paf
+	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -S $(S) -M $(M) -t $(T) -x 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -k $(K) -r $(R) -S $(S) -M $(M) -t $(T) -x    2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).paf
 	-paftools.js mapeval -r 0.1 $(SWEEPMAP_PREF).paf | tee $(SWEEPMAP_PREF).eval
 	@-paftools.js mapeval -r 0.1 -Q 60 $(SWEEPMAP_PREF).paf >$(SWEEPMAP_PREF).wrong
+
+eval_sweepmap_slow: $(SWEEPMAP_BIN) gen_reads
+	@mkdir -p $(shell dirname $(SWEEPMAP_SLOW_PREF))
+	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -z $(SWEEPMAP_SLOW_PREF).params -k $(K_SLOW) -r $(R_SLOW) -t $(T_SLOW) -x >/dev/null 2>/dev/null
+	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_SLOW_PREF).params -k $(K_SLOW) -r $(R_SLOW) -t $(T_SLOW) -x 2> >(tee $(SWEEPMAP_SLOW_PREF).log) >$(SWEEPMAP_SLOW_PREF).paf 
+	-paftools.js mapeval $(SWEEPMAP_SLOW_PREF).paf | tee $(SWEEPMAP_SLOW_PREF).eval
+	@-paftools.js mapeval -Q 0 $(SWEEPMAP_SLOW_PREF).paf >$(SWEEPMAP_SLOW_PREF).wrong
 
 eval_bucketmap: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(BUCKETMAP_PREF))
 #	$(TIME_CMD) -o $(BUCKETMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -m bucket 2>/dev/null >/dev/null
-	$(TIME_CMD) -o $(BUCKETMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(BUCKETMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -M 100000 -m bucket   2> >(tee $(BUCKETMAP_PREF).log) >$(BUCKETMAP_PREF).paf
+	$(TIME_CMD) -o $(BUCKETMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(BUCKETMAP_PREF).params -k $(K) -r $(R) -t $(T) -x -m bucket     2> >(tee $(BUCKETMAP_PREF).log) >$(BUCKETMAP_PREF).paf
 	-paftools.js mapeval -r 0.1 $(BUCKETMAP_PREF).paf | tee $(BUCKETMAP_PREF).eval
 	@-paftools.js mapeval -r 0.1 -Q 60 $(BUCKETMAP_PREF).paf >$(BUCKETMAP_PREF).wrong
 
-eval_sweepmap_slow: $(SWEEPMAP_BIN) gen_reads
-	@mkdir -p $(shell dirname $(SWEEPMAP_SLOW_PREF))
-	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) >/dev/null 2>/dev/null
-	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_SLOW_PREF).params -x -t $(T_SLOW) -k $(K_SLOW) -r $(R_SLOW) -S $(S_SLOW) -M $(M_SLOW) 2> >(tee $(SWEEPMAP_SLOW_PREF).log) >$(SWEEPMAP_SLOW_PREF).paf 
-	-paftools.js mapeval $(SWEEPMAP_SLOW_PREF).paf | tee $(SWEEPMAP_SLOW_PREF).eval
-	@-paftools.js mapeval -Q 0 $(SWEEPMAP_SLOW_PREF).paf >$(SWEEPMAP_SLOW_PREF).wrong
+eval_rmqmap: $(SWEEPMAP_BIN) gen_reads
+	@mkdir -p $(shell dirname $(RMQMAP_PREF))
+#	$(TIME_CMD) -o $(RMQMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -m rmq 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(RMQMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(RMQMAP_PREF).params -k $(K) -r $(R) -t $(T) -x -m rmq     2> >(tee $(RMQMAP_PREF).log) >$(RMQMAP_PREF).paf
+	-paftools.js mapeval -r 0.1 $(RMQMAP_PREF).paf | tee $(RMQMAP_PREF).eval
+	@-paftools.js mapeval -r 0.1 -Q 60 $(RMQMAP_PREF).paf >$(RMQMAP_PREF).wrong
 
 eval_winnowmap: gen_reads
 	@mkdir -p $(shell dirname $(WINNOWMAP_PREF))

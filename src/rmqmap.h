@@ -63,8 +63,9 @@ class RMQMapper : public Mapper {
 	}
 
 	// Initializes the histogram of the pattern and the list of matches
-	void match_seeds(SegmentTree /*fenwick_tree<int>*/ *hist, pos_t P_sz, pos_t p_sz, const vector<Seed> &seeds, int *t_abs, vector<Match> *matches_infreq, vector<Match> *matches_freq) {
+	void match_seeds(SegmentTree *hist, pos_t P_sz, pos_t p_sz, const vector<Seed> &seeds, int *t_abs, vector<Match> *matches_infreq, vector<Match> *matches_freq) {
 		H->T.start("match_infrequent");
+        vector<pair<int, int>> infreq_intervals;
 		// match infrequent seeds to all buckets
 		size_t seed;
         int rem_seeds;
@@ -74,12 +75,35 @@ class RMQMapper : public Mapper {
 			if (seeds[seed].hits_in_T > 0) {
 				vector<Match> seed_matches;
 				tidx.get_matches(&seed_matches, seeds[seed], seed);
-				for (const auto &match: seed_matches) {
-                    hist->incRange(match.hit);
-                    matches_infreq->push_back(match);
+                matches_infreq->insert(matches_infreq->end(), seed_matches.begin(), seed_matches.end());
+
+                int l = hist->from(seed_matches[0].hit);
+                int r = hist->to(seed_matches[0].hit);
+				for (int match = 1; match < seed_matches.size(); ++match) {
+                    if (hist->from(seed_matches[match].hit) <= r)
+                        r = hist->to(seed_matches[match].hit);  // prolong the range to the right
+                    else {
+                        hist->incRange(l, r);
+                        infreq_intervals.push_back({l, r});
+                        l = hist->from(seed_matches[match].hit);
+                        r = hist->to(seed_matches[match].hit);
+                    }
                 }
+                hist->incRange(l, r);
+                infreq_intervals.push_back({l, r});
 			}
 		H->T.stop("match_infrequent");
+
+        //cerr << "infreq_intervals: " << infreq_intervals.size() << ", matches_infreq: " << matches_infreq->size() << endl;
+
+        //cerr << "matches_infreq: ";
+        //for (auto &match: *matches_infreq) cerr << match.hit.r << ", ";
+        //cerr << endl;
+
+        sort(infreq_intervals.begin(), infreq_intervals.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.first < b.first; });
+
+        // TODO: sort by seeds too
+        //sort(matches_infreq->begin(), matches_infreq->end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; });
 
         //TODO: consider a speedup by sorting the infreq matches
         auto first_freq_seed = seed;
@@ -87,15 +111,17 @@ class RMQMapper : public Mapper {
 		H->T.start("match_frequent");
         vector<Match> freq_matches;
 		// match frequent seeds to all buckets with an infrequent seed
-		for (auto &match: *matches_infreq) {
-			int max_matches = hist->query(match.hit);
-			for (auto seed=first_freq_seed, rem_seeds=seeds.size() - first_freq_seed;
-                 seed < seeds.size() && max_matches + rem_seeds >= *t_abs;
-                 ++seed, --rem_seeds)
-				max_matches = tidx.match_seed_around_hit(hist, seeds[seed], match.hit, seed, matches_freq);
-			if (max_matches >= *t_abs)
-				*t_abs = max_matches;
-		}
+        for (auto [l, r]: infreq_intervals) {
+            int max_matches = hist->query(l, r);
+            for (auto seed=first_freq_seed, rem_seeds=seeds.size() - first_freq_seed;
+                seed < seeds.size() && max_matches + rem_seeds >= *t_abs;
+                ++seed, --rem_seeds)
+                max_matches = tidx.match_seed_around_hit(hist, seeds[seed], l, r, seed, matches_freq);
+            if (max_matches > *t_abs) {
+                //cerr << "Better max_matches: " << *t_abs << " -> " << max_matches << endl;
+                *t_abs = max_matches;
+            }
+        }
 		H->T.stop("match_frequent");
 	}
 
@@ -133,7 +159,7 @@ class RMQMapper : public Mapper {
 			// Wrong invariant:
 			// best[l,r) -- a mapping best.l<=l with maximal J
 			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
-			if (m.J >= H->params.tThres) {
+			//if (m.J >= H->params.tThres) {
 				if (H->params.onlybest) {
 					if (m.intersection > best.intersection) {  // if (intersection > best.intersection)
 						if (best.T_l < m.T_l - 0.9*P_sz)
@@ -145,7 +171,7 @@ class RMQMapper : public Mapper {
 				} else {
 					mappings.push_back(m);
 				}
-			}
+			//}
 
 			// Prepare for the next step by moving `l` to the right.
 			auto it = diff_hist.find(l->seed_num);
@@ -211,6 +237,7 @@ class RMQMapper : public Mapper {
 			string query_id = seq->name.s;
 			pos_t P_sz = (pos_t)seq->seq.l;
             hist.P_sz = P_sz;  // TODO: remove this hack
+            hist.clear();
 
 			H->C.inc("kmers", p.size());
 			H->C.inc("read_len", P_sz);
@@ -236,18 +263,16 @@ class RMQMapper : public Mapper {
 			H->C.inc("matches_infreq", matches_infreq.size());
 			H->C.inc("matches_freq", matches_freq.size());
 
-            cerr << "new read. matches: " << matches.size() << ", matches_infreq: " << matches_infreq.size() << ", matches_freq: " << matches_freq.size() << endl;
-
 			H->T.start("sweep");
 			vector<Mapping> mappings = sweep(matches, P_sz, seeds.size());
 			if (mappings.size() > 0) {
 				H->C.inc("mapped_reads");
 				H->C.inc("intersection_diff", t_abs - mappings[0].intersection);
-				//if (mappings[0].intersection != t_abs)
-				//	cerr << "mappings[0].intersection: " << mappings[0].intersection << ", t_abs: " << t_abs << ", mapping: " << mappings[0] << endl;
-				//assert(mappings[0].intersection == t_abs);
 			}
 			H->T.stop("sweep");
+
+            cerr << query_id << ": seeds: " << seeds.size() << ", I: " << int(H->params.tThres * seeds.size()) << " -> " << t_abs << ", matches: " << matches.size() << ", matches_infreq: " << matches_infreq.size() << ", matches_freq: " << matches_freq.size() << ", mappings: " << mappings.size();
+            cerr << mappings[0] << endl;
 
 			read_mapping_time.stop();
 

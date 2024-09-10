@@ -27,13 +27,25 @@ class SegmentTree {
         return T[i] = std::max(T[2*i], T[2*i+1]);
     }
 
+    void clear(int i) {
+        if (i < T.size() && T[i]) {
+            T[i] = 0;
+            clear(2*i);
+            clear(2*i+1);
+        }
+    }
+
 public:
     int P_sz;
     SegmentTree(int n) : n(n), T(4*n+1) {}
 
     inline int size() const { return n; }
     inline int from(const sweepmap::Hit &hit) const { return std::max(hit.r-P_sz, 0); }
-    inline int to(const sweepmap::Hit &hit) const  { return std::min(hit.r+P_sz, size()-1); }
+    inline int to(const sweepmap::Hit &hit) const  { return std::min(hit.r, size()-1); }
+
+    inline void clear() {
+        clear(1);
+    }
 
     inline int query(int qs, int qe) const {
         return query(qs, qe, 1, 0, n-1);
