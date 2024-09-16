@@ -62,31 +62,34 @@ class RMQMapper : public Mapper {
 		return seeds;
 	}
 
+	using Matches = vector<Match>;
+	using Intervals = vector<pair<int, int>>;
+	
 	// Initializes the histogram of the pattern and the list of matches
-	void match_seeds(SegmentTree *hist, pos_t P_sz, pos_t p_sz, const vector<Seed> &seeds, int *t_abs, vector<Match> *matches_infreq, vector<Match> *matches_freq) {
-		H->T.start("match_infrequent");
-        vector<pair<int, int>> infreq_intervals;
+	tuple<int, Matches, Intervals> match_infreq_seeds(SegmentTree *hist, const vector<Seed> &seeds, int t_abs) {
+		Matches matches_infreq;
+        Intervals intervals_infreq;
 		// match infrequent seeds to all buckets
 		size_t seed;
         int rem_seeds;
 		for (seed=0, rem_seeds=seeds.size();
-             seed<seeds.size() && rem_seeds >= *t_abs;
+             seed<seeds.size() && rem_seeds >= t_abs;
              ++seed, --rem_seeds)
 			if (seeds[seed].hits_in_T > 0) {
 				vector<Match> seed_matches;
 				tidx.get_matches(&seed_matches, seeds[seed], seed);
-                matches_infreq->insert(matches_infreq->end(), seed_matches.begin(), seed_matches.end());
+                matches_infreq.insert(matches_infreq.end(), seed_matches.begin(), seed_matches.end());
 
                 int l = hist->from(seed_matches[0].hit);
                 int r = hist->to(seed_matches[0].hit);
 				assert(l <= r);
-				for (int match = 1; match < seed_matches.size(); ++match) {
+				for (int match = 1; match < (int)seed_matches.size(); ++match) {
                     if (hist->from(seed_matches[match].hit) <= r) {
 						assert(r <= hist->to(seed_matches[match].hit));
                         r = hist->to(seed_matches[match].hit);  // prolong the range to the right
 					} else {
                         hist->incRange(l, r);
-                        infreq_intervals.push_back({l, r});
+                        intervals_infreq.push_back({l, r});
 						assert(l <= hist->from(seed_matches[match].hit));
 						assert(r <= hist->to(seed_matches[match].hit));
                         l = hist->from(seed_matches[match].hit);
@@ -95,36 +98,38 @@ class RMQMapper : public Mapper {
                     }
                 }
                 hist->incRange(l, r);
-                infreq_intervals.push_back({l, r});
+                intervals_infreq.push_back({l, r});
 			}
-		H->T.stop("match_infrequent");
 
         //TODO: consider a speedup by sorting the infreq matches
-        sort(infreq_intervals.begin(), infreq_intervals.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.first < b.first; });
+        sort(intervals_infreq.begin(), intervals_infreq.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.first < b.first; });
 
-		// print intervals
-		for (int i=0; i<infreq_intervals.size(); i++) {
-			if (i>0) assert(infreq_intervals[i-1].second <= infreq_intervals[i].first);
-			cerr << "Interval: " << infreq_intervals[i].first << ", " << infreq_intervals[i].second << endl;
+		return {seed, matches_infreq, intervals_infreq};
+	}
+
+	tuple<Matches, int> match_frequent_seeds(SegmentTree *hist, const vector<Seed> &seeds, int t_abs, const Intervals &intervals_infreq, int first_freq_seed) {
+		Matches matches_freq;
+
+		for (int i=0; i<(int)intervals_infreq.size(); i++) {
+			if (i>0) assert(intervals_infreq[i-1].second <= intervals_infreq[i].first);
+			cerr << "Interval: " << intervals_infreq[i].first << ", " << intervals_infreq[i].second << endl;
 		}
 
-        auto first_freq_seed = seed;
-
-		H->T.start("match_frequent");
         vector<Match> freq_matches;
 		// match frequent seeds to all buckets with an infrequent seed
-        for (auto [l, r]: infreq_intervals) {
+        for (auto [l, r]: intervals_infreq) {
             int max_matches = hist->query(l, r);
-            for (auto seed = first_freq_seed, rem_seeds = seeds.size()-first_freq_seed;
-                seed < seeds.size() && max_matches + rem_seeds >= *t_abs;
+            for (int seed = first_freq_seed, rem_seeds = (int)seeds.size()-first_freq_seed;
+                seed < (int)seeds.size() && max_matches + rem_seeds >= t_abs;
                 ++seed, --rem_seeds)
-                max_matches = tidx.match_seed_around_hit(hist, seeds[seed], l, r, seed, matches_freq);
-            if (max_matches > *t_abs) {
-                //cerr << "Better max_matches: " << *t_abs << " -> " << max_matches << endl;
-                *t_abs = max_matches;
+                max_matches = tidx.match_seed_around_hit(hist, seeds[seed], l, r, seed, &matches_freq);
+            if (max_matches > t_abs) {
+                //cerr << "Better max_matches: " << t_abs << " -> " << max_matches << endl;
+                t_abs = max_matches;
             }
         }
-		H->T.stop("match_frequent");
+
+		return {matches_freq, t_abs};
 	}
 
 	const vector<Mapping> sweep(vector<Match> &M, const pos_t P_sz, const int p_sz) {
@@ -241,69 +246,76 @@ class RMQMapper : public Mapper {
 			H->C.inc("reads");
 			H->T.stop("query_reading");
 			H->T.start("query_mapping");
-			H->T.start("sketching");
-			sketch_t p = H->sketcher.sketch(seq->seq.s);
-			H->T.stop("sketching");
+				H->T.start("sketching");
+					sketch_t p = H->sketcher.sketch(seq->seq.s);
+					H->T.stop("sketching");
 
-			string query_id = seq->name.s;
-			pos_t P_sz = (pos_t)seq->seq.l;
-            hist.clear();
-            hist.P_sz = P_sz;  // TODO: remove this hack
+				string query_id = seq->name.s;
+				pos_t P_sz = (pos_t)seq->seq.l;
+				hist.clear();
+				hist.P_sz = P_sz;  // TODO: remove this hack
 
-			H->C.inc("kmers", p.size());
-			H->C.inc("read_len", P_sz);
+				H->C.inc("kmers", p.size());
+				H->C.inc("read_len", P_sz);
 
-			Timer read_mapping_time;
-			read_mapping_time.start();
-			H->T.start("seeding");
-			vector<Seed> seeds = select_seeds(p);
-			H->T.stop("seeding");
-			H->C.inc("seeds", seeds.size());
+				Timer read_mapping_time;  // TODO: change to H->T.start
+				read_mapping_time.start();
+				H->T.start("seeding");
+					vector<Seed> seeds = select_seeds(p);
+					H->T.stop("seeding");
+					H->C.inc("seeds", seeds.size());
 
-			vector<Match> matches_infreq, matches_freq;
-			H->T.start("matching");
-			int t_abs = H->params.tThres * seeds.size();
-			match_seeds(&hist, P_sz, seeds.size(), seeds, &t_abs, &matches_infreq, &matches_freq);
-			H->T.stop("matching");
+				H->T.start("matching");
+					int t_abs = H->params.tThres * seeds.size();
+					H->T.start("match_infrequent");
+						auto [first_freq_seed, matches_infreq, intervals_infreq] = match_infreq_seeds(&hist, seeds, t_abs);
+						H->T.stop("match_infrequent");
 
-			vector<Match> matches;
-            matches.insert(matches.end(), matches_infreq.begin(), matches_infreq.end());
-            matches.insert(matches.end(), matches_freq.begin(), matches_freq.end());
+					H->T.start("match_frequent");
+						auto [matches_freq, max_t_abs] = match_frequent_seeds(&hist, seeds, t_abs, intervals_infreq, first_freq_seed);
+						H->T.stop("match_frequent");
+					//match_seeds(&hist, P_sz, seeds.size(), seeds, &t_abs, &matches_infreq, &matches_freq);
+					//Matches matches_freq;
 
-			H->C.inc("matches", matches.size());
-			H->C.inc("matches_infreq", matches_infreq.size());
-			H->C.inc("matches_freq", matches_freq.size());
+					vector<Match> matches;
+					matches.insert(matches.end(), matches_infreq.begin(), matches_infreq.end());
+					matches.insert(matches.end(), matches_freq.begin(), matches_freq.end());
 
-			H->T.start("sweep");
-			vector<Mapping> mappings = sweep(matches, P_sz, seeds.size());
-			if (mappings.size() > 0) {
-				H->C.inc("mapped_reads");
-				H->C.inc("intersection_diff", t_abs - mappings[0].intersection);
-			}
-			H->T.stop("sweep");
+					H->C.inc("matches", matches.size());
+					H->C.inc("matches_infreq", matches_infreq.size());
+					H->C.inc("matches_freq", matches_freq.size());
+					H->T.stop("matching");
 
-            cerr << query_id << ": seeds: " << seeds.size() << ", I: " << int(H->params.tThres * seeds.size()) << " -> " << t_abs << ", matches: " << matches.size() << ", matches_infreq: " << matches_infreq.size() << ", matches_freq: " << matches_freq.size() << ", mappings: " << mappings.size();
-            cerr << mappings[0] << endl;
+				H->T.start("sweep");
+				vector<Mapping> mappings = sweep(matches, P_sz, seeds.size());
+				if (mappings.size() > 0) {
+					H->C.inc("mapped_reads");
+					H->C.inc("intersection_diff", t_abs - mappings[0].intersection);
+				}
+				H->T.stop("sweep");
 
-			read_mapping_time.stop();
+				cerr << query_id << ": seeds: " << seeds.size() << ", I: " << int(H->params.tThres * seeds.size()) << " -> " << t_abs << ", matches: " << matches.size() << ", matches_infreq: " << matches_infreq.size() << ", matches_freq: " << matches_freq.size() << ", mappings: " << mappings.size();
+				cerr << mappings[0] << endl;
 
-			for (auto &m: mappings) {
-				m.map_time = read_mapping_time.secs() / (double)mappings.size();
-				const auto &segm = tidx.T[m.segm_id];
-//				if (H->params.sam) {
-//					auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
-//					H->C.inc("total_edit_distance", ed);
-//				}
-//				else
-					m.print_paf(query_id, segm, matches.size());
-				//  H->C.inc("spurious_matches", spurious_matches(m, matches));
-				H->C.inc("J", int(10000.0*m.J));
-				H->C.inc("mappings");
-			}
-//			H->C.inc("matches", matches.size());
-			//H->T.stop("postproc");
+				read_mapping_time.stop();
 
-			H->T.stop("query_mapping");
+				for (auto &m: mappings) {
+					m.map_time = read_mapping_time.secs() / (double)mappings.size();
+					const auto &segm = tidx.T[m.segm_id];
+	//				if (H->params.sam) {
+	//					auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
+	//					H->C.inc("total_edit_distance", ed);
+	//				}
+	//				else
+						m.print_paf(query_id, segm, matches.size());
+					//  H->C.inc("spurious_matches", spurious_matches(m, matches));
+					H->C.inc("J", int(10000.0*m.J));
+					H->C.inc("mappings");
+				}
+	//			H->C.inc("matches", matches.size());
+				//H->T.stop("postproc");
+
+				H->T.stop("query_mapping");
 			H->T.start("query_reading");
 		});
 		H->T.stop("query_reading");

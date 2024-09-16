@@ -28,7 +28,7 @@ class SegmentTree {
     }
 
     void clear(int i) {
-        if (i < T.size() && T[i]) {
+        if (i < (int)T.size() && T[i]) {
             T[i] = 0;
             clear(2*i);
             clear(2*i+1);
