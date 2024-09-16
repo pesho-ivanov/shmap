@@ -108,22 +108,22 @@ class BucketMapper : public Mapper {
 		H->T.start("match_frequent");
 		Buckets promising_buckets;
 		// match frequent seeds to all buckets with an infrequent seed
-		for (auto &[bucket, matches]: M) {
-			auto bucket_interval = bucket2interval(bucket, h);
-			int potential_matches = matches.size() + (seeds.size() - seed);
-			for (auto seed_it = seeds.begin()+seed; seed_it != seeds.end(); ++seed_it, --potential_matches) {
-				if (potential_matches < *t_abs)	
-					break;
-				if (tidx.get_matches_in_interval(&matches, *seed_it, bucket_interval.first, bucket_interval.second, seed_it-seeds.begin())) {
-					++potential_matches;
-					++(*matches_freq);
-				}
-			}
-			if (potential_matches >= *t_abs) {
-				promising_buckets[bucket] = matches;
-				*t_abs = potential_matches; // TODO: fix correctness!!
-			}
-		}
+		//for (auto &[bucket, matches]: M) {
+		//	auto bucket_interval = bucket2interval(bucket, h);
+		//	int potential_matches = matches.size() + (seeds.size() - seed);
+		//	for (auto seed_it = seeds.begin()+seed; seed_it != seeds.end(); ++seed_it, --potential_matches) {
+		//		if (potential_matches < *t_abs)	
+		//			break;
+		//		if (tidx.get_matches_in_interval(&matches, *seed_it, bucket_interval.first, bucket_interval.second)) {
+		//			++potential_matches;
+		//			++(*matches_freq);
+		//		}
+		//	}
+		//	if (potential_matches >= *t_abs) {
+		//		promising_buckets[bucket] = matches;
+		//		*t_abs = potential_matches; // TODO: fix correctness!!
+		//	}
+		//}
 		H->T.stop("match_frequent");
 		
 		return promising_buckets;

@@ -99,27 +99,31 @@ class RMQMapper : public Mapper {
 		}
 		intervals_infreq.push_back({l, r});
 
+		for (int i=1; i<(int)intervals_infreq.size(); i++)
+			assert(intervals_infreq[i-1].second < intervals_infreq[i].first);
+
 		return intervals_infreq;
 	}
 
+	// match frequent seeds to all buckets with an infrequent seed
 	tuple<Matches, int> match_frequent_seeds(const Seeds &seeds_freq, int t_abs, const Intervals &intervals_infreq) {
 		Matches matches_freq;
 
         vector<Match> freq_matches;
-		// match frequent seeds to all buckets with an infrequent seed
         for (auto [l, r]: intervals_infreq) {
-            int max_matches = hist.query(l, r);
-			int rem_seeds = (int)seeds_freq.size();
+            int max_matches = -1, rem_seeds = (int)seeds_freq.size();
+			//cerr << "l=" << l << ", r=" << r << ", rem_seeds=" << rem_seeds << ", t_abs=" << t_abs << endl;
             for (const auto &seed: seeds_freq) {
+				max_matches = hist.query(l, r);
+				//cerr << "max_matches=" << max_matches << ", rem_seeds=" << rem_seeds << ", t_abs=" << t_abs << endl;
 				if (max_matches + rem_seeds < t_abs)
-					break;
-                max_matches = tidx.match_seed_around_hit(&hist, seed, l, r, &matches_freq);
+					;//break;
+                tidx.match_seed_in_interval(&hist, seed, l, r, &matches_freq);
 				--rem_seeds;
 			}
-            if (max_matches > t_abs) {
-                //cerr << "Better max_matches: " << t_abs << " -> " << max_matches << endl;
-                t_abs = max_matches;
-            }
+			assert(max_matches != -1);
+			assert(rem_seeds >= 0);
+			t_abs = max(t_abs, max_matches);
         }
 
 		return {matches_freq, t_abs};
@@ -137,7 +141,7 @@ class RMQMapper : public Mapper {
 
 		sort(M.begin(), M.end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; }); 
 
-		cerr << "sweep" << endl;
+		//cerr << "sweep" << endl;
 		// print all matches
 		//for (int m=0; m<(int)M.size(); m++) {
 		//	if (m>0 && M[m].hit.r - M[m-1].hit.r>P_sz) {
@@ -281,6 +285,8 @@ class RMQMapper : public Mapper {
 					vector<Match> matches;
 					matches.insert(matches.end(), matches_infreq.begin(), matches_infreq.end());
 					matches.insert(matches.end(), matches_freq.begin(), matches_freq.end());
+
+					cerr << matches_infreq.size() << " + " << matches_freq.size() << " = " << matches.size() << ", max_t_abs=" << max_t_abs << endl;
 
 					H->C.inc("matches", matches.size());
 					H->C.inc("matches_infreq", matches_infreq.size());

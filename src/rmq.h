@@ -15,15 +15,17 @@ class SegmentTree {
         int m = (s+e)/2;
         int l = query(qs, qe, 2*i,   s,   m);
         int r = query(qs, qe, 2*i+1, m+1, e);
-        return std::max(l,r);
+        assert(l != -1 || r != -1);
+        return std::max(l, r);
     }
 
-    int incRange(int rs, int re, int i, int s, int e) {
-        if(rs>e || s>re) return 0;
-        if(rs<=s && e<=re) return ++T[i];
+    int incRange(int rs, int re, int i, int s, int e, int val) {
+        if(rs>e || s>re) return -1;
+        if(rs<=s && e<=re) return T[i]=T[i]+val;
         int m = (s+e)/2;
-        incRange(rs, re, 2*i,   s,   m);
-        incRange(rs, re, 2*i+1, m+1, e);
+        incRange(rs, re, 2*i,   s,   m, val);
+        incRange(rs, re, 2*i+1, m+1, e, val);
+        assert(T[2*i] != -1 || T[2*i+1] != -1);
         return T[i] = std::max(T[2*i], T[2*i+1]);
     }
 
@@ -56,7 +58,7 @@ public:
     }
 
     inline int incRange(int rs, int re) {
-        return incRange(rs, re, 1, 0, n-1);
+        return incRange(rs, re, 1, 0, n-1, 1);
     }
 
     inline int incRange(const sweepmap::Hit &hit) {
