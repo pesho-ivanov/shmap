@@ -79,14 +79,19 @@ class RMQMapper : public Mapper {
 
                 int l = hist->from(seed_matches[0].hit);
                 int r = hist->to(seed_matches[0].hit);
+				assert(l <= r);
 				for (int match = 1; match < seed_matches.size(); ++match) {
-                    if (hist->from(seed_matches[match].hit) <= r)
+                    if (hist->from(seed_matches[match].hit) <= r) {
+						assert(r <= hist->to(seed_matches[match].hit));
                         r = hist->to(seed_matches[match].hit);  // prolong the range to the right
-                    else {
+					} else {
                         hist->incRange(l, r);
                         infreq_intervals.push_back({l, r});
+						assert(l <= hist->from(seed_matches[match].hit));
+						assert(r <= hist->to(seed_matches[match].hit));
                         l = hist->from(seed_matches[match].hit);
                         r = hist->to(seed_matches[match].hit);
+						assert(l <= r);
                     }
                 }
                 hist->incRange(l, r);
@@ -94,18 +99,15 @@ class RMQMapper : public Mapper {
 			}
 		H->T.stop("match_infrequent");
 
-        //cerr << "infreq_intervals: " << infreq_intervals.size() << ", matches_infreq: " << matches_infreq->size() << endl;
-
-        //cerr << "matches_infreq: ";
-        //for (auto &match: *matches_infreq) cerr << match.hit.r << ", ";
-        //cerr << endl;
-
+        //TODO: consider a speedup by sorting the infreq matches
         sort(infreq_intervals.begin(), infreq_intervals.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.first < b.first; });
 
-        // TODO: sort by seeds too
-        //sort(matches_infreq->begin(), matches_infreq->end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; });
+		// print intervals
+		for (int i=0; i<infreq_intervals.size(); i++) {
+			if (i>0) assert(infreq_intervals[i-1].second <= infreq_intervals[i].first);
+			cerr << "Interval: " << infreq_intervals[i].first << ", " << infreq_intervals[i].second << endl;
+		}
 
-        //TODO: consider a speedup by sorting the infreq matches
         auto first_freq_seed = seed;
 
 		H->T.start("match_frequent");
@@ -113,7 +115,7 @@ class RMQMapper : public Mapper {
 		// match frequent seeds to all buckets with an infrequent seed
         for (auto [l, r]: infreq_intervals) {
             int max_matches = hist->query(l, r);
-            for (auto seed=first_freq_seed, rem_seeds=seeds.size() - first_freq_seed;
+            for (auto seed = first_freq_seed, rem_seeds = seeds.size()-first_freq_seed;
                 seed < seeds.size() && max_matches + rem_seeds >= *t_abs;
                 ++seed, --rem_seeds)
                 max_matches = tidx.match_seed_around_hit(hist, seeds[seed], l, r, seed, matches_freq);
@@ -136,6 +138,15 @@ class RMQMapper : public Mapper {
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 
 		sort(M.begin(), M.end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; }); 
+
+		cerr << "sweep" << endl;
+		// print all matches
+		//for (int m=0; m<(int)M.size(); m++) {
+		//	if (m>0 && M[m].hit.r - M[m-1].hit.r>P_sz) {
+		//		cerr << "-----------------" << endl;
+		//	}
+		//	cerr << M[m] << endl;
+		//}
 
 		// Increase the left point end of the window [l,r) one by one. O(matches)
 		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l) {
@@ -236,8 +247,8 @@ class RMQMapper : public Mapper {
 
 			string query_id = seq->name.s;
 			pos_t P_sz = (pos_t)seq->seq.l;
-            hist.P_sz = P_sz;  // TODO: remove this hack
             hist.clear();
+            hist.P_sz = P_sz;  // TODO: remove this hack
 
 			H->C.inc("kmers", p.size());
 			H->C.inc("read_len", P_sz);
@@ -306,7 +317,7 @@ class RMQMapper : public Mapper {
 		cerr << std::fixed << std::setprecision(1);
 		cerr << "Mapping:" << endl;
 		cerr << " | Total reads:           " << H->C.count("reads") << " (~" << 1.0*H->C.count("read_len") / H->C.count("reads") << " nb per read)" << endl;
-		cerr << " |  | unmapped:               " << H->C.count("mapped_reads") << " (" << H->C.perc("mapped_reads", "reads") << "%)" << endl;
+		cerr << " |  | mapped:               " << H->C.count("mapped_reads") << " (" << H->C.perc("mapped_reads", "reads") << "%)" << endl;
 		cerr << " |  |  | intersect. diff:     " << H->C.frac("intersection_diff", "mapped_reads") << " per mapped read" << endl;
 		cerr << " | Read kmers (total):    " << H->C.count("kmers") << " (" << H->C.frac("kmers", "reads") << " per read)" << endl;
 		cerr << " |  | unique:                 " << H->C.count("seeds") << " (" << H->C.frac("seeds", "kmers") << ")" << endl;

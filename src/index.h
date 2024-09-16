@@ -94,31 +94,44 @@ public:
 
 	// returns the number of hits in the interval from, to
 	int match_seed_around_hit(SegmentTree *hist, const Seed &s, const int hit_l, const int hit_r, int seed_num, vector<Match> *matches_freq) const {
+		//cerr << "1. seed: " << s << ", hit_l: " << hit_l << ", hit_r: " << hit_r << endl;
 		// assume matches of each seed are sorted by position in T
 		if (s.hits_in_T == 1) {
+			//cerr << "2. 1 hit. seed: " << s << ", hit: " << h2single.at(s.kmer.h) << endl;
 			auto &hit = h2single.at(s.kmer.h);
+			matches_freq->push_back(Match(s, hit, seed_num));
 			return hist->incRange(hit);
 		} else {
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
 			auto it = lower_bound(hits.begin(), hits.end(), hit_l, [&hist](const Hit &hit, int pos) {
-				return hist->from(hit) < pos;
+				return hist->to(hit) < pos;
 			});
-			if (it == hits.end()) return 0;
+			assert(it==hits.begin() || hist->to(*(it-1)) < hit_l);
+			assert(it==hits.end() || hit_l <= hist->to(*it));
 
-			auto it_begin = it;
+			int l=-1, r=-1;  // hist->from(*it), r=hist->to(*it);
 			int res = 0;
-			int l=hist->from(*it), r=hist->to(*it);
-			matches_freq->push_back(Match(s, *it, seed_num));
-			for (++it; it != hits.end() && hist->from(*it) < hit_r; ++it) {
-				matches_freq->push_back(Match(s, *it, seed_num));
-				if (r < hist->from(*it)) {  // if there will be a gap, push the current range
-					res = max(res, hist->incRange(l, r));
+			for (; it != hits.end() && l <= hit_r; ++it) {
+				//cerr << "3. seed: " << s << ", hit: " << *it << ", l: " << l << ", r: " << r << endl;
+				if (hit_l <= hist->to(*it) && hist->from(*it) <= hit_r)
+					matches_freq->push_back(Match(s, *it, seed_num));
+				if (l == -1) {
 					l = hist->from(*it);
+					r = hist->to(*it);
+				} else if (r < hist->from(*it)) {  // if there will be a gap, push the current range
+					res = max(res, hist->incRange(l, r));
+					//cerr << "4. Segment Tree inc: " << l << ", " << r << ", res = " << res << endl;
+					l = hist->from(*it);
+					r = hist->to(*it);
 				} else {  // prolong the range to the right
 					r = hist->to(*it);
 				}
 			}
-			res = max(res, hist->incRange(l, r));  // add the last range
+			//cerr << "5. seed: " << s << ", hit: " << *it << ", l: " << l << ", r: " << r << endl;
+			if (-1 < l && l <= hit_r) {
+				res = max(res, hist->incRange(l, r));  // add the last range
+				//cerr << "6. Segment Tree inc: " << l << ", " << r << ", res = " << res << endl;
+			}
 			//cerr << "seed: " << s <<  ", new freq matches: " << it - it_begin << ", res: " << res << endl;
 			return res;
 		}	
