@@ -72,9 +72,11 @@ class RMQMapper : public Mapper {
 		for (const auto seed: seeds_infreq)
 			if (seed.hits_in_T > 0)
 				tidx.get_matches(&matches_infreq, seed);
+
         sort(matches_infreq.begin(), matches_infreq.end(), [](const Match &a, const Match &b) {
 			return a.hit.r < b.hit.r;
 		});
+
 		return matches_infreq;
 	}
 
@@ -85,10 +87,13 @@ class RMQMapper : public Mapper {
 
 		int l = hist.from(matches_infreq[0].hit);
 		int r = hist.to(matches_infreq[0].hit);
+		hist.incRange(l, r);  // TODO: fix so that one interval set is per seed not for all seeds
 		for (int i=1; i<(int)matches_infreq.size(); i++) {
 			int curr_l = hist.from(matches_infreq[i].hit);
 			int curr_r = hist.to(matches_infreq[i].hit);
 			assert(curr_l <= curr_r);
+			hist.incRange(curr_l, curr_r);  // TODO: fix
+
 			if (curr_l <= r) {
 				r = curr_r;
 			} else {
@@ -99,8 +104,10 @@ class RMQMapper : public Mapper {
 		}
 		intervals_infreq.push_back({l, r});
 
-		for (int i=1; i<(int)intervals_infreq.size(); i++)
-			assert(intervals_infreq[i-1].second < intervals_infreq[i].first);
+		for (int i=0; i<(int)intervals_infreq.size(); i++) {
+			assert(i==0 || intervals_infreq[i-1].second < intervals_infreq[i].first);
+			//hist.incRange(intervals_infreq[i].first, intervals_infreq[i].second);
+		}
 
 		return intervals_infreq;
 	}
@@ -117,7 +124,7 @@ class RMQMapper : public Mapper {
 				max_matches = hist.query(l, r);
 				//cerr << "max_matches=" << max_matches << ", rem_seeds=" << rem_seeds << ", t_abs=" << t_abs << endl;
 				if (max_matches + rem_seeds < t_abs)
-					;//break;
+					break;
                 tidx.match_seed_in_interval(&hist, seed, l, r, &matches_freq);
 				--rem_seeds;
 			}
@@ -301,7 +308,7 @@ class RMQMapper : public Mapper {
 				}
 				H->T.stop("sweep");
 
-				cerr << query_id << ": seeds: " << seeds.size() << ", I: " << int(H->params.tThres * seeds.size()) << " -> " << t_abs << ", matches: " << matches.size() << ", matches_infreq: " << matches_infreq.size() << ", matches_freq: " << matches_freq.size() << ", mappings: " << mappings.size();
+				cerr << query_id << ": seeds: " << seeds.size() << ", I: " << int(H->params.tThres * seeds.size()) << " -> " << t_abs << ", matches: " << matches.size() << ", matches_infreq: " << matches_infreq.size() << ", matches_freq: " << matches_freq.size() << ", mappings: " << mappings.size() << endl;
 				cerr << mappings[0] << endl;
 
 				read_mapping_time.stop();

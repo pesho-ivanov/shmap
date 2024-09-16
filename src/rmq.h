@@ -3,35 +3,57 @@
 #include <bits/stdc++.h>
 #include <vector>
 
+// This file is a derivative of a work under Attribution-ShareAlike 4.0 International
+// https://cp-algorithms.com/data_structures/segment_tree.html#adding-on-segments-querying-for-maximum
+
 #include "sketch.h"
 
+// TODO: make sure to use [l,r) intervals instead of [l,r]
 class SegmentTree {
     int n;
-    std::vector<int> T;
+    std::vector<int> t, lazy;
+    const int MINUS_INF = std::numeric_limits<int>::min();
 
-    int query(int qs, int qe, int i, int s, int e) const {
-        if(qs>e || s>qe) return -1;
-        if(qs<=s && e<=qe) return T[i];
-        int m = (s+e)/2;
-        int l = query(qs, qe, 2*i,   s,   m);
-        int r = query(qs, qe, 2*i+1, m+1, e);
-        assert(l != -1 || r != -1);
-        return std::max(l, r);
+    void push(int v) {
+        t[v*2] += lazy[v];
+        lazy[v*2] += lazy[v];
+        t[v*2+1] += lazy[v];
+        lazy[v*2+1] += lazy[v];
+        lazy[v] = 0;
     }
 
-    int incRange(int rs, int re, int i, int s, int e, int val) {
-        if(rs>e || s>re) return -1;
-        if(rs<=s && e<=re) return T[i]=T[i]+val;
-        int m = (s+e)/2;
-        incRange(rs, re, 2*i,   s,   m, val);
-        incRange(rs, re, 2*i+1, m+1, e, val);
-        assert(T[2*i] != -1 || T[2*i+1] != -1);
-        return T[i] = std::max(T[2*i], T[2*i+1]);
+    void update(int v, int tl, int tr, int l, int r, int addend) {
+        if (l > r) 
+            return;
+        if (l == tl && tr == r) {
+            t[v] += addend;
+            lazy[v] += addend;
+        } else {
+            push(v);
+            int tm = (tl + tr) / 2;
+            update(v*2, tl, tm, l, min(r, tm), addend);
+            update(v*2+1, tm+1, tr, max(l, tm+1), r, addend);
+            t[v] = max(t[v*2], t[v*2+1]);
+        }
+    }
+
+    int query(int v, int tl, int tr, int l, int r) {
+        if (l > r)
+            return MINUS_INF;
+        if (l == tl && tr == r)
+            return t[v];
+        push(v);
+        int tm = (tl + tr) / 2;
+        return max(query(v*2, tl, tm, l, min(r, tm)), 
+                query(v*2+1, tm+1, tr, max(l, tm+1), r));
     }
 
     void clear(int i) {
-        if (i < (int)T.size() && T[i]) {
-            T[i] = 0;
+        if (i >= (int)t.size()) return;
+        
+        if (t[i] != 0 || lazy[i] != 0) {
+            t[i] = 0;
+            lazy[i] = 0;
             clear(2*i);
             clear(2*i+1);
         }
@@ -39,29 +61,21 @@ class SegmentTree {
 
 public:
     int P_sz;
-    SegmentTree(int n) : n(n), T(4*n+1) {}
+    SegmentTree(int n) : n(n), t(4*n+1), lazy(4*n+1) {}
 
-    inline int size() const { return n; }
-    inline int from(const sweepmap::Hit &hit) const { return std::max(hit.r-P_sz, 0); }
-    inline int to(const sweepmap::Hit &hit) const  { return std::min(hit.r, size()-1); }
+    int size() const { return n; }
+    int from(const sweepmap::Hit &hit) const { return std::max(hit.r-P_sz, 0); }
+    int to(const sweepmap::Hit &hit) const  { assert(hit.r < size()); return std::min(hit.r, size()-1); }
 
-    inline void clear() {
+    void clear() {
         clear(1);
     }
 
-    inline int query(int qs, int qe) const {
-        return query(qs, qe, 1, 0, n-1);
+    int query(int l, int r) {
+        return query(1, 0, n-1, l, r);
     }
 
-    inline int query(const sweepmap::Hit &hit) const {
-        return query(from(hit), to(hit));
-    }
-
-    inline int incRange(int rs, int re) {
-        return incRange(rs, re, 1, 0, n-1, 1);
-    }
-
-    inline int incRange(const sweepmap::Hit &hit) {
-        return incRange(from(hit), to(hit));
+    void incRange(int l, int r) {
+        update(1, 0, n-1, l, r, 1);
     }
 };

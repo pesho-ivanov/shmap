@@ -98,7 +98,7 @@ public:
 		if (s.hits_in_T == 1) {
 			auto &hit = h2single.at(s.kmer.h);
 			matches_freq->push_back(Match(s, hit));
-			hist->incRange(hit);
+			hist->incRange(hist->from(hit), hist->to(hit));
 		} else {
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
 			auto it = lower_bound(hits.begin(), hits.end(), from, [&hist](const Hit &hit, int pos) {
