@@ -38,7 +38,7 @@ class SweepMapper : public Mapper {
 			const auto &kmer = p[ppos];
 			const auto count = tidx.count(kmer.h);
 			if (count > 0)
-				seeds.push_back(Seed(kmer, p[ppos].r, p[ppos].r, count));
+				seeds.push_back(Seed(kmer, p[ppos].r, p[ppos].r, count, seeds.size()));
 		}
 		H->T.stop("collect_seed_info");
         H->C.inc("collected_seeds", seeds.size());
@@ -94,7 +94,7 @@ class SweepMapper : public Mapper {
 		matches.reserve(2*(int)seeds.size());
 		for (int seed_num=0; seed_num<(int)seeds.size(); seed_num++)
 			if (seeds[seed_num].hits_in_T > 0)
-				tidx.get_matches(&matches, seeds[seed_num], seed_num);
+				tidx.get_matches(&matches, seeds[seed_num]);
 		H->T.stop("collect_matches");
 
 		H->T.start("sort_matches");
@@ -133,7 +133,7 @@ class SweepMapper : public Mapper {
 				same_strand_seeds += r->is_same_strand() ? +1 : -1;  // change to r inside the loop
 				// If taking this kmer from T increases the intersection with P.
 				// TODO: iterate following seeds
-				if (--diff_hist[r->seed_num] >= 0)
+				if (--diff_hist[r->seed.seed_num] >= 0)
 					++intersection;
 				assert (l->hit.r <= r->hit.r);
 			}
@@ -159,7 +159,7 @@ class SweepMapper : public Mapper {
 			}
 
 			// Prepare for the next step by moving `l` to the right.
-			if (++diff_hist[l->seed_num] >= 1)
+			if (++diff_hist[l->seed.seed_num] >= 1)
 				--intersection;
 			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
 

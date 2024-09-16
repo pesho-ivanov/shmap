@@ -16,6 +16,7 @@
 #include "utils.h"
 #include "handler.h"
 #include "mapper.h"
+#include "rmq.h"
 
 namespace sweepmap {
 
@@ -29,7 +30,8 @@ class BucketMapper : public Mapper {
 
 	using hist_t = vector<int>;
 	using bucket_t = int;
-	using Buckets = unordered_map<bucket_t, vector<Match>>;
+	//using Buckets = unordered_map<bucket_t, vector<Match>>;
+	using Buckets = unordered_map<bucket_t, SegmentTree>;
 
 	vector<Seed> select_seeds(sketch_t& p) {
 		H->T.start("unique_kmers");
@@ -48,7 +50,7 @@ class BucketMapper : public Mapper {
 			const auto &kmer = p[ppos];
 			const auto count = tidx.count(kmer.h);
 			if (count > 0)
-				seeds.push_back(Seed(kmer, p[ppos].r, p[ppos].r, count));
+				seeds.push_back(Seed(kmer, p[ppos].r, p[ppos].r, count, seeds.size()));
 		}
 		H->T.stop("collect_seed_info");
         H->C.inc("collected_seeds", seeds.size());
@@ -87,14 +89,15 @@ class BucketMapper : public Mapper {
 				if (rem_seeds < *t_abs)	//seeds[seed].hits_in_T > 300 &&
 					break;
 				vector<Match> seed_matches;
-				tidx.get_matches(&seed_matches, seeds[seed], seed);
+				tidx.get_matches(&seed_matches, seeds[seed]);
 				*matches_infreq += seed_matches.size();
 				for (const auto &match: seed_matches)
 					for (int which_bucket=0; which_bucket<2; ++which_bucket) {
 						auto bucket = pos2bucket(match.hit.r, h, bool(which_bucket));
-						M[bucket].push_back(match);
-						//if (M[bucket].size() > max_seeds_in_bucket)
-						//	max_seeds_in_bucket = M[bucket].size();
+						//auto interval = bucket2interval(bucket, h);
+						if (!M.contains(bucket))
+							M.insert({bucket, SegmentTree(2*h + H->params.k)});
+						//M.at(bucket).incRange(match.hit.r - interval.first, match.hit.r - interval.first - 1 + H->params.k);
 					}
 			}
 		}
@@ -126,83 +129,83 @@ class BucketMapper : public Mapper {
 		return promising_buckets;
 	}
 
-	void sweep_bucket(vector<Match> &M, const pos_t P_sz, const int p_sz,
-			vector<Mapping> *mappings, Mapping *best, Mapping *second, unordered_multiset<int> *diff_hist) {
-		int intersection = 0;
-		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
+//	void sweep_bucket(vector<Match> &M, const pos_t P_sz, const int p_sz,
+//			vector<Mapping> *mappings, Mapping *best, Mapping *second, unordered_multiset<int> *diff_hist) {
+//		int intersection = 0;
+//		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
+//
+//		sort(M.begin(), M.end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; }); 
+//
+//		// Increase the left point end of the window [l,r) one by one. O(matches)
+//		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l) {
+//			// Increase the right end of the window [l,r) until it gets out.
+//			for(;  r != M.end()
+//				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
+//				&& r->hit.r + H->params.k <= l->hit.r + P_sz
+//				; ++r) {
+//				same_strand_seeds += r->is_same_strand() ? +1 : -1;  // change to r inside the loop
+//				// If taking this kmer from T increases the intersection with P.
+//				// TODO: iterate following seeds
+//				if (!diff_hist->contains(r->seed_num))
+//					++intersection;
+//				diff_hist->insert(r->seed_num);
+//				assert (l->hit.r <= r->hit.r);
+//			}
+//
+//			auto m = Mapping(H->params.k, P_sz, p_sz, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), intersection, same_strand_seeds, l, r);
+//
+//			// second best without guarantees
+//			// Wrong invariant:
+//			// best[l,r) -- a mapping best.l<=l with maximal J
+//			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
+//			if (m.J >= H->params.tThres) {
+//				if (H->params.onlybest) {
+//					if (m.intersection > best->intersection) {  // if (intersection > best.intersection)
+//						if (best->T_l < m.T_l - 0.9*P_sz)
+//							second = best;
+//						*best = m;
+//					} else if (m.intersection > second->intersection && m.T_l > best->T_l + 0.9*P_sz) {
+//						*second = m;
+//					}
+//				} else {
+//					mappings->push_back(m);
+//				}
+//			}
+//
+//			// Prepare for the next step by moving `l` to the right.
+//			auto it = diff_hist->find(l->seed_num);
+//			assert(it != diff_hist->end());
+//			diff_hist->erase(it); 
+//			if (!diff_hist->contains(l->seed_num))
+//				--intersection;
+//			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
+//
+//			assert(intersection >= 0);
+//		}
+//		assert(intersection == 0);
+//		assert(same_strand_seeds == 0);
+//	}
 
-		sort(M.begin(), M.end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; }); 
-
-		// Increase the left point end of the window [l,r) one by one. O(matches)
-		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l) {
-			// Increase the right end of the window [l,r) until it gets out.
-			for(;  r != M.end()
-				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
-				&& r->hit.r + H->params.k <= l->hit.r + P_sz
-				; ++r) {
-				same_strand_seeds += r->is_same_strand() ? +1 : -1;  // change to r inside the loop
-				// If taking this kmer from T increases the intersection with P.
-				// TODO: iterate following seeds
-				if (!diff_hist->contains(r->seed_num))
-					++intersection;
-				diff_hist->insert(r->seed_num);
-				assert (l->hit.r <= r->hit.r);
-			}
-
-			auto m = Mapping(H->params.k, P_sz, p_sz, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), intersection, same_strand_seeds, l, r);
-
-			// second best without guarantees
-			// Wrong invariant:
-			// best[l,r) -- a mapping best.l<=l with maximal J
-			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
-			if (m.J >= H->params.tThres) {
-				if (H->params.onlybest) {
-					if (m.intersection > best->intersection) {  // if (intersection > best.intersection)
-						if (best->T_l < m.T_l - 0.9*P_sz)
-							second = best;
-						*best = m;
-					} else if (m.intersection > second->intersection && m.T_l > best->T_l + 0.9*P_sz) {
-						*second = m;
-					}
-				} else {
-					mappings->push_back(m);
-				}
-			}
-
-			// Prepare for the next step by moving `l` to the right.
-			auto it = diff_hist->find(l->seed_num);
-			assert(it != diff_hist->end());
-			diff_hist->erase(it); 
-			if (!diff_hist->contains(l->seed_num))
-				--intersection;
-			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
-
-			assert(intersection >= 0);
-		}
-		assert(intersection == 0);
-		assert(same_strand_seeds == 0);
-	}
-
-	vector<Mapping> sweep_all_buckets(Buckets &promising_buckets, pos_t P_len, const pos_t p_sz) {
-		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
-		if (promising_buckets.empty())
-			return mappings;
-
-		unordered_multiset<int> diff_hist;
-		Mapping best(H->params.k, P_len, 0, -1, -1, -1, -1, -1, 0, promising_buckets.begin()->second.begin(), promising_buckets.begin()->second.end());
-		Mapping second = best;
-
-		for (auto &[bucket, matches]: promising_buckets)
-			sweep_bucket(matches, P_len, p_sz, &mappings, &best, &second, &diff_hist);
-
-		if (H->params.onlybest && best.intersection != -1) { // && best.J > H->params.tThres)
-			best.mapq = (best.intersection > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
-			best.J2 = second.J;
-			mappings.push_back(best);
-		}
-
-		return mappings;
-	}
+//	vector<Mapping> sweep_all_buckets(Buckets &promising_buckets, pos_t P_len, const pos_t p_sz) {
+//		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
+//		if (promising_buckets.empty())
+//			return mappings;
+//
+//		unordered_multiset<int> diff_hist;
+//		Mapping best(H->params.k, P_len, 0, -1, -1, -1, -1, -1, 0, promising_buckets.begin()->second.begin(), promising_buckets.begin()->second.end());
+//		Mapping second = best;
+//
+//		for (auto &[bucket, matches]: promising_buckets)
+//			sweep_bucket(matches, P_len, p_sz, &mappings, &best, &second, &diff_hist);
+//
+//		if (H->params.onlybest && best.intersection != -1) { // && best.J > H->params.tThres)
+//			best.mapq = (best.intersection > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
+//			best.J2 = second.J;
+//			mappings.push_back(best);
+//		}
+//
+//		return mappings;
+//	}
 
   public:
 	BucketMapper(const SketchIndex &tidx, Handler *H) : tidx(tidx), H(H) {
@@ -262,7 +265,7 @@ class BucketMapper : public Mapper {
 			H->C.inc("matches_freq", matches_freq);
 
 			H->T.start("sweep");
-			vector<Mapping> mappings = sweep_all_buckets(promising_buckets, P_sz, seeds.size());
+			vector<Mapping> mappings; // = sweep_all_buckets(promising_buckets, P_sz, seeds.size());
 			if (mappings.size() > 0) {
 				H->C.inc("mapped_reads");
 				H->C.inc("intersection_diff", t_abs - mappings[0].intersection);

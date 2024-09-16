@@ -52,13 +52,13 @@ public:
 		return hit.r >= from && hit.r < to;
 	}
 
-	bool get_matches_in_interval(std::vector<Match> *matches, const Seed &s, const int from, const int to, int seed_num) const {
+	bool get_matches_in_interval(std::vector<Match> *matches, const Seed &s, const int from, const int to) const {
 		// assume matches of each seed are sorted by position in T
 		// TODO: account for segments
 		if (s.hits_in_T == 1) {
 			auto &hit = h2single.at(s.kmer.h);
 			if (intersect(hit, from, to)) {
-				matches->push_back(Match(s, hit, seed_num));
+				matches->push_back(Match(s, hit));
 				return true;
 			}
 		} else {
@@ -68,10 +68,10 @@ public:
 			if (hits.size() < 10) {
 				for (int i=0; i<(int)hits.size(); i++)
 					if (hits[i].r >= from) {
-						matches->push_back(Match(s, hits[i], seed_num));
+						matches->push_back(Match(s, hits[i]));
 						for (int j=(int)hits.size()-1; j>i; j--)
 							if (hits[j].r < to) {
-								matches->push_back(Match(s, hits[j], seed_num));
+								matches->push_back(Match(s, hits[j]));
 								break;
 							}
 						return true;
@@ -80,11 +80,11 @@ public:
 				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.r < pos; });
 				auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, int pos) { return hit.r > pos; });
 
-				matches->push_back(Match(s, *it, seed_num));
-				matches->push_back(Match(s, *it_r, seed_num));
+				matches->push_back(Match(s, *it));
+				matches->push_back(Match(s, *it_r));
 
 				//for (; it != hits.end() && it->r < to; ++it)
-				//	matches.push_back(Match(s, *it, seed_num));
+				//	matches.push_back(Match(s, *it));
 
 				return true;
 			}
@@ -93,13 +93,13 @@ public:
 	}
 
 	// returns the number of hits in the interval from, to
-	int match_seed_around_hit(SegmentTree *hist, const Seed &s, const int hit_l, const int hit_r, int seed_num, vector<Match> *matches_freq) const {
+	int match_seed_around_hit(SegmentTree *hist, const Seed &s, const int hit_l, const int hit_r, vector<Match> *matches_freq) const {
 		//cerr << "1. seed: " << s << ", hit_l: " << hit_l << ", hit_r: " << hit_r << endl;
 		// assume matches of each seed are sorted by position in T
 		if (s.hits_in_T == 1) {
 			//cerr << "2. 1 hit. seed: " << s << ", hit: " << h2single.at(s.kmer.h) << endl;
 			auto &hit = h2single.at(s.kmer.h);
-			matches_freq->push_back(Match(s, hit, seed_num));
+			matches_freq->push_back(Match(s, hit));
 			return hist->incRange(hit);
 		} else {
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
@@ -114,7 +114,7 @@ public:
 			for (; it != hits.end() && l <= hit_r; ++it) {
 				//cerr << "3. seed: " << s << ", hit: " << *it << ", l: " << l << ", r: " << r << endl;
 				if (hit_l <= hist->to(*it) && hist->from(*it) <= hit_r)
-					matches_freq->push_back(Match(s, *it, seed_num));
+					matches_freq->push_back(Match(s, *it));
 				if (l == -1) {
 					l = hist->from(*it);
 					r = hist->to(*it);
@@ -137,13 +137,13 @@ public:
 		}	
 	}
 
-	void get_matches(std::vector<Match> *matches, const Seed &s, int seed_num) const {
-		matches->reserve(s.hits_in_T);
+	void get_matches(std::vector<Match> *matches, const Seed &s) const {
+		matches->reserve(matches->size() + s.hits_in_T);
 		if (s.hits_in_T == 1) {
-			matches->push_back(Match(s, h2single.at(s.kmer.h), seed_num));
+			matches->push_back(Match(s, h2single.at(s.kmer.h)));
 		} else {
 			for (const auto &hit: h2multi.at(s.kmer.h))
-				matches->push_back(Match(s, hit, seed_num));
+				matches->push_back(Match(s, hit));
 		}	
 	}
 

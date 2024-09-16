@@ -46,10 +46,11 @@ struct Seed {
 	Kmer kmer;
 	int r_first, r_last;
 	int hits_in_T;
-	Seed(const Kmer &kmer, pos_t r_first, pos_t r_last, int hits_in_T) :
-		kmer(kmer), r_first(r_first), r_last(r_last), hits_in_T(hits_in_T) {}	
+	int seed_num;
+	Seed(const Kmer &kmer, pos_t r_first, pos_t r_last, int hits_in_T, int seed_num) :
+		kmer(kmer), r_first(r_first), r_last(r_last), hits_in_T(hits_in_T), seed_num(seed_num) {}	
 	friend std::ostream& operator<<(std::ostream& os, const Seed& seed) {
-		os << "Seed(" << seed.kmer << ", r_first=" << seed.r_first << ", r_last=" << seed.r_last << ", hits_in_T=" << seed.hits_in_T << ")";
+		os << "Seed(" << seed.kmer << ", r_first=" << seed.r_first << ", r_last=" << seed.r_last << ", hits_in_T=" << seed.hits_in_T << ", seed_num=" << seed.seed_num << ")";
 		return os;
 	}
 };
@@ -58,15 +59,14 @@ struct Seed {
 struct Match {
 	Seed seed;
 	Hit hit;
-	int seed_num; // seed number among the chosen seeds, used for indexing the histogram
-	Match(const Seed &seed, const Hit &hit, int seed_num)
-		: seed(seed), hit(hit), seed_num(seed_num) {}
+	Match(const Seed &seed, const Hit &hit)
+		: seed(seed), hit(hit) {}
 	
 	inline bool is_same_strand() const {
 		return seed.kmer.strand == hit.strand;
 	}
 	friend std::ostream& operator<<(std::ostream& os, const Match& match) {
-		os << "Match(" << match.seed << ", " << match.hit << ", seed_num=" << match.seed_num << ")";
+		os << "Match(" << match.seed << ", " << match.hit << ")";
 		return os;
 	}
 };
