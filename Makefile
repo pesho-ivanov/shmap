@@ -231,6 +231,12 @@ eval_sweepmap_on_datasets:
 	make eval_sweepmap REFNAME=t2tChrY DEPTH=1 	MEANLEN=24000
 	make eval_sweepmap REFNAME=chm13   READS_PREFIX=HG002_24kb
 
+eval_rmqmap_on_datasets:
+	make eval_rmqmap REFNAME=t2tChrY DEPTH=10
+	make eval_rmqmap REFNAME=chm13   DEPTH=0.1
+	make eval_rmqmap REFNAME=t2tChrY DEPTH=1 	MEANLEN=24000
+	make eval_rmqmap REFNAME=chm13   READS_PREFIX=HG002_24kb
+
 eval_sweepmap_slow_on_datasets:
 	make eval_sweepmap_slow REFNAME=t2tChrY DEPTH=10
 	make eval_sweepmap_slow REFNAME=chm13   DEPTH=0.1

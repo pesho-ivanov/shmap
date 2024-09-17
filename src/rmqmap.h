@@ -348,7 +348,9 @@ class RMQMapper : public Mapper {
 					matches.insert(matches.end(), matches_infreq.begin(), matches_infreq.end());
 					matches.insert(matches.end(), matches_freq.begin(), matches_freq.end());
 
+#ifdef DEBUG
 					cerr << matches_infreq.size() << " + " << matches_freq.size() << " = " << matches.size() << ", max_t_abs=" << max_t_abs << endl;
+#endif
 
 					H->C.inc("matches", matches.size());
 					H->C.inc("matches_infreq", matches_infreq.size());
@@ -364,8 +366,10 @@ class RMQMapper : public Mapper {
 				H->T.stop("sweep");
 
 				H->T.start("prepare");
+#ifdef DEBUG
 					cerr << query_id << ": seeds: " << seeds.size() << ", I: " << t_abs << " -> " << max_t_abs << ", matches: " << matches.size() << ", matches_infreq: " << matches_infreq.size() << ", matches_freq: " << matches_freq.size() << ", mappings: " << mappings.size() << endl;
 					cerr << mappings[0] << endl;
+#endif
 
 					read_mapping_time.stop();
 
