@@ -97,8 +97,12 @@ public:
 		// assume matches of each seed are sorted by position in T
 		if (s.hits_in_T == 1) {
 			auto &hit = h2single.at(s.kmer.h);
-			matches_freq->push_back(Match(s, hit));
-			hist->incRange(hist->from(hit), hist->to(hit));
+			int curr_l = hist->from(hit);
+			int curr_r = hist->to(hit);
+			if (from <= curr_r && curr_l <= to) {
+				matches_freq->push_back(Match(s, hit));
+				hist->incRange(max(curr_l, from), min(curr_r, to));
+			}
 		} else {
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
 			auto it = lower_bound(hits.begin(), hits.end(), from, [&hist](const Hit &hit, int pos) {
@@ -107,31 +111,36 @@ public:
 			assert(it==hits.begin() || hist->to(*(it-1)) < from);
 			assert(it==hits.end() || from <= hist->to(*it));
 
-			int l=-1, r=-1;
-			for (; it != hits.end() && l <= to; ++it) {
-				int hit_l = hist->from(*it);
-				int hit_r = hist->to(*it);
-				assert(hit_l <= hit_r);
-				if (from <= hit_r && hit_l <= to)  // intersect?
+			int prev_l = -1;  //hist->from(*it);
+			int prev_r = -1;  // hist->to(*it);
+			for (; it != hits.end() && prev_l <= to; ++it) {
+				int curr_l = hist->from(*it);
+				int curr_r = hist->to(*it);
+				assert(curr_l <= curr_r);
+				if (from <= curr_r && curr_l <= to)  // intersect?
 					matches_freq->push_back(Match(s, *it));
-				if (l == -1) {
-					l = hit_l;
-					r = hit_r;
-				} else if (r < hit_l) {  // if there will be a gap, push the current range
-					assert(l != -1 && r != -1);
-					hist->incRange(l, r);
-					l = hit_l;
-					r = hit_r;
+				if (prev_r < curr_l) {  // if there will be a gap, push the current range
+					if (prev_l != -1) {
+#ifdef DEBUG
+						cerr << "  match_seed_in_interval(" << s << ", " << from << ", " << to << ")" << endl;
+#endif
+						hist->incRange(max(prev_l, from), min(prev_r, to));
+					}
+					prev_l = curr_l;
+					prev_r = curr_r;
 				} else {
-					assert(l <= hit_l);
-					r = hit_r;
+					assert(prev_l <= curr_l);
+					prev_r = curr_r;
 				}
 			}
-			if (l != -1) {
-				assert (l <= r);
-				hist->incRange(l, r);  // add the last range
-			}
-		}	
+			if (prev_l != -1 && prev_l <= to) {
+				assert (prev_l <= prev_r);
+#ifdef DEBUG
+				cerr << "  match_seed_in_interval(" << s << ", " << from << ", " << to << ")" << endl;
+#endif
+				hist->incRange(max(prev_l, from), min(prev_r, to));
+			}	
+		}
 	}
 
 	void get_matches(std::vector<Match> *matches, const Seed &s) const {

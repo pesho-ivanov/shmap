@@ -71,11 +71,14 @@ public:
         clear(1);
     }
 
-    int query(int l, int r) {
-        return query(1, 0, n-1, l, r);
+    int query(int l, int r) {  // [l,r)
+        return query(1, 0, n-1, l, r-1);  // [l,r-1]
     }
 
-    void incRange(int l, int r) {
-        update(1, 0, n-1, l, r, 1);
+    void incRange(int l, int r) {  // [l,r)
+#ifdef DEBUG
+        cerr << "incRange(" << l << "," << r << ")" << endl;
+#endif
+        update(1, 0, n-1, l, r-1, 1);  // [l,r-1]
     }
 };
