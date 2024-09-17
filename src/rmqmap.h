@@ -297,7 +297,6 @@ class RMQMapper : public Mapper {
 
 		H->T.start("mapping");
 		H->T.start("query_reading");
-        //fenwick_tree<int> hist(tidx.T[0].sz);
 
 		read_fasta_klib(pFile, [this](kseq_t *seq) {
 			H->C.inc("reads");
@@ -307,16 +306,18 @@ class RMQMapper : public Mapper {
 					sketch_t p = H->sketcher.sketch(seq->seq.s);
 					H->T.stop("sketching");
 
-				string query_id = seq->name.s;
-				pos_t P_sz = (pos_t)seq->seq.l;
-				hist.clear();
-				hist.P_sz = P_sz;  // TODO: remove this hack
+				H->T.start("prepare");
+					string query_id = seq->name.s;
+					pos_t P_sz = (pos_t)seq->seq.l;
+					hist.clear();
+					hist.P_sz = P_sz;  // TODO: remove this hack
 
-				H->C.inc("kmers", p.size());
-				H->C.inc("read_len", P_sz);
+					H->C.inc("kmers", p.size());
+					H->C.inc("read_len", P_sz);
+					Timer read_mapping_time;  // TODO: change to H->T.start
+					read_mapping_time.start();
+				H->T.stop("prepare");
 
-				Timer read_mapping_time;  // TODO: change to H->T.start
-				read_mapping_time.start();
 				H->T.start("seeding");
 					Seeds seeds = select_seeds(p);
 					int t_abs = H->params.tThres * seeds.size();  // flooring is safe
@@ -362,27 +363,29 @@ class RMQMapper : public Mapper {
 				}
 				H->T.stop("sweep");
 
-				cerr << query_id << ": seeds: " << seeds.size() << ", I: " << t_abs << " -> " << max_t_abs << ", matches: " << matches.size() << ", matches_infreq: " << matches_infreq.size() << ", matches_freq: " << matches_freq.size() << ", mappings: " << mappings.size() << endl;
-				cerr << mappings[0] << endl;
+				H->T.start("prepare");
+					cerr << query_id << ": seeds: " << seeds.size() << ", I: " << t_abs << " -> " << max_t_abs << ", matches: " << matches.size() << ", matches_infreq: " << matches_infreq.size() << ", matches_freq: " << matches_freq.size() << ", mappings: " << mappings.size() << endl;
+					cerr << mappings[0] << endl;
 
-				read_mapping_time.stop();
+					read_mapping_time.stop();
 
-				for (auto &m: mappings) {
-					m.map_time = read_mapping_time.secs() / (double)mappings.size();
-					const auto &segm = tidx.T[m.segm_id];
-	//				if (H->params.sam) {
-	//					auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
-	//					H->C.inc("total_edit_distance", ed);
-	//				}
-	//				else
-						m.print_paf(query_id, segm, matches.size());
-					//  H->C.inc("spurious_matches", spurious_matches(m, matches));
-					H->C.inc("J", int(10000.0*m.J));
-					H->C.inc("mappings");
-				}
-	//			H->C.inc("matches", matches.size());
-				//H->T.stop("postproc");
+					for (auto &m: mappings) {
+						m.map_time = read_mapping_time.secs() / (double)mappings.size();
+						const auto &segm = tidx.T[m.segm_id];
+		//				if (H->params.sam) {
+		//					auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
+		//					H->C.inc("total_edit_distance", ed);
+		//				}
+		//				else
+							m.print_paf(query_id, segm, matches.size());
+						//  H->C.inc("spurious_matches", spurious_matches(m, matches));
+						H->C.inc("J", int(10000.0*m.J));
+						H->C.inc("mappings");
+					}
+		//			H->C.inc("matches", matches.size());
+					//H->T.stop("postproc");
 
+				H->T.stop("prepare");
 				H->T.stop("query_mapping");
 			H->T.start("query_reading");
 		});
@@ -416,8 +419,9 @@ class RMQMapper : public Mapper {
 
     void print_time_stats() {
         cerr << std::fixed << std::setprecision(1);
-        cerr << " | Runtime:                   "     << setw(5) << right << H->T.secs("mapping")           << " (" << setw(5) << right << H->T.range_ratio("query_mapping") << "x)" << endl; //setw(4) << right << H->C.count("reads") / H->T.secs("total") << " reads per sec)" << endl;
+        cerr << " | Runtime:                   "     << setw(5) << right << H->T.secs("mapping")        << "sec (" << setw(5) << right << H->T.range_ratio("query_mapping") << "x)" << endl; //setw(4) << right << H->C.count("reads") / H->T.secs("total") << " reads per sec)" << endl;
         cerr << " |  | load queries:           "     << setw(5) << right << H->T.secs("query_reading")     << " (" << setw(4) << right << H->T.perc("query_reading", "mapping")       << "\%, " << setw(5) << right << H->T.range_ratio("query_reading") << "x)" << endl;
+        cerr << " |  | prepare:                "     << setw(5) << right << H->T.secs("prepare")           << " (" << setw(4) << right << H->T.perc("prepare", "mapping")             << "\%, " << setw(5) << right << H->T.range_ratio("prepare") << "x)" << endl;
         cerr << " |  | sketch reads:           "     << setw(5) << right << H->T.secs("sketching")         << " (" << setw(4) << right << H->T.perc("sketching", "mapping")           << "\%, " << setw(5) << right << H->T.range_ratio("sketching") << "x)" << endl;
         cerr << " |  | seeding:                "     << setw(5) << right << H->T.secs("seeding")           << " (" << setw(4) << right << H->T.perc("seeding", "mapping")             << "\%, " << setw(5) << right << H->T.range_ratio("seeding") << "x)" << endl;
         cerr << " |  |  | collect seed info:       " << setw(5) << right << H->T.secs("collect_seed_info") << " (" << setw(4) << right << H->T.perc("collect_seed_info", "seeding")   << "\%, " << setw(5) << right << H->T.range_ratio("collect_seed_info") << "x)" << endl;
@@ -426,6 +430,7 @@ class RMQMapper : public Mapper {
         cerr << " |  |  | sort seeds:              " << setw(5) << right << H->T.secs("sort_seeds")        << " (" << setw(4) << right << H->T.perc("sort_seeds", "seeding")          << "\%, " << setw(5) << right << H->T.range_ratio("sort_seeds") << "x)" << endl;
         cerr << " |  | matching seeds:         "     << setw(5) << right << H->T.secs("matching")          << " (" << setw(4) << right << H->T.perc("matching", "mapping")            << "\%, " << setw(5) << right << H->T.range_ratio("matching") << "x)" << endl;
         cerr << " |  |  | match infrequent:        " << setw(5) << right << H->T.secs("match_infrequent")  << " (" << setw(4) << right << H->T.perc("match_infrequent", "matching")   << "\%, " << setw(5) << right << H->T.range_ratio("match_infrequent") << "x)" << endl;
+        cerr << " |  |  | get intervals:           " << setw(5) << right << H->T.secs("get_intervals")     << " (" << setw(4) << right << H->T.perc("get_intervals", "matching")   << "\%, " << setw(5) << right << H->T.range_ratio("get_intervals") << "x)" << endl;
         cerr << " |  |  | match frequent:          " << setw(5) << right << H->T.secs("match_frequent")    << " (" << setw(4) << right << H->T.perc("match_frequent", "matching")     << "\%, " << setw(5) << right << H->T.range_ratio("match_frequent") << "x)" << endl;
 //        cerr << " |  |  | filter promising buckets:" << setw(5) << right << H->T.secs("filter_promising_buckets")    << " (" << setw(4) << right << H->T.perc("filter_promising_buckets", "matching")     << "\%, " << setw(5) << right << H->T.range_ratio("filter_promising_buckets") << "x)" << endl;
         cerr << " |  | sweep:                  "     << setw(5) << right << H->T.secs("sweep")             << " (" << setw(4) << right << H->T.perc("sweep", "mapping")               << "\%, " << setw(5) << right << H->T.range_ratio("sweep") << "x)" << endl;
