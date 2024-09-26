@@ -87,6 +87,7 @@ class RMQMapper : public Mapper {
 			return a.hit.r < b.hit.r;
 		});
 
+		// move to get_intervals_of_matches
 		if (!matches_infreq.empty()) {
 			int l = hist.from(matches_infreq[0].hit);
 			int r = hist.to(matches_infreq[0].hit);
@@ -149,10 +150,10 @@ class RMQMapper : public Mapper {
 	}
 
 	// match frequent seeds to all buckets with an infrequent seed
-	tuple<Matches, int> match_frequent_seeds(const Seeds &seeds_freq, int t_abs, const Intervals &intervals_infreq) {
+	tuple<Matches, int> match_frequent_kmers(const Seeds &kmers_freq, int t_abs, const Intervals &intervals_infreq) {
 #ifdef DEBUG
-		cerr << "> match_frequent_seeds: seeds_freq.size()=" << seeds_freq.size() << ", t_abs=" << t_abs << ", intervals_infreq.size()=" << intervals_infreq.size() << endl;
-		for (const auto &seed: seeds_freq)
+		cerr << "> match_frequent_kmers: kmers_freq.size()=" << kmers_freq.size() << ", t_abs=" << t_abs << ", intervals_infreq.size()=" << intervals_infreq.size() << endl;
+		for (const auto &seed: kmers_freq)
 			cerr << "freq seed: " << seed << endl;
 		for (const auto &interval: intervals_infreq)
 			cerr << "infreq interval: " << interval.first << ", " << interval.second << endl;
@@ -161,12 +162,12 @@ class RMQMapper : public Mapper {
 
         vector<Match> freq_matches;
         for (auto [l, r]: intervals_infreq) {
-            int max_matches = hist.query(l, r), rem_seeds = (int)seeds_freq.size();
-            for (const auto &seed: seeds_freq) {
+            int max_matches = hist.query(l, r), rem_seeds = (int)kmers_freq.size();
+            for (const auto &kmer: kmers_freq) {
 				//cerr << "max_matches=" << max_matches << ", rem_seeds=" << rem_seeds << ", t_abs=" << t_abs << endl;
 				if (max_matches + rem_seeds < t_abs)
 					break;
-                tidx.match_seed_in_interval(&hist, seed, l, r, &matches_freq);
+                tidx.match_kmer_in_interval(&hist, kmer, l, r, &matches_freq);
 				max_matches = hist.query(l, r);
 				--rem_seeds;
 			}
@@ -260,7 +261,7 @@ class RMQMapper : public Mapper {
 		assert(intersection == 0);
 		assert(same_strand_seeds == 0);
 
-		if (H->params.onlybest && best.intersection != -1) { // && best.J > H->params.tThres)
+		if (H->params.onlybest && best.intersection != -1 && best.J > H->params.tThres) {
 			best.mapq = (best.intersection > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
 			best.J2 = second.J;
 			mappings.push_back(best);
@@ -281,7 +282,7 @@ class RMQMapper : public Mapper {
     }
 
 	void map(const string &pFile) {
-		cerr << "Mapping reads using BucketMap " << pFile << "..." << endl;
+		cerr << "Mapping reads using Map " << pFile << "..." << endl;
 
 		H->C.inc("kmers", 0);
 		H->C.inc("seeds", 0);
@@ -323,7 +324,7 @@ class RMQMapper : public Mapper {
 					int t_abs = H->params.tThres * seeds.size();  // flooring is safe
 					int number_of_infreq_seeds = (1.0 - H->params.tThres) * seeds.size();  // flooring is safe
 					Seeds seeds_infreq(seeds.begin(), seeds.begin() + number_of_infreq_seeds);
-					Seeds seeds_freq(seeds.begin() + number_of_infreq_seeds, seeds.end());
+					Seeds kmers_freq(seeds.begin() + number_of_infreq_seeds, seeds.end());
 					H->T.stop("seeding");
 					H->C.inc("seeds", seeds.size());
 
@@ -341,7 +342,7 @@ class RMQMapper : public Mapper {
 						H->T.stop("get_intervals");
 
 					H->T.start("match_frequent");
-						auto [matches_freq, max_t_abs] = match_frequent_seeds(seeds_freq, t_abs, intervals_infreq);
+						auto [matches_freq, max_t_abs] = match_frequent_kmers(kmers_freq, t_abs, intervals_infreq);
 						H->T.stop("match_frequent");
 
 					vector<Match> matches;

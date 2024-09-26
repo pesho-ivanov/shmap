@@ -93,7 +93,7 @@ public:
 	}
 
 	// returns the number of hits in the interval from, to
-	void match_seed_in_interval(SegmentTree *hist, const Seed &s, const int from, const int to, vector<Match> *matches_freq) const {
+	void match_kmer_in_interval(SegmentTree *hist, const Seed &s, const int from, const int to, vector<Match> *matches_freq) const {
 		// assume matches of each seed are sorted by position in T
 		if (s.hits_in_T == 1) {
 			auto &hit = h2single.at(s.kmer.h);
@@ -122,7 +122,7 @@ public:
 				if (prev_r < curr_l) {  // if there will be a gap, push the current range
 					if (prev_l != -1) {
 #ifdef DEBUG
-						cerr << "  match_seed_in_interval(" << s << ", " << from << ", " << to << ")" << endl;
+						cerr << "  match_kmer_in_interval(" << s << ", " << from << ", " << to << ")" << endl;
 #endif
 						hist->incRange(max(prev_l, from), min(prev_r, to));
 					}
@@ -136,7 +136,7 @@ public:
 			if (prev_l != -1 && prev_l <= to) {
 				assert (prev_l <= prev_r);
 #ifdef DEBUG
-				cerr << "  match_seed_in_interval(" << s << ", " << from << ", " << to << ")" << endl;
+				cerr << "  match_kmer_in_interval(" << s << ", " << from << ", " << to << ")" << endl;
 #endif
 				hist->incRange(max(prev_l, from), min(prev_r, to));
 			}	
