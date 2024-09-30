@@ -168,7 +168,7 @@ class SweepMapper : public Mapper {
 		assert(intersection == 0);
 		assert(same_strand_seeds == 0);
 
-		if (H->params.onlybest && best.intersection != -1) { // && best.J > H->params.tThres)
+		if (H->params.onlybest && best.intersection != -1 && best.J > H->params.tThres) {
 			best.mapq = (best.intersection > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
 			best.J2 = second.J;
 			mappings.push_back(best);

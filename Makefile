@@ -176,7 +176,7 @@ eval_bucketmap: $(SWEEPMAP_BIN) gen_reads
 
 eval_rmqmap: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(RMQMAP_PREF))
-#	$(TIME_CMD) -o $(RMQMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -m rmq 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(RMQMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -x -m rmq 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(RMQMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(RMQMAP_PREF).params -k $(K) -r $(R) -t $(T) -x -m rmq     2> >(tee $(RMQMAP_PREF).log) >$(RMQMAP_PREF).paf
 	-paftools.js mapeval -r 0.1 $(RMQMAP_PREF).paf | tee $(RMQMAP_PREF).eval
 	@-paftools.js mapeval -r 0.1 -Q 60 $(RMQMAP_PREF).paf >$(RMQMAP_PREF).wrong
@@ -221,6 +221,9 @@ eval_tools_on_datasets:
 eval_sweepmap_on_SV:
 	make eval_sweepmap REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
 #	make eval_minimap  REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
+
+eval_rmqmap_on_SV:
+	make eval_rmqmap REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
 
 eval_tools_on_SV:
 	make eval_tools REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
