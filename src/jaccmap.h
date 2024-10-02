@@ -45,16 +45,12 @@ class JaccMapper : public Mapper {
 		return kmers;
 	}
 
-	const vector<Mapping> sweep(vector<Match> &M, const pos_t P_sz, const int p_sz) {
-		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
-
+	void sweep(vector<Match> &M, const pos_t P_sz, const int p_sz, vector<Mapping> *mappings) {
         unordered_multiset<int> diff_hist;
 		int intersection = 0;
-		Mapping best(H->params.k, P_sz, 0, -1, -1, -1, -1, -1, 0, M.end(), M.end());
-		Mapping second = best;
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 
-		sort(M.begin(), M.end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; }); 
+		//sort(M.begin(), M.end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; }); 
 
 		// Increase the left point end of the window [l,r) one by one. O(matches)
 		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l) {
@@ -74,23 +70,8 @@ class JaccMapper : public Mapper {
 
 			auto m = Mapping(H->params.k, P_sz, p_sz, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), intersection, same_strand_seeds, l, r);
 
-			// second best without guarantees
-			// Wrong invariant:
-			// best[l,r) -- a mapping best.l<=l with maximal J
-			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
-			//if (m.J >= H->params.tThres) {
-				if (H->params.onlybest) {
-					if (m.intersection > best.intersection) {  // if (intersection > best.intersection)
-						if (best.T_l < m.T_l - 0.9*P_sz)
-							second = best;
-						best = m;
-					} else if (m.intersection > second.intersection && m.T_l > best.T_l + 0.9*P_sz) {
-						second = m;
-					}
-				} else {
-					mappings.push_back(m);
-				}
-			//}
+			if (m.J >= H->params.tThres)
+				mappings->push_back(m);
 
 			// Prepare for the next step by moving `l` to the right.
 			auto it = diff_hist.find(l->seed.seed_num);
@@ -104,14 +85,6 @@ class JaccMapper : public Mapper {
 		}
 		assert(intersection == 0);
 		assert(same_strand_seeds == 0);
-
-		if (H->params.onlybest && best.intersection != -1 && best.J > H->params.tThres) {
-			best.mapq = (best.intersection > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
-			best.J2 = second.J;
-			mappings.push_back(best);
-		}
-
-		return mappings;
 	}
 
   public:
@@ -166,72 +139,83 @@ class JaccMapper : public Mapper {
 					H->T.stop("seeding");
 					H->C.inc("kmers", kmers.size());
 
-				H->T.start("matching");
-                    int l = int(kmers.size() / H->params.tThres);				// maximum length of a similar mapping
-                    int S = int((1.0 - H->params.tThres) * kmers.size()) + 1;	// any similar mapping includes at least 1 seed match
-                    std::unordered_map<int, int> M;  							// M[b] -- #matched kmers[0...i] in [bl, (b+2)l)
+				int l = int(kmers.size() / H->params.tThres);				// maximum length of a similar mapping
+				int S = int((1.0 - H->params.tThres) * kmers.size()) + 1;	// any similar mapping includes at least 1 seed match
+				std::unordered_map<int, int> M;  							// M[b] -- #matched kmers[0...i] in [bl, (b+2)l)
 
-					H->T.start("match_infrequent");
-                    for (int i = 0; i < S; i++) {
-                        std::unordered_set<int> matched_buckets;
-                        Matches matches_infreq;
-                        Kmer seed = kmers[i];
-                        if (seed.hits_in_T > 0) {
-                            tidx.get_matches(&matches_infreq, seed);
-                            for (auto &m: matches_infreq) {
-                                matched_buckets.insert(int(m.hit.tpos / l));
-                                matched_buckets.insert(int(m.hit.tpos / l) + 1);
-                            }
-                        }
-                        for (int b: matched_buckets)
-                            ++M[b];
-                    }
-					H->T.stop("match_infrequent");
-
-					{
-						int total = 0; for (auto &[b, cnt]: M) total += cnt;	
-						cerr << "Before. buckets: " << M.size() << ", total: " << total << endl;
+				H->T.start("match_infrequent");
+				for (int i = 0; i < S; i++) {
+					Kmer seed = kmers[i];
+					if (seed.hits_in_T > 0) {
+						Matches matches_infreq;
+						std::unordered_set<int> matched_buckets;
+						tidx.get_matches(&matches_infreq, seed);
+						for (auto &m: matches_infreq) {
+							matched_buckets.insert(int(m.hit.tpos / l));
+							matched_buckets.insert(int(m.hit.tpos / l) + 1);
+						}
+						for (int b: matched_buckets)
+							++M[b];
 					}
+				}
+				H->T.stop("match_infrequent");
 
-					H->T.start("match_frequent");
-                    for (int i = S; i < (int)kmers.size(); i++) {
-						vector<int> to_erase;
+				//{
+				//	int total = 0; for (auto &[b, cnt]: M) total += cnt;	
+				//	cerr << "Before. buckets: " << M.size() << ", total: " << total << endl;
+				//}
 
-                        for (auto &[b, cnt]: M) {
-                            if (tidx.is_kmer_in_t_interval(kmers[i], b*l, (b+2)*l))
-                                ++cnt;
-                            if (cnt <= i-S+1) {
-								to_erase.push_back(b);
-							}
-                        }
-								
-						for (auto b: to_erase)
-							M.erase(b);
-                    }
-					H->T.stop("match_frequent");
+				H->T.start("match_frequent");
+				for (int i = S; i < (int)kmers.size(); i++) {
+					vector<int> to_erase;
 
-					{
-						int total = 0; for (auto &[b, cnt]: M) total += cnt;	
-						cerr << "After. buckets: " << M.size() << ", total: " << total << endl;
+					for (auto &[b, cnt]: M) {
+						if (tidx.is_kmer_in_t_interval(kmers[i], b*l, (b+2)*l))
+							++cnt;
+						if (cnt <= i-S+1) {
+							to_erase.push_back(b);
+						}
 					}
+							
+					for (auto b: to_erase)
+						M.erase(b);
+				}
+				H->T.stop("match_frequent");
 
+				//{
+				//	int total = 0; for (auto &[b, cnt]: M) total += cnt;	
+				//	cerr << "After. buckets: " << M.size() << ", total: " << total << endl;
+				//}
+
+				vector<Mapping> mappings;
+				for (const auto &[b, cnt]: M) {
 					H->T.start("match_collect");
-                    Matches matches;
-                    for (const auto &[b, cnt]: M)
-						for (const auto &kmer: kmers)
-							tidx.get_matches_in_t_interval(&matches, kmer, b*l, (b+2)*l);
+					Matches matches;
+					for (const auto &kmer: kmers)
+						tidx.get_matches_in_t_interval(&matches, kmer, b*l, (b+2)*l);
 					H->T.stop("match_collect");
-					cerr << "Collected matches: " << matches.size() << endl;
 
-					H->T.stop("matching");
+					H->T.start("sweep");
+						sweep(matches, P_sz, kmers.size(), &mappings);
+					H->T.stop("sweep");
+				}
 
-				H->T.start("sweep");
-					vector<Mapping> mappings = sweep(matches, P_sz, kmers.size());
-					if (mappings.size() > 0) {
-						H->C.inc("mapped_reads");
-						//H->C.inc("intersection_diff", t_abs - mappings[0].intersection);
+				if (mappings.size() > 0) {
+					H->C.inc("mapped_reads");
+					//H->C.inc("intersection_diff", t_abs - mappings[0].intersection);
+				}
+
+				if (H->params.onlybest && mappings.size() > 0) {
+					Mapping best = *mappings.begin(); 
+					for (auto &m: mappings) {
+						//cerr << m << endl;
+						if (m.J > best.J)
+							best = m;
 					}
-				H->T.stop("sweep");
+					
+					mappings.clear();
+					mappings.push_back(best);
+				}
 
 				H->T.start("output");
 					read_mapping_time.stop();
@@ -244,7 +228,8 @@ class JaccMapper : public Mapper {
 		//					H->C.inc("total_edit_distance", ed);
 		//				}
 		//				else
-							m.print_paf(query_id, segm, matches.size());
+		     				int total_matches = -1; //matches.size();
+							m.print_paf(query_id, segm, total_matches);
 						//  H->C.inc("spurious_matches", spurious_matches(m, matches));
 						H->C.inc("J", int(10000.0*m.J));
 						H->C.inc("mappings");
@@ -295,12 +280,11 @@ class JaccMapper : public Mapper {
 //        cerr << " |  |  | thin sketch:             " << setw(5) << right << H->T.secs("thin_sketch")       << " (" << setw(4) << right << H->T.perc("thin_sketch", "seeding")         << "\%, " << setw(5) << right << H->T.range_ratio("thin_sketch") << "x)" << endl;
 //        cerr << " |  |  | unique seeds:            " << setw(5) << right << H->T.secs("unique_seeds")      << " (" << setw(4) << right << H->T.perc("unique_seeds", "seeding")        << "\%, " << setw(5) << right << H->T.range_ratio("unique_seeds") << "x)" << endl;
         cerr << " |  |  | sort seeds:              " << setw(5) << right << H->T.secs("sort_kmers")        << " (" << setw(4) << right << H->T.perc("sort_kmers", "seeding")          << "\%, " << setw(5) << right << H->T.range_ratio("sort_kmers") << "x)" << endl;
-        cerr << " |  | matching seeds:         "     << setw(5) << right << H->T.secs("matching")          << " (" << setw(4) << right << H->T.perc("matching", "mapping")            << "\%, " << setw(5) << right << H->T.range_ratio("matching") << "x)" << endl;
-        cerr << " |  |  | match infrequent:        " << setw(5) << right << H->T.secs("match_infrequent")  << " (" << setw(4) << right << H->T.perc("match_infrequent", "matching")   << "\%, " << setw(5) << right << H->T.range_ratio("match_infrequent") << "x)" << endl;
-        cerr << " |  |  | match frequent:          " << setw(5) << right << H->T.secs("match_frequent")    << " (" << setw(4) << right << H->T.perc("match_frequent", "matching")     << "\%, " << setw(5) << right << H->T.range_ratio("match_frequent") << "x)" << endl;
-        cerr << " |  |  | matches collect:         " << setw(5) << right << H->T.secs("match_collect")     << " (" << setw(4) << right << H->T.perc("match_collect", "matching")      << "\%, " << setw(5) << right << H->T.range_ratio("match_collect") << "x)" << endl;
-//        cerr << " |  |  | get intervals:           " << setw(5) << right << H->T.secs("get_intervals")     << " (" << setw(4) << right << H->T.perc("get_intervals", "matching")      << "\%, " << setw(5) << right << H->T.range_ratio("get_intervals") << "x)" << endl;
-//        cerr << " |  |  | filter promising buckets:" << setw(5) << right << H->T.secs("filter_promising_buckets")    << " (" << setw(4) << right << H->T.perc("filter_promising_buckets", "matching")     << "\%, " << setw(5) << right << H->T.range_ratio("filter_promising_buckets") << "x)" << endl;
+        cerr << " |  | match infrequent:        " << setw(5) << right << H->T.secs("match_infrequent")  << " (" << setw(4) << right << H->T.perc("match_infrequent", "mapping")   << "\%, " << setw(5) << right << H->T.range_ratio("match_infrequent") << "x)" << endl;
+        cerr << " |  | match frequent:          " << setw(5) << right << H->T.secs("match_frequent")    << " (" << setw(4) << right << H->T.perc("match_frequent", "mapping")     << "\%, " << setw(5) << right << H->T.range_ratio("match_frequent") << "x)" << endl;
+        cerr << " |  | matches collect:         " << setw(5) << right << H->T.secs("match_collect")     << " (" << setw(4) << right << H->T.perc("match_collect", "mapping")      << "\%, " << setw(5) << right << H->T.range_ratio("match_collect") << "x)" << endl;
+//        cerr << " |  |  | get intervals:           " << setw(5) << right << H->T.secs("get_intervals")     << " (" << setw(4) << right << H->T.perc("get_intervals", "mapping")      << "\%, " << setw(5) << right << H->T.range_ratio("get_intervals") << "x)" << endl;
+//        cerr << " |  |  | filter promising buckets:" << setw(5) << right << H->T.secs("filter_promising_buckets")    << " (" << setw(4) << right << H->T.perc("filter_promising_buckets", "mapping")     << "\%, " << setw(5) << right << H->T.range_ratio("filter_promising_buckets") << "x)" << endl;
         cerr << " |  | sweep:                  "     << setw(5) << right << H->T.secs("sweep")             << " (" << setw(4) << right << H->T.perc("sweep", "mapping")               << "\%, " << setw(5) << right << H->T.range_ratio("sweep") << "x)" << endl;
         cerr << " |  | prepare:                "     << setw(5) << right << H->T.secs("output")            << " (" << setw(4) << right << H->T.perc("output", "mapping")              << "\%, " << setw(5) << right << H->T.range_ratio("output") << "x)" << endl;
 //        cerr << " |  | post proc:              "     << setw(5) << right << H->T.secs("postproc")          << " (" << setw(4) << right << H->T.perc("postproc", "mapping")            << "\%, " << setw(5) << right << H->T.range_ratio("postproc") << "x)" << endl;

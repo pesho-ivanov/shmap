@@ -61,22 +61,22 @@ public:
 				matches->push_back(Match(s, hit));
 				return true;
 			}
-		} else {
+		} else if (s.hits_in_T > 1) {
 			// TODO: account for segments
 			// TODO: careful with left and right ends
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
-			if (hits.size() < 10) {
-				for (int i=0; i<(int)hits.size(); i++)
-					if (hits[i].tpos >= from) {
-						matches->push_back(Match(s, hits[i]));
-						for (int j=(int)hits.size()-1; j>i; j--)
-							if (hits[j].tpos < to) {
-								matches->push_back(Match(s, hits[j]));
-								break;
-							}
-						return true;
-					}
-			} else {
+//			if (hits.size() < 10) {
+//				for (int i=0; i<(int)hits.size(); i++)
+//					if (hits[i].tpos >= from) {
+//						matches->push_back(Match(s, hits[i]));
+//						for (int j=(int)hits.size()-1; j>i; j--)
+//							if (hits[j].tpos < to) {
+//								matches->push_back(Match(s, hits[j]));
+//								break;
+//							}
+//						return true;
+//					}
+//			} else {
 				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.tpos < pos; });
 				//auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, int pos) { return hit.r > pos; });
 
@@ -87,7 +87,7 @@ public:
 					matches->push_back(Match(s, *it));
 
 				return true;
-			}
+//			}
 		}	
 		return false;
 	}
@@ -101,7 +101,7 @@ public:
 				matches->push_back(Match(s, hit));
 				return true;
 			}
-		} else {
+		} else if (s.hits_in_T > 1) {
 			// TODO: account for segments
 			// TODO: careful with left and right ends
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
@@ -137,7 +137,7 @@ public:
 		if (s.hits_in_T == 1) {
 			auto &hit = h2single.at(s.kmer.h);
 			return from <= hit.tpos && hit.tpos < to;
-		} else {
+		} else if (s.hits_in_T > 1) {
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
 			//for (int i=1; i<(int)hits.size(); i++) assert(hits[i-1].r <= hits[i].r);
 			auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.tpos < pos; });
@@ -146,6 +146,7 @@ public:
 			//cout << (it != hits.end() && it->r < to) << ", [" << from << ", " << to << ")" << ", it: " << (it != hits.end() ? it->r : -1) << endl;
 			return it != hits.end() && it->tpos < to;
 		}
+		return false;
 	}
 
 	bool is_kmer_in_interval(const Seed &s, int from, int to) const {
@@ -153,7 +154,7 @@ public:
 		if (s.hits_in_T == 1) {
 			auto &hit = h2single.at(s.kmer.h);
 			return intersect(hit, from, to);
-		} else {
+		} else if (s.hits_in_T > 1) {
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
 			//for (int i=1; i<(int)hits.size(); i++) assert(hits[i-1].r <= hits[i].r);
 			auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.r < pos; });
@@ -162,6 +163,7 @@ public:
 			//cout << (it != hits.end() && it->r < to) << ", [" << from << ", " << to << ")" << ", it: " << (it != hits.end() ? it->r : -1) << endl;
 			return it != hits.end() && it->r < to;
 		}
+		return false;
 	}
 
 	// returns the number of hits in the interval from, to
@@ -175,7 +177,7 @@ public:
 				matches_freq->push_back(Match(s, hit));
 				hist->incRange(max(curr_l, from), min(curr_r, to));
 			}
-		} else {
+		} else if (s.hits_in_T > 1) {
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
 			auto it = lower_bound(hits.begin(), hits.end(), from, [&hist](const Hit &hit, int pos) {
 				return hist->to(hit) < pos;
@@ -219,7 +221,7 @@ public:
 		matches->reserve(matches->size() + s.hits_in_T);
 		if (s.hits_in_T == 1) {
 			matches->push_back(Match(s, h2single.at(s.kmer.h)));
-		} else {
+		} else if (s.hits_in_T > 1) {
 			for (const auto &hit: h2multi.at(s.kmer.h))
 				matches->push_back(Match(s, hit));
 		}	
