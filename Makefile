@@ -38,7 +38,7 @@ K ?= 22
 R ?= 0.1
 S ?= 300
 M ?= 100
-T ?= 0.85
+T ?= 0.9
 
 K_SLOW ?= $(K) #22
 R_SLOW ?= $(R) #0.1
@@ -65,6 +65,7 @@ OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 SWEEPMAP_PREF = $(OUTDIR)/sweepmap/sweepmap
 BUCKETMAP_PREF = $(OUTDIR)/bucketmap/bucketmap
 RMQMAP_PREF = $(OUTDIR)/rmqmap/rmqmap
+JACCMAP_PREF = $(OUTDIR)/jaccmap/jaccmap
 SWEEPMAP_SLOW_PREF = $(OUTDIR)/sweepmap-slow/sweepmap-slow
 MINIMAP_PREF = $(OUTDIR)/minimap/minimap
 BLEND_PREF = $(OUTDIR)/blend/blend
@@ -180,6 +181,13 @@ eval_rmqmap: $(SWEEPMAP_BIN) gen_reads
 	$(TIME_CMD) -o $(RMQMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(RMQMAP_PREF).params -k $(K) -r $(R) -t $(T) -x -m rmq     2> >(tee $(RMQMAP_PREF).log) >$(RMQMAP_PREF).paf
 	-paftools.js mapeval -r 0.1 $(RMQMAP_PREF).paf | tee $(RMQMAP_PREF).eval
 	@-paftools.js mapeval -r 0.1 -Q 60 $(RMQMAP_PREF).paf >$(RMQMAP_PREF).wrong
+
+eval_jaccmap: $(SWEEPMAP_BIN) gen_reads
+	@mkdir -p $(shell dirname $(JACCMAP_PREF))
+#	$(TIME_CMD) -o $(JACCMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -x -m jacc 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(JACCMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(JACCMAP_PREF).params -k $(K) -r $(R) -t $(T) -x -m jacc     2> >(tee $(JACCMAP_PREF).log) >$(JACCMAP_PREF).paf
+	-paftools.js mapeval -r 0.1 $(JACCMAP_PREF).paf | tee $(JACCMAP_PREF).eval
+#	@-paftools.js mapeval -r 0.1 -Q 60 $(JACCMAP_PREF).paf >$(JACCMAP_PREF).wrong
 
 eval_winnowmap: gen_reads
 	@mkdir -p $(shell dirname $(WINNOWMAP_PREF))

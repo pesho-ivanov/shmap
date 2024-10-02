@@ -58,6 +58,7 @@ public:
     std::unordered_map<std::string, Timer> timers_;
 
     void start(const std::string& name) {
+        //std::cerr << "Starting timer " << name << std::endl;
         timers_[name].start();
     }
 
