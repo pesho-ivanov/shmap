@@ -133,7 +133,7 @@ struct Mapping {
 			//<< "\t" << "s:i:" << s_sz
 			<< "\t" << "I:i:" << intersection  // intersection of `p` and `s` [kmers]
 			<< "\t" << "J:f:" << J   // Jaccard similarity [0; 1]
-			<< "\t" << "J2:f:" << J2   // second best mapping Jaccard similarity [0; 1]
+//			<< "\t" << "J2:f:" << J2   // second best mapping Jaccard similarity [0; 1]
 			<< "\t" << "t:f:" << map_time
 			<< endl;
 	}

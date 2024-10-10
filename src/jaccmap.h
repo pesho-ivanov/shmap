@@ -45,8 +45,13 @@ class JaccMapper : public Mapper {
 		return kmers;
 	}
 
-	void sweep(vector<Match> &M, const pos_t P_sz, const int p_sz, vector<Mapping> *mappings) {
-        unordered_multiset<int> diff_hist;
+	void sweep(vector<Match> &M, const pos_t P_sz, const Kmers &kmers, vector<Mapping> *mappings) {
+		unordered_map<int, int> diff_hist;
+        //unordered_multiset<int> diff_hist;
+
+		for (auto &kmer: kmers)
+			++diff_hist[kmer.kmer.h];
+
 		int intersection = 0;
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 
@@ -60,24 +65,16 @@ class JaccMapper : public Mapper {
 				&& r->hit.r + H->params.k <= l->hit.r + P_sz
 				; ++r) {
 				same_strand_seeds += r->is_same_strand() ? +1 : -1;  // change to r inside the loop
-				// If taking this kmer from T increases the intersection with P.
-				// TODO: iterate following seeds
-				if (!diff_hist.contains(r->seed.seed_num))
+				if (--diff_hist[r->seed.kmer.h] >= 0)
 					++intersection;
-				diff_hist.insert(r->seed.seed_num);
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			auto m = Mapping(H->params.k, P_sz, p_sz, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), intersection, same_strand_seeds, l, r);
-
+			auto m = Mapping(H->params.k, P_sz, kmers.size(), l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), intersection, same_strand_seeds, l, r);
 			if (m.J >= H->params.tThres)
 				mappings->push_back(m);
 
-			// Prepare for the next step by moving `l` to the right.
-			auto it = diff_hist.find(l->seed.seed_num);
-			assert(it != diff_hist.end());
-			diff_hist.erase(it); 
-			if (!diff_hist.contains(l->seed.seed_num))
+			if (++diff_hist[r->seed.kmer.h] >= 1)
 				--intersection;
 			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
 
@@ -196,7 +193,7 @@ class JaccMapper : public Mapper {
 					H->T.stop("match_collect");
 
 					H->T.start("sweep");
-						sweep(matches, P_sz, kmers.size(), &mappings);
+						sweep(matches, P_sz, kmers, &mappings);
 					H->T.stop("sweep");
 				}
 
