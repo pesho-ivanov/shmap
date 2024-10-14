@@ -38,11 +38,11 @@ K ?= 22
 R ?= 0.1
 S ?= 300
 M ?= 100
-T ?= 0.85
+T ?= 0.95
 
-K_SLOW ?= $(K) #22
-R_SLOW ?= $(R) #0.1
-T_SLOW ?= $(T) #0.0
+K_SLOW ?= $(K)
+R_SLOW ?= $(R)
+T_SLOW ?= $(T)
 
 DIR = evals
 REF_DIR = $(DIR)/refs
