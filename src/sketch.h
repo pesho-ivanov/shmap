@@ -102,17 +102,19 @@ struct Mapping {
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
     void print_paf(const string &query_id, const RefSegment &segm, int total_matches) const {
-		int P_start = P_sz, P_end = -1;
-		for (auto m = l; m != r; ++m) {
-			P_start = std::min(P_start, m->seed.r_first);
-			P_end = std::max(P_end, m->seed.r_last);
-		}
-		//if (!(0 <= P_start && P_start <= P_end && P_end <= P_sz))
-		//	std::cerr << "P_start=" << P_start << " P_end=" << P_end << " P_sz=" << P_sz << std::endl;
-		assert(0 <= P_start && P_start <= P_end && P_end <= P_sz);
+		//cerr << "P_sz=" << P_sz << " T_l=" << T_l << " T_r=" << T_r << " segm.sz=" << segm.sz << " p_sz=" << p_sz << " intersection=" << intersection << " J=" << J << " map_time=" << map_time << " mapq=" << mapq << " strand=" << strand << " unreasonable=" << unreasonable << endl;
+//		int P_start = P_sz, P_end = -1;
+//		for (auto m = l; m != r; ++m) {
+//			P_start = std::min(P_start, m->seed.r_first);
+//			P_end = std::max(P_end, m->seed.r_last);
+//		}
+//		if (!(0 <= P_start && P_start <= P_end && P_end <= P_sz))
+//			std::cerr << "P_start=" << P_start << " P_end=" << P_end << " P_sz=" << P_sz << std::endl;
+//		assert(0 <= P_start);
+//		assert(P_start <= P_end);
+//		assert(P_end <= P_sz);
 
-		auto T_l_predicted = std::max(T_l-P_start, 0);  // -P_start -- P_start too big
-		auto T_r_predicted = std::min(T_r+(P_sz-P_end), segm.sz);  // +(P_sz-P_end) too big
+		int P_start = 0, P_end = P_sz-1;
 
 		std::cout << query_id  			// Query sequence name
 			<< "\t" << P_sz     // query sequence length
@@ -121,8 +123,8 @@ struct Mapping {
 			<< "\t" << strand   // '+' or '-'
 			<< "\t" << segm.name // reference segment name
 			<< "\t" << segm.sz // T_sz -- target sequence length
-			<< "\t" << T_l_predicted  // target start on original strand (0-based)
-			<< "\t" << T_r_predicted  // target start on original strand (0-based)
+			<< "\t" << T_l  // target start on original strand (0-based)
+			<< "\t" << T_r  // target end on original strand (0-based)
 			<< "\t" << P_sz  // TODO: fix; Number of residue matches (number of nucleotide matches)
 			<< "\t" << P_sz  // TODO: fix; Alignment block length: total number of sequence matches, mismatches, insertions and deletions in the alignment
 			<< "\t" << mapq  // Mapping quality (0-255; 255 for missing)

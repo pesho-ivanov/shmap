@@ -12,7 +12,7 @@ namespace sweepmap {
 
 using hash_t     = uint64_t;
 using pos_t      = int32_t;
-using segm_t     = int8_t;
+using segm_t     = int32_t;
 
 class Timer {
 public:

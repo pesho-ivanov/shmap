@@ -11,7 +11,7 @@
 #include "mapper.h"
 
 namespace sweepmap {
-
+	
 class JaccMapper : public Mapper {
 	const SketchIndex &tidx;
 	Handler *H;
@@ -55,11 +55,27 @@ class JaccMapper : public Mapper {
 		int intersection = 0;
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 
-		//sort(M.begin(), M.end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; }); 
+		H->T.start("sweep-sort");
+		sort(M.begin(), M.end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; }); 
+		H->T.stop("sweep-sort");
 
+#ifdef DEBUG
+		for (auto &kmer: kmers) {
+			assert(diff_hist[kmer.kmer.h] > 0);
+			cerr << "kmer: " << kmer.kmer.h << " " << kmer.kmer.r << " " << kmer.hits_in_T << endl;
+		}
+
+		for (int i=1; i<(int)M.size(); i++) {
+			assert(M[i-1].hit.r <= M[i].hit.r);
+			cerr << "match: " << M[i].hit.segm_id << " " << M[i].hit.r << " " << M[i].seed.kmer.h << " " << M[i].seed.kmer.r << endl;
+		}
+#endif
+
+		H->T.start("sweep-main");
 		// Increase the left point end of the window [l,r) one by one. O(matches)
 		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l) {
 			// Increase the right end of the window [l,r) until it gets out.
+			//cerr << "l: " << l->hit.segm_id << " " << l->hit.r << " " << l->seed.kmer.h << " " << l->seed.kmer.r << endl;
 			for(;  r != M.end()
 				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
 				&& r->hit.r + H->params.k <= l->hit.r + P_sz
@@ -74,12 +90,13 @@ class JaccMapper : public Mapper {
 			if (m.J >= H->params.tThres)
 				mappings->push_back(m);
 
-			if (++diff_hist[r->seed.kmer.h] >= 1)
-				--intersection;
 			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
+			if (++diff_hist[l->seed.kmer.h] >= 1)
+				--intersection;
 
 			assert(intersection >= 0);
 		}
+		H->T.stop("sweep-main");
 		assert(intersection == 0);
 		assert(same_strand_seeds == 0);
 	}
@@ -95,7 +112,7 @@ class JaccMapper : public Mapper {
     }
 
 	void map(const string &pFile) {
-		cerr << "Mapping reads using JaccMap " << pFile << "..." << endl;
+		cerr << "Mapping reads using JaccMap " << "..." << endl;
 
 		H->C.inc("kmers", 0);
 		H->C.inc("seeds", 0);
@@ -185,12 +202,14 @@ class JaccMapper : public Mapper {
 				//}
 
 				vector<Mapping> mappings;
+				int total_matches = 0; //matches.size();
 				for (const auto &[b, cnt]: M) {
 					H->T.start("match_collect");
 					Matches matches;
 					for (const auto &kmer: kmers)
 						tidx.get_matches_in_t_interval(&matches, kmer, b*l, (b+2)*l);
 					H->T.stop("match_collect");
+					total_matches += matches.size();
 
 					H->T.start("sweep");
 						sweep(matches, P_sz, kmers, &mappings);
@@ -225,7 +244,6 @@ class JaccMapper : public Mapper {
 		//					H->C.inc("total_edit_distance", ed);
 		//				}
 		//				else
-		     				int total_matches = -1; //matches.size();
 							m.print_paf(query_id, segm, total_matches);
 						//  H->C.inc("spurious_matches", spurious_matches(m, matches));
 						H->C.inc("J", int(10000.0*m.J));
@@ -283,6 +301,8 @@ class JaccMapper : public Mapper {
 //        cerr << " |  |  | get intervals:           " << setw(5) << right << H->T.secs("get_intervals")     << " (" << setw(4) << right << H->T.perc("get_intervals", "mapping")      << "\%, " << setw(5) << right << H->T.range_ratio("get_intervals") << "x)" << endl;
 //        cerr << " |  |  | filter promising buckets:" << setw(5) << right << H->T.secs("filter_promising_buckets")    << " (" << setw(4) << right << H->T.perc("filter_promising_buckets", "mapping")     << "\%, " << setw(5) << right << H->T.range_ratio("filter_promising_buckets") << "x)" << endl;
         cerr << " |  | sweep:                  "     << setw(5) << right << H->T.secs("sweep")             << " (" << setw(4) << right << H->T.perc("sweep", "mapping")               << "\%, " << setw(5) << right << H->T.range_ratio("sweep") << "x)" << endl;
+        cerr << " |  |  | sort matches:            " << setw(5) << right << H->T.secs("sweep-sort")        << " (" << setw(4) << right << H->T.perc("sweep-sort", "sweep")            << "\%, " << setw(5) << right << H->T.range_ratio("sweep-sort") << "x)" << endl;
+        cerr << " |  |  | main:                    " << setw(5) << right << H->T.secs("sweep-main")        << " (" << setw(4) << right << H->T.perc("sweep-main", "sweep")            << "\%, " << setw(5) << right << H->T.range_ratio("sweep-main") << "x)" << endl;
         cerr << " |  | prepare:                "     << setw(5) << right << H->T.secs("output")            << " (" << setw(4) << right << H->T.perc("output", "mapping")              << "\%, " << setw(5) << right << H->T.range_ratio("output") << "x)" << endl;
 //        cerr << " |  | post proc:              "     << setw(5) << right << H->T.secs("postproc")          << " (" << setw(4) << right << H->T.perc("postproc", "mapping")            << "\%, " << setw(5) << right << H->T.range_ratio("postproc") << "x)" << endl;
     }

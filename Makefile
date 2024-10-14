@@ -30,15 +30,15 @@ INF = 999999
 
 REFNAME ?= t2tChrY
 ACCURACY ?= 0.99
-DEPTH ?= 1
+DEPTH ?= 0.01
 MEANLEN ?= 10000
 READSIM_REFNAME ?= $(REFNAME)
 
-K ?= 15
+K ?= 22
 R ?= 0.1
 S ?= 300
 M ?= 100
-T ?= 0.9
+T ?= 0.85
 
 K_SLOW ?= $(K) #22
 R_SLOW ?= $(R) #0.1
@@ -60,7 +60,7 @@ READS = $(ALLREADS_DIR)/$(READS_PREFIX).fa
 #endif
 ONE_READ = $(ALLREADS_DIR)/$(READS_PREFIX).oneread.fa
 ALLOUT_DIR = $(DIR)/out
-OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
+OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)/k$(K)-r$(R)-s$(S)-m$(M)-t$(T)
 
 SWEEPMAP_PREF = $(OUTDIR)/sweepmap/sweepmap
 BUCKETMAP_PREF = $(OUTDIR)/bucketmap/bucketmap

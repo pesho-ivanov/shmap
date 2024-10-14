@@ -80,8 +80,8 @@ struct params_t {
 	void print_display(std::ostream& out) {
 		out << "Params:" << endl;
 		out << " | reference:             " << tFile << endl;
-		out << " | queries:               " << pFile << endl;
-		out << " | mapper:                " << mapper << endl;
+		out << " | reads:                 " << pFile << endl;
+		out << " | algorithm:             " << mapper << endl;
 		out << " | k:                     " << k << endl;
 		out << " | hFrac:                 " << hFrac << endl;
 		out << " | max_seeds (S):         " << max_seeds << endl;
