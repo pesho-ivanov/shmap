@@ -32,11 +32,12 @@ class JaccMapper : public Mapper {
 				++strike;
 				if (ppos == (int)p.size()-1 || p[ppos].h != p[ppos+1].h) {
 					int hits_in_t = tidx.count(p[ppos].h);
-					//if (count > 0)  // TODO: try out
-					Seed el(p[ppos], -1, -1, hits_in_t, kmers.size());
-					el.occs_in_p = strike;
-					strike = 0;
-					kmers.push_back(el);
+					if (hits_in_t > 0) { // TODO: try out
+						Seed el(p[ppos], -1, -1, hits_in_t, kmers.size());
+						el.occs_in_p = strike;
+						kmers.push_back(el);
+						strike = 0;
+					}
 				}
 			}
 		H->T.stop("collect_kmer_info");
@@ -158,8 +159,11 @@ class JaccMapper : public Mapper {
 					read_mapping_time.start();
 				H->T.stop("prepare");
 
-				int m = p.size();
+				//int m = p.size();
 				Seeds kmers = select_seeds(p);
+				int m = 0;
+				for (const auto kmer: kmers)
+					m += kmer.occs_in_p;
 				H->C.inc("kmers", m);
 
 				int lmax = int(m / H->params.theta);					// maximum length of a similar mapping
