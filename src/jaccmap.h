@@ -32,7 +32,7 @@ class JaccMapper : public Mapper {
 				++strike;
 				if (ppos == (int)p.size()-1 || p[ppos].h != p[ppos+1].h) {
 					int hits_in_t = tidx.count(p[ppos].h);
-					//if (count > 0)
+					//if (count > 0)  // TODO: try out
 					Seed el(p[ppos], -1, -1, hits_in_t, kmers.size());
 					el.occs_in_p = strike;
 					strike = 0;
@@ -79,11 +79,14 @@ class JaccMapper : public Mapper {
 				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
 				&& r->hit.r + H->params.k <= l->hit.r + P_sz
 				; ++r) {
-				for (int k = 0; k < r->seed.occs_in_p; ++k) {  // TODO: in O(1)
-					same_strand_seeds += r->is_same_strand() ? +1 : -1;  // todo: kmer multiplicity
-					if (--diff_hist[r->seed.kmer.h] >= 0)
-						++intersection;
-				}
+				same_strand_seeds += r->seed.occs_in_p * (r->is_same_strand() ? +1 : -1);  // todo: kmer multiplicity
+				//for (int k = 0; k < r->seed.occs_in_p; ++k) {  // TODO: in O(1)
+				//	if (--diff_hist[r->seed.kmer.h] >= 0)
+				//		++intersection;
+				//}
+				intersection += min(r->seed.occs_in_p, max(0, diff_hist[r->seed.kmer.h]));
+				diff_hist[r->seed.kmer.h] -= r->seed.occs_in_p;
+				
 				assert (l->hit.r <= r->hit.r);
 			}
 
@@ -91,11 +94,13 @@ class JaccMapper : public Mapper {
 			if (mapping.J > best.J)
 				best = mapping;
 
-			for (int k = 0; k < l->seed.occs_in_p; ++k) {  // TODO: in O(1)
-				same_strand_seeds -= l->is_same_strand() ? +1 : -1;
-				if (++diff_hist[l->seed.kmer.h] >= 1)
-					--intersection;
-			}
+			same_strand_seeds -= l->seed.occs_in_p * (l->is_same_strand() ? +1 : -1);
+			//for (int k = 0; k < l->seed.occs_in_p; ++k) {  // TODO: in O(1)
+			//	if (++diff_hist[l->seed.kmer.h] >= 1)
+			//		--intersection;
+			//}
+			intersection -= max(0, l->seed.occs_in_p + min(0, diff_hist[l->seed.kmer.h]));
+			diff_hist[l->seed.kmer.h] += l->seed.occs_in_p;
 
 			assert(intersection >= 0);
 		}
@@ -213,6 +218,7 @@ class JaccMapper : public Mapper {
 
 					H->T.start("sweep");
 						sweep(matches, P_sz, m, kmers, &mappings);
+						//fast_sweep(matches, P_sz, m, kmers, &mappings);
 					H->T.stop("sweep");
 				}
 
