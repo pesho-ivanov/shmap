@@ -123,6 +123,11 @@ class JaccMapper : public Mapper {
         }
     }
 
+	double hseed(int p, int S, int matches) {
+		//cerr << "hseed: " << p << " " << S << " " << matches << endl;
+		return 1.0 - double(S - matches) / p;
+	}
+
 	void map(const string &pFile) {
 		cerr << "Mapping reads using JaccMap " << "..." << endl;
 
@@ -194,16 +199,19 @@ class JaccMapper : public Mapper {
 				}
 				H->T.stop("match_infrequent");
 				
-				// TODO: iterate by interval first, keep 2nd best, discard a
-				// bucket if worst than second, compute mapq, break if mapq is too low
 				H->T.start("match_frequent");
 				for (; i < (int)kmers.size(); i++) {
 					vector<int> to_erase;
+					matched_seeds += kmers[i].occs_in_p;
 
 					for (auto &[b, cnt]: M) {
 						if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
-							++cnt;
-						if (cnt <= i-S+1) {
+							cnt += kmers[i].occs_in_p;
+						auto h = hseed(m, matched_seeds, cnt);
+						//cerr << "cnt <= i-s+1: " << bool(cnt <= i-S+1) << ", h < theta: " << bool(h < H->params.theta) << endl;
+						//if (cnt <= i-S+1) {
+						//if (cnt < matched_seeds - S) {
+						if (h < H->params.theta) {
 							to_erase.push_back(b);
 						}
 					}
@@ -211,6 +219,20 @@ class JaccMapper : public Mapper {
 					for (auto b: to_erase)
 						M.erase(b);
 				}
+
+				// TODO: iterate by interval first, keep 2nd best, discard a
+				// bucket if worst than second, compute mapq, break if mapq is too low
+				//int from_i = i; // TODO: sort intervals by Matches
+				//for (auto &[b, cnt]: M) {
+				//	for (i = from_i; i < (int)kmers.size(); i++) {
+				//		if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
+				//			cnt += kmers[i].occs_in_p;
+				//		if (hseed(kmers, S, cnt))
+				//		if (cnt <= i-S+1) {
+				//			to_erase.push_back(b);
+				//		}
+				//	}
+				//}
 				H->T.stop("match_frequent");
 
 				vector<Mapping> mappings;
