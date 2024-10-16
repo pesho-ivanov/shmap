@@ -46,6 +46,7 @@ struct Seed {
 	Kmer kmer;
 	int r_first, r_last;
 	int hits_in_T;
+	int occs_in_p;
 	int seed_num;
 	Seed(const Kmer &kmer, pos_t r_first, pos_t r_last, int hits_in_T, int seed_num) :
 		kmer(kmer), r_first(r_first), r_last(r_last), hits_in_T(hits_in_T), seed_num(seed_num) {}	

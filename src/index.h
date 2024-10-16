@@ -133,8 +133,9 @@ public:
 	}
 
 	bool is_kmer_in_t_interval(const Seed &s, int from, int to) const {
-		assert(s.hits_in_T > 0);
-		if (s.hits_in_T == 1) {
+		if (s.hits_in_T == 0) {
+			return false;
+		} else if (s.hits_in_T == 1) {
 			auto &hit = h2single.at(s.kmer.h);
 			return from <= hit.tpos && hit.tpos < to;
 		} else if (s.hits_in_T > 1) {

@@ -16,50 +16,58 @@ class JaccMapper : public Mapper {
 	const SketchIndex &tidx;
 	Handler *H;
 
-    using Kmer = Seed;
+    //using Kmer = Seed;
 	using hist_t = vector<int>;
-	using Kmers = vector<Kmer>;
+	using Seeds = vector<Seed>;
 	using Matches = vector<Match>;
 	using Intervals = vector<pair<int, int>>;
 
-	Kmers select_seeds(sketch_t& p) {
+	Seeds select_seeds(sketch_t& p) {
+		H->T.start("seeding");
 		H->T.start("collect_kmer_info");
-		Kmers kmers;
-		kmers.reserve(p.size());
-
-		for (int ppos = 0; ppos < (int)p.size(); ++ppos) {
-			const auto &kmer = p[ppos];
-			const auto count = tidx.count(kmer.h);
-			if (count > 0)  // TODO: comment out!
-				kmers.push_back(Kmer(kmer, p[ppos].r, p[ppos].r, count, kmers.size()));
-		}
+			Seeds kmers;
+			sort(p.begin(), p.end(), [](const Kmer &a, const Kmer &b) { return a.h < b.h; });
+			int strike = 0;
+			for (int ppos = 0; ppos < (int)p.size(); ++ppos) {
+				++strike;
+				if (ppos == (int)p.size()-1 || p[ppos].h != p[ppos+1].h) {
+					int hits_in_t = tidx.count(p[ppos].h);
+					//if (count > 0)
+					Seed el(p[ppos], -1, -1, hits_in_t, kmers.size());
+					el.occs_in_p = strike;
+					strike = 0;
+					kmers.push_back(el);
+				}
+			}
 		H->T.stop("collect_kmer_info");
-        H->C.inc("collected_kmers", kmers.size());
 
 		H->T.start("sort_kmers");
-		pdqsort_branchless(kmers.begin(), kmers.end(), [](const Kmer &a, const Kmer &b) {
-            return a.hits_in_T < b.hits_in_T;
-		});
+			pdqsort_branchless(kmers.begin(), kmers.end(), [](const Seed &a, const Seed &b) {
+				return a.hits_in_T < b.hits_in_T;
+			});
 		H->T.stop("sort_kmers");
+		H->T.stop("seeding");
 
 		return kmers;
 	}
 
-	void sweep(vector<Match> &M, const pos_t P_sz, const Kmers &kmers, vector<Mapping> *mappings) {
+	void sweep(vector<Match> &M, const pos_t P_sz, const int m, const Seeds &kmers, vector<Mapping> *mappings) {
 		unordered_map<int, int> diff_hist;
         //unordered_multiset<int> diff_hist;
 
 		for (auto &kmer: kmers)
-			++diff_hist[kmer.kmer.h];
+			diff_hist[kmer.kmer.h] += kmer.occs_in_p;
 
 		int intersection = 0;
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 
 		H->T.start("sweep-sort");
-		sort(M.begin(), M.end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; }); 
+			sort(M.begin(), M.end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; });   // TODO: remove sort by a linear pass through the bucket
 		H->T.stop("sweep-sort");
 		
-		assert(M.size() <= M.back().hit.tpos - M.front().hit.tpos + 1);
+		for (int i=1; i<(int)M.size(); i++)
+			assert(M[i-1].hit.tpos < M[i].hit.tpos);
+		assert(M.size() == 0 || (int)M.size() <= M.back().hit.tpos - M.front().hit.tpos + 1);
 		
 		H->T.start("sweep-main");
 		// Increase the left point end of the window [l,r) one by one. O(matches)
@@ -70,19 +78,23 @@ class JaccMapper : public Mapper {
 				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
 				&& r->hit.r + H->params.k <= l->hit.r + P_sz
 				; ++r) {
-				same_strand_seeds += r->is_same_strand() ? +1 : -1;  // change to r inside the loop
-				if (--diff_hist[r->seed.kmer.h] >= 0)
-					++intersection;
+				for (int k = 0; k < r->seed.occs_in_p; ++k) {  // TODO: in O(1)
+					same_strand_seeds += r->is_same_strand() ? +1 : -1;  // todo: kmer multiplicity
+					if (--diff_hist[r->seed.kmer.h] >= 0)
+						++intersection;
+				}
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			auto m = Mapping(H->params.k, P_sz, kmers.size(), l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, same_strand_seeds, l, prev(r));
-			if (m.J >= H->params.tThres)
-				mappings->push_back(m);
+			auto mapping = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, same_strand_seeds, l, prev(r));
+			if (mapping.J >= H->params.theta)
+				mappings->push_back(mapping);
 
-			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
-			if (++diff_hist[l->seed.kmer.h] >= 1)
-				--intersection;
+			for (int k = 0; k < l->seed.occs_in_p; ++k) {  // TODO: in O(1)
+				same_strand_seeds -= l->is_same_strand() ? +1 : -1;
+				if (++diff_hist[l->seed.kmer.h] >= 1)
+					--intersection;
+			}
 
 			assert(intersection >= 0);
 		}
@@ -95,8 +107,8 @@ class JaccMapper : public Mapper {
 	JaccMapper(const SketchIndex &tidx, Handler *H) : tidx(tidx), H(H) {
         H->C.inc("seeds_limit_reached", 0);
         H->C.inc("mapped_reads", 0);
-        if (H->params.tThres < 0.0 || H->params.tThres > 1.0) {
-            cerr << "tThres = " << H->params.tThres << " outside of [0,1]." << endl;
+        if (H->params.theta < 0.0 || H->params.theta > 1.0) {
+            cerr << "tThres = " << H->params.theta << " outside of [0,1]." << endl;
             exit(1);
         }
     }
@@ -137,40 +149,39 @@ class JaccMapper : public Mapper {
 					read_mapping_time.start();
 				H->T.stop("prepare");
 
-				H->T.start("seeding");
-					Kmers kmers = select_seeds(p);
-					//assert(kmers.size() == p.size());
-					H->T.stop("seeding");
-					H->C.inc("kmers", kmers.size());
+				int m = p.size();
+				Seeds kmers = select_seeds(p);
+				H->C.inc("kmers", m);
 
-				int lmax = int(kmers.size() / H->params.tThres);			// maximum length of a similar mapping
-				int S = int((1.0 - H->params.tThres) * kmers.size()) + 1;	// any similar mapping includes at least 1 seed match
-				std::unordered_map<int, int> M;  							// M[b] -- #matched kmers[0...i] in [bl, (b+2)l)
+				int lmax = int(m / H->params.theta);					// maximum length of a similar mapping
+				int S = int((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
+				std::unordered_map<int, int> M;  			// M[b] -- #matched kmers[0...i] in [bl, (b+2)l)
+				int matched_seeds = 0;
 
 				H->T.start("match_infrequent");
-				for (int i = 0; i < S; i++) {
-					Kmer seed = kmers[i];
+				int i = 0;
+				for (; i < (int)kmers.size() && matched_seeds < S; i++) {
+					Seed seed = kmers[i];
 					if (seed.hits_in_T > 0) {
 						Matches matches_infreq;
-						std::unordered_set<int> matched_buckets;
+						std::unordered_map<int, int> matched_buckets;
 						tidx.get_matches(&matches_infreq, seed);
 						for (auto &m: matches_infreq) {
-							matched_buckets.insert(int(m.hit.tpos / lmax));
-							matched_buckets.insert(int(m.hit.tpos / lmax) + 1);
+							int b = int(m.hit.tpos / lmax);
+							matched_buckets[b] = seed.occs_in_p;
+							matched_buckets[b+1] = seed.occs_in_p;
 						}
-						for (int b: matched_buckets)
-							++M[b];
+						for (const auto [b, occs_in_p]: matched_buckets)
+							M[b] += occs_in_p;
 					}
+					matched_seeds += seed.occs_in_p;
 				}
 				H->T.stop("match_infrequent");
-
-				//{
-				//	int total = 0; for (auto &[b, cnt]: M) total += cnt;	
-				//	cerr << "Before. buckets: " << M.size() << ", total: " << total << endl;
-				//}
-
+				
+				// TODO: iterate by interval first, keep 2nd best, discard a
+				// bucket if worst than second, compute mapq, break if mapq is too low
 				H->T.start("match_frequent");
-				for (int i = S; i < (int)kmers.size(); i++) {
+				for (; i < (int)kmers.size(); i++) {
 					vector<int> to_erase;
 
 					for (auto &[b, cnt]: M) {
@@ -186,11 +197,6 @@ class JaccMapper : public Mapper {
 				}
 				H->T.stop("match_frequent");
 
-				//{
-				//	int total = 0; for (auto &[b, cnt]: M) total += cnt;	
-				//	cerr << "After. buckets: " << M.size() << ", total: " << total << endl;
-				//}
-
 				vector<Mapping> mappings;
 				int total_matches = 0; //matches.size();
 				for (const auto &[b, cnt]: M) {
@@ -202,7 +208,7 @@ class JaccMapper : public Mapper {
 					total_matches += matches.size();
 
 					H->T.start("sweep");
-						sweep(matches, P_sz, kmers, &mappings);
+						sweep(matches, P_sz, m, kmers, &mappings);
 					H->T.stop("sweep");
 				}
 
@@ -212,7 +218,6 @@ class JaccMapper : public Mapper {
 				}
 				
 				if (mappings.size() >= 2) {
-
 				}
 
 				if (H->params.onlybest && mappings.size() >= 1) {

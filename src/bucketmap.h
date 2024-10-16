@@ -211,8 +211,8 @@ class BucketMapper : public Mapper {
 	BucketMapper(const SketchIndex &tidx, Handler *H) : tidx(tidx), H(H) {
         H->C.inc("seeds_limit_reached", 0);
         H->C.inc("mapped_reads", 0);
-        if (H->params.tThres < 0.0 || H->params.tThres > 1.0) {
-            cerr << "tThres = " << H->params.tThres << " outside of [0,1]." << endl;
+        if (H->params.theta < 0.0 || H->params.theta > 1.0) {
+            cerr << "tThres = " << H->params.theta << " outside of [0,1]." << endl;
             exit(1);
         }
     }
@@ -256,8 +256,8 @@ class BucketMapper : public Mapper {
 
 			int matches_infreq, matches_freq;
 			H->T.start("matching");
-			int t_abs = H->params.tThres * seeds.size();
-			Buckets promising_buckets = match_seeds(P_sz, seeds.size(), seeds, H->params.tThres, &matches_infreq, &matches_freq, &t_abs);
+			int t_abs = H->params.theta * seeds.size();
+			Buckets promising_buckets = match_seeds(P_sz, seeds.size(), seeds, H->params.theta, &matches_infreq, &matches_freq, &t_abs);
 			H->T.stop("matching");
 			int matches = matches_infreq + matches_freq;
 			H->C.inc("matches", matches);

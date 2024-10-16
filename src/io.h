@@ -33,7 +33,7 @@ struct params_t {
 	double hFrac;					// The FracMinHash ratio
 	int max_seeds; 					// Maximum seeds in a sketch
 	int max_matches; 				// Maximum seed matches in a sketch
-	double tThres; 					// The t-homology threshold
+	double theta; 					// The t-homology threshold
 	string paramsFile;
 	string mapper;                  // The name of the mapper
 
@@ -44,7 +44,7 @@ struct params_t {
 	bool onlybest;			// Output up to one (best) mapping (if above the threshold)
 
 	params_t() :
-		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), tThres(0.9), mapper("sweep"),
+		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), mapper("sweep"),
 		sam(false), overlaps(false), normalize(false), onlybest(false) {}
 
 	void print(std::ostream& out, bool human) const {
@@ -55,7 +55,7 @@ struct params_t {
 		m.push_back({"hFrac", std::to_string(hFrac)});
 		m.push_back({"max_seeds", std::to_string(max_seeds)});
 		m.push_back({"max_matches", std::to_string(max_matches)});
-		m.push_back({"tThres", std::to_string(tThres)});
+		m.push_back({"tThres", std::to_string(theta)});
 		m.push_back({"paramsFile", paramsFile});
 		m.push_back({"mapper", mapper});
 
@@ -89,7 +89,7 @@ struct params_t {
 		out << " | sam:                   " << sam << endl;
 		out << " | overlaps:              " << overlaps << endl;
 		out << " | onlybest:              " << onlybest << endl;
-		out << " | tThres:                " << tThres << endl;
+		out << " | tThres:                " << theta << endl;
 	}
 
 	void dsHlp() {
@@ -184,7 +184,7 @@ struct params_t {
 						cerr << "ERROR: The threshold t should be between 0 and 1." << endl;
 						return false;
 					}
-					tThres = atof(optarg);
+					theta = atof(optarg);
 					break;
 				case 'z':
 					paramsFile = optarg;

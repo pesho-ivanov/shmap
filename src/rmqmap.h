@@ -261,7 +261,7 @@ class RMQMapper : public Mapper {
 		assert(intersection == 0);
 		assert(same_strand_seeds == 0);
 
-		if (H->params.onlybest && best.intersection != -1 && best.J > H->params.tThres) {
+		if (H->params.onlybest && best.intersection != -1 && best.J > H->params.theta) {
 			best.mapq = (best.intersection > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
 			best.J2 = second.J;
 			mappings.push_back(best);
@@ -275,8 +275,8 @@ class RMQMapper : public Mapper {
 	RMQMapper(const SketchIndex &tidx, Handler *H) : tidx(tidx), H(H), hist(tidx.T[0].sz) {
         H->C.inc("seeds_limit_reached", 0);
         H->C.inc("mapped_reads", 0);
-        if (H->params.tThres < 0.0 || H->params.tThres > 1.0) {
-            cerr << "tThres = " << H->params.tThres << " outside of [0,1]." << endl;
+        if (H->params.theta < 0.0 || H->params.theta > 1.0) {
+            cerr << "tThres = " << H->params.theta << " outside of [0,1]." << endl;
             exit(1);
         }
     }
@@ -321,8 +321,8 @@ class RMQMapper : public Mapper {
 
 				H->T.start("seeding");
 					Seeds seeds = select_seeds(p);
-					int t_abs = H->params.tThres * seeds.size();  // flooring is safe
-					int number_of_infreq_seeds = (1.0 - H->params.tThres) * seeds.size();  // flooring is safe
+					int t_abs = H->params.theta * seeds.size();  // flooring is safe
+					int number_of_infreq_seeds = (1.0 - H->params.theta) * seeds.size();  // flooring is safe
 					Seeds seeds_infreq(seeds.begin(), seeds.begin() + number_of_infreq_seeds);
 					Seeds kmers_freq(seeds.begin() + number_of_infreq_seeds, seeds.end());
 					H->T.stop("seeding");

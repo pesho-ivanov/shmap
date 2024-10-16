@@ -144,7 +144,7 @@ class SweepMapper : public Mapper {
 			// Wrong invariant:
 			// best[l,r) -- a mapping best.l<=l with maximal J
 			// second_best[l,r) -- a mapping second_best.l \notin [l-90%|P|; l+90%|P|] with maximal J
-			if (m.J >= H->params.tThres) {
+			if (m.J >= H->params.theta) {
 				if (H->params.onlybest) {
 					if (m.intersection > best.intersection) {  // if (intersection > best.intersection)
 						if (best.T_l < m.T_l - 0.9*P_sz)
@@ -168,7 +168,7 @@ class SweepMapper : public Mapper {
 		assert(intersection == 0);
 		assert(same_strand_seeds == 0);
 
-		if (H->params.onlybest && best.intersection != -1 && best.J > H->params.tThres) {
+		if (H->params.onlybest && best.intersection != -1 && best.J > H->params.theta) {
 			best.mapq = (best.intersection > 5 && best.J > 0.1 && best.J > 1.2*second.J) ? 60 : 0;
 			best.J2 = second.J;
 			mappings.push_back(best);
@@ -184,7 +184,7 @@ class SweepMapper : public Mapper {
 		std::deque<Mapping> recent;
 
 		// Minimal separation between mappings to be considered reasonable
-		pos_t sep = pos_t((1.0 - H->params.tThres) * double(P_len));
+		pos_t sep = pos_t((1.0 - H->params.theta) * double(P_len));
 
 		// The deque `recent' is sorted decreasingly by J
 		//					  _________`recent'_________
@@ -246,8 +246,8 @@ class SweepMapper : public Mapper {
 	SweepMapper(const SketchIndex &tidx, Handler *H) : tidx(tidx), H(H) {
 		H->C.inc("seeds_limit_reached", 0);
 		H->C.inc("unmapped_reads", 0);
-		if (H->params.tThres < 0.0 || H->params.tThres > 1.0) {
-			cerr << "tThres = " << H->params.tThres << " outside of [0,1]." << endl;
+		if (H->params.theta < 0.0 || H->params.theta > 1.0) {
+			cerr << "tThres = " << H->params.theta << " outside of [0,1]." << endl;
 			exit(1);
 		}
 	}
