@@ -34,8 +34,8 @@ DEPTH ?= 0.01
 MEANLEN ?= 10000
 READSIM_REFNAME ?= $(REFNAME)
 
-K ?= 15
-R ?= 0.1
+K ?= 19
+R ?= 1.0
 S ?= 300
 M ?= 100
 T ?= 0.9
