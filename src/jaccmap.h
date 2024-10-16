@@ -214,29 +214,7 @@ class JaccMapper : public Mapper {
 					matched_seeds += seed.occs_in_p;
 				}
 				H->T.stop("match_infrequent");
-				
-				//for (; i < (int)kmers.size(); i++) {
-				//	vector<int> to_erase;
-				//	matched_seeds += kmers[i].occs_in_p;
 
-				//	for (auto &[b, cnt]: M) {
-				//		if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
-				//			cnt += kmers[i].occs_in_p;
-				//		auto h = hseed(m, matched_seeds, cnt);
-				//		//cerr << "cnt <= i-s+1: " << bool(cnt <= i-S+1) << ", h < theta: " << bool(h < H->params.theta) << endl;
-				//		//if (cnt <= i-S+1) {
-				//		//if (cnt < matched_seeds - S) {
-				//		if (h < H->params.theta) {
-				//			to_erase.push_back(b);
-				//		}
-				//	}
-				//			
-				//	for (auto b: to_erase)
-				//		M.erase(b);
-				//}
-
-				// TODO: discard a bucket if worst than second, compute mapq, break if mapq is too low
-				//int from_i = i, from_matched_seeds = matched_seeds;
 				vector<Mapping> mappings;
 				int mappings_it = 0;
 				int total_matches = 0;
@@ -278,7 +256,8 @@ class JaccMapper : public Mapper {
 					mappings.clear();
 
 					best_copy.J2 = J_second;
-					double mapq_fl = 60.0 * (1.0 - 1.0 * (J_second - H->params.theta) / (J_best - H->params.theta)); // minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
+					// minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
+					double mapq_fl = 60.0 * (1.0 - 1.0 * (J_second - H->params.theta) / (J_best - H->params.theta));
 					best_copy.mapq = int(mapq_fl);
 					best_copy.max_seed_matches = max_seed_matches;
 					best_copy.seed_matches = seed_matches;
