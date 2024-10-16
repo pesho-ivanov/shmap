@@ -60,6 +60,7 @@ class JaccMapper : public Mapper {
 
 		int intersection = 0;
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
+		Mapping best;
 
 		H->T.start("sweep-sort");
 			sort(M.begin(), M.end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; });   // TODO: remove sort by a linear pass through the bucket
@@ -87,8 +88,8 @@ class JaccMapper : public Mapper {
 			}
 
 			auto mapping = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, same_strand_seeds, l, prev(r));
-			if (mapping.J >= H->params.theta)
-				mappings->push_back(mapping);
+			if (mapping.J > best.J)
+				best = mapping;
 
 			for (int k = 0; k < l->seed.occs_in_p; ++k) {  // TODO: in O(1)
 				same_strand_seeds -= l->is_same_strand() ? +1 : -1;
@@ -101,6 +102,9 @@ class JaccMapper : public Mapper {
 		H->T.stop("sweep-main");
 		assert(intersection == 0);
 		assert(same_strand_seeds == 0);
+		
+		if (best.J >= H->params.theta)
+			mappings->push_back(best);
 	}
 
   public:
@@ -212,24 +216,35 @@ class JaccMapper : public Mapper {
 					H->T.stop("sweep");
 				}
 
-				if (mappings.size() > 0) {
-					H->C.inc("mapped_reads");
+				H->C.inc("mapped_reads");
+				//if (mappings.size() > 0) {
 					//H->C.inc("intersection_diff", t_abs - mappings[0].intersection);
-				}
+				//}
 				
-				if (mappings.size() >= 2) {
+				double J_best(0.0), J_second(H->params.theta);
+				auto best = mappings.end();
+				auto second = mappings.end();
+				for (auto it = mappings.begin(); it != mappings.end(); ++it) {
+					if (best == mappings.end() || it->J > best->J) {
+						second = best;
+						best = it;
+						J_best = it->J;
+					} else if (second == mappings.end() || it->J > second->J) {
+						second = it;
+						J_second = it->J;
+					}
 				}
+				//double mapq = J_second / J_best;
 
 				if (H->params.onlybest && mappings.size() >= 1) {
-					Mapping best = *mappings.begin(); 
-					for (auto &m: mappings) {
-						//cerr << m << endl;
-						if (m.J > best.J)
-							best = m;
-					}
-					
+					Mapping best_copy = *best;
 					mappings.clear();
-					mappings.push_back(best);
+
+					best_copy.J2 = J_second;
+					double mapq_fl = 60.0 * (1.0 - 1.0 * (J_second - H->params.theta) / (J_best - H->params.theta)); // minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
+					best_copy.mapq = int(mapq_fl);
+					//if (best_copy.mapq > 0)
+						mappings.push_back(best_copy);
 				}
 
 				H->T.start("output");
