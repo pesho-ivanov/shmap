@@ -153,7 +153,7 @@ class JaccMapper : public Mapper {
 					H->T.stop("seeding");
 					H->C.inc("kmers", kmers.size());
 
-				int l = int(kmers.size() / H->params.tThres);				// maximum length of a similar mapping
+				int lmax = int(kmers.size() / H->params.tThres);			// maximum length of a similar mapping
 				int S = int((1.0 - H->params.tThres) * kmers.size()) + 1;	// any similar mapping includes at least 1 seed match
 				std::unordered_map<int, int> M;  							// M[b] -- #matched kmers[0...i] in [bl, (b+2)l)
 
@@ -165,8 +165,8 @@ class JaccMapper : public Mapper {
 						std::unordered_set<int> matched_buckets;
 						tidx.get_matches(&matches_infreq, seed);
 						for (auto &m: matches_infreq) {
-							matched_buckets.insert(int(m.hit.tpos / l));
-							matched_buckets.insert(int(m.hit.tpos / l) + 1);
+							matched_buckets.insert(int(m.hit.tpos / lmax));
+							matched_buckets.insert(int(m.hit.tpos / lmax) + 1);
 						}
 						for (int b: matched_buckets)
 							++M[b];
@@ -184,7 +184,7 @@ class JaccMapper : public Mapper {
 					vector<int> to_erase;
 
 					for (auto &[b, cnt]: M) {
-						if (tidx.is_kmer_in_t_interval(kmers[i], b*l, (b+2)*l))
+						if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
 							++cnt;
 						if (cnt <= i-S+1) {
 							to_erase.push_back(b);
@@ -207,7 +207,7 @@ class JaccMapper : public Mapper {
 					H->T.start("match_collect");
 					Matches matches;
 					for (const auto &kmer: kmers)
-						tidx.get_matches_in_t_interval(&matches, kmer, b*l, (b+2)*l);
+						tidx.get_matches_in_t_interval(&matches, kmer, b*lmax, (b+2)*lmax);
 					H->T.stop("match_collect");
 					total_matches += matches.size();
 
