@@ -58,19 +58,9 @@ class JaccMapper : public Mapper {
 		H->T.start("sweep-sort");
 		sort(M.begin(), M.end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; }); 
 		H->T.stop("sweep-sort");
-
-#ifdef DEBUG
-		for (auto &kmer: kmers) {
-			assert(diff_hist[kmer.kmer.h] > 0);
-			cerr << "kmer: " << kmer.kmer.h << " " << kmer.kmer.r << " " << kmer.hits_in_T << endl;
-		}
-
-		for (int i=1; i<(int)M.size(); i++) {
-			assert(M[i-1].hit.r <= M[i].hit.r);
-			cerr << "match: " << M[i].hit.segm_id << " " << M[i].hit.r << " " << M[i].seed.kmer.h << " " << M[i].seed.kmer.r << endl;
-		}
-#endif
-
+		
+		assert(M.size() <= M.back().hit.tpos - M.front().hit.tpos + 1);
+		
 		H->T.start("sweep-main");
 		// Increase the left point end of the window [l,r) one by one. O(matches)
 		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l) {
@@ -86,7 +76,7 @@ class JaccMapper : public Mapper {
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			auto m = Mapping(H->params.k, P_sz, kmers.size(), l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), intersection, same_strand_seeds, l, r);
+			auto m = Mapping(H->params.k, P_sz, kmers.size(), l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, same_strand_seeds, l, prev(r));
 			if (m.J >= H->params.tThres)
 				mappings->push_back(m);
 
@@ -220,8 +210,12 @@ class JaccMapper : public Mapper {
 					H->C.inc("mapped_reads");
 					//H->C.inc("intersection_diff", t_abs - mappings[0].intersection);
 				}
+				
+				if (mappings.size() >= 2) {
 
-				if (H->params.onlybest && mappings.size() > 0) {
+				}
+
+				if (H->params.onlybest && mappings.size() >= 1) {
 					Mapping best = *mappings.begin(); 
 					for (auto &m: mappings) {
 						//cerr << m << endl;

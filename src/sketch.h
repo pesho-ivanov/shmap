@@ -97,8 +97,17 @@ struct Mapping {
 	std::vector<Match>::const_iterator l, r;
 
     Mapping() {}
-	Mapping(int k, pos_t P_sz, int p_sz, pos_t T_l, pos_t T_r, segm_t segm_id, pos_t s_sz, int intersection, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r)
-		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), s_sz(s_sz), intersection(intersection), J(1.0*intersection / p_sz), mapq(255), strand(same_strand_seeds > 0 ? '+' : '-'), unreasonable(false), l(l), r(r) {}
+	Mapping(int k, pos_t P_sz, int p_sz, pos_t T_l, pos_t T_r, segm_t segm_id, int intersection, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r)
+		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), intersection(intersection), unreasonable(false), l(l), r(r) {
+		s_sz = r->hit.tpos - l->hit.tpos + 1;
+		//cerr << "Jprev = " << 1.0*intersection / p_sz << ", Jnew = " << 1.0*intersection / (p_sz + s_sz - intersection) << endl;
+		J = 1.0*intersection / p_sz;
+		//J = 1.0*intersection / (p_sz + s_sz - intersection);
+		assert(J >= -0.0);
+		assert(J <= 1.0);
+		mapq = 255;
+		strand = same_strand_seeds > 0 ? '+' : '-';
+	}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
     void print_paf(const string &query_id, const RefSegment &segm, int total_matches) const {
@@ -131,10 +140,10 @@ struct Mapping {
 // ----- end of required PAF fields -----
 			<< "\t" << "k:i:" << k
 			<< "\t" << "p:i:" << p_sz  // sketches
-			<< "\t" << "M:i:" << total_matches // kmer matches in T
-			//<< "\t" << "s:i:" << s_sz
+			<< "\t" << "s:i:" << s_sz
 			<< "\t" << "I:i:" << intersection  // intersection of `p` and `s` [kmers]
 			<< "\t" << "J:f:" << J   // Jaccard similarity [0; 1]
+			<< "\t" << "M:i:" << total_matches // kmer matches in T
 //			<< "\t" << "J2:f:" << J2   // second best mapping Jaccard similarity [0; 1]
 			<< "\t" << "t:f:" << map_time
 			<< endl;

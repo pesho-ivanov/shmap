@@ -119,7 +119,7 @@ class SweepMapper : public Mapper {
 		vector<Mapping> mappings;	// List of tripples <i, j, score> of matches
 
 		int intersection = 0;
-		Mapping best(H->params.k, P_sz, 0, -1, -1, -1, -1, -1, 0, M.end(), M.end());
+		Mapping best(H->params.k, P_sz, 0, -1, -1, -1, -1, 0, M.end(), M.end());
 		Mapping second = best;
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 
@@ -138,7 +138,7 @@ class SweepMapper : public Mapper {
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			auto m = Mapping(H->params.k, P_sz, p_sz, l->hit.r, prev(r)->hit.r, l->hit.segm_id, pos_t(r-l), intersection, same_strand_seeds, l, r);
+			auto m = Mapping(H->params.k, P_sz, p_sz, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, same_strand_seeds, l, r);
 
 			// second best without guarantees
 			// Wrong invariant:
