@@ -96,6 +96,8 @@ struct Mapping {
 	char strand;    // '+' or '-'
 	bool unreasonable;  // reserved for filtering matches
 	std::vector<Match>::const_iterator l, r;
+	int max_seed_matches;
+	int seed_matches;
 
     Mapping() {}
 	Mapping(int k, pos_t P_sz, int p_sz, pos_t T_l, pos_t T_r, segm_t segm_id, int intersection, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r)
@@ -145,6 +147,8 @@ struct Mapping {
 			<< "\t" << "I:i:" << intersection  // intersection of `p` and `s` [kmers]
 			<< "\t" << "J:f:" << J   // Jaccard similarity [0; 1]
 			<< "\t" << "J2:f:" << J2   // second best mapping Jaccard similarity [0; 1]
+			<< "\t" << "MSM:i:" << max_seed_matches // maximum matches of a seed
+			<< "\t" << "SM:i:" << seed_matches // maximum matches of a seed
 			<< "\t" << "M:i:" << total_matches // kmer matches in T
 			<< "\t" << "t:f:" << map_time
 			<< endl;
