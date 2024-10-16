@@ -96,8 +96,12 @@ struct Mapping {
 	char strand;    // '+' or '-'
 	bool unreasonable;  // reserved for filtering matches
 	std::vector<Match>::const_iterator l, r;
+
+	// internal stats
 	int max_seed_matches;
 	int seed_matches;
+	int max_buckets;
+	int final_buckets;
 
     Mapping() {}
 	Mapping(int k, pos_t P_sz, int p_sz, pos_t T_l, pos_t T_r, segm_t segm_id, int intersection, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r)
@@ -110,6 +114,12 @@ struct Mapping {
 		assert(J <= 1.0);
 		mapq = 255;
 		strand = same_strand_seeds > 0 ? '+' : '-';
+
+		// stats
+		max_seed_matches = -1;
+		seed_matches = -1;
+		max_buckets = -1;
+		final_buckets = -1;
 	}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
@@ -149,7 +159,9 @@ struct Mapping {
 			<< "\t" << "J2:f:" << J2   // second best mapping Jaccard similarity [0; 1]
 			<< "\t" << "MSM:i:" << max_seed_matches // maximum matches of a seed
 			<< "\t" << "SM:i:" << seed_matches // maximum matches of a seed
-			<< "\t" << "M:i:" << total_matches // kmer matches in T
+			<< "\t" << "M:i:" << total_matches
+			<< "\t" << "Bm:i:" << max_buckets
+			<< "\t" << "Bf:i:" << final_buckets
 			<< "\t" << "t:f:" << map_time
 			<< endl;
 	}

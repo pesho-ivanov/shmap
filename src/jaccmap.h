@@ -191,7 +191,10 @@ class JaccMapper : public Mapper {
 				int S = int((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
 				std::unordered_map<int, int> M;  			// M[b] -- #matched kmers[0...i] in [bl, (b+2)l)
 				int matched_seeds = 0;
-				int seed_matches(0), max_seed_matches(0);									// for statistical purposes
+
+				// stats
+				int seed_matches(0), max_seed_matches(0);
+				int max_buckets(0), final_buckets(0);
 
 				H->T.start("match_infrequent");
 				int i = 0;
@@ -213,6 +216,7 @@ class JaccMapper : public Mapper {
 					}
 					matched_seeds += seed.occs_in_p;
 				}
+				max_buckets = M.size();
 				H->T.stop("match_infrequent");
 
 				vector<Mapping> mappings;
@@ -231,6 +235,7 @@ class JaccMapper : public Mapper {
 							tidx.get_matches_in_t_interval(&matches, kmer, b*lmax, (b+2)*lmax);
 						H->T.stop("match_collect");
 						total_matches += matches.size();
+						++final_buckets;
 
 						H->T.start("sweep");
 							sweep(matches, P_sz, m, kmers, &mappings);
@@ -261,6 +266,8 @@ class JaccMapper : public Mapper {
 					best_copy.mapq = int(mapq_fl);
 					best_copy.max_seed_matches = max_seed_matches;
 					best_copy.seed_matches = seed_matches;
+					best_copy.max_buckets = max_buckets;
+					best_copy.final_buckets = final_buckets;
 					//if (best_copy.mapq > 0)
 						mappings.push_back(best_copy);
 				}
