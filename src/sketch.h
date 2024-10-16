@@ -257,7 +257,7 @@ public:
 		if ((int)s.size() < k) return kmers;
 
 		hash_t h, h_fw = 0, h_rc = 0;
-		hash_t hThres = hash_t(hFrac * double(std::numeric_limits<hash_t>::max()));
+		hash_t hThres = hFrac < 1.0 ? hash_t(hFrac * double(std::numeric_limits<hash_t>::max())) : std::numeric_limits<hash_t>::max();
 		int r;
 
 		for (r=0; r<k; r++) {
@@ -272,7 +272,7 @@ public:
 			const bool strand         = h_fw & first_diff_bit;
 			h = strand ? h_rc : h_fw;
 
-			if (h < hThres) // optimize to only look at specific bits
+			if (h <= hThres) // optimize to only look at specific bits
 				kmers.push_back(Kmer(r, h, strand));
 						
 			if (r >= (int)s.size()) break;
