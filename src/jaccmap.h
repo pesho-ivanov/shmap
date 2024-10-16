@@ -221,7 +221,7 @@ class JaccMapper : public Mapper {
 				int best(-1), second_best(-1);
 				double J_best(0.0), J_second(H->params.theta);
 				vector<pair<int,int>> M_vec(M.begin(), M.end());
-				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second < b.second; });  // TODO: sort intervals by increasing number of matches
+				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 
 				for (auto &[b, cnt]: M) {
 					if (is_bucket_interesting(kmers, lmax, m, b, cnt, i, matched_seeds, J_second)) {
