@@ -128,6 +128,22 @@ class JaccMapper : public Mapper {
 		return 1.0 - double(S - matches) / p;
 	}
 
+	bool is_bucket_interesting(const Seeds &kmers, int lmax, int m, int b, int cnt, int i, int matched_seeds, double J_second) {
+		H->T.start("match_frequent");
+		bool ret = true;
+		for (; i < (int)kmers.size(); i++) {
+			matched_seeds += kmers[i].occs_in_p;
+			if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
+				cnt += kmers[i].occs_in_p;
+			if (hseed(m, matched_seeds, cnt) < J_second) {  //if (cnt <= i-S+1)
+				ret = false;
+				break;
+			}
+		}
+		H->T.stop("match_frequent");
+		return ret;
+	}
+
 	void map(const string &pFile) {
 		cerr << "Mapping reads using JaccMap " << "..." << endl;
 
@@ -199,79 +215,66 @@ class JaccMapper : public Mapper {
 				}
 				H->T.stop("match_infrequent");
 				
-				H->T.start("match_frequent");
-				for (; i < (int)kmers.size(); i++) {
-					vector<int> to_erase;
-					matched_seeds += kmers[i].occs_in_p;
+				//for (; i < (int)kmers.size(); i++) {
+				//	vector<int> to_erase;
+				//	matched_seeds += kmers[i].occs_in_p;
 
-					for (auto &[b, cnt]: M) {
-						if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
-							cnt += kmers[i].occs_in_p;
-						auto h = hseed(m, matched_seeds, cnt);
-						//cerr << "cnt <= i-s+1: " << bool(cnt <= i-S+1) << ", h < theta: " << bool(h < H->params.theta) << endl;
-						//if (cnt <= i-S+1) {
-						//if (cnt < matched_seeds - S) {
-						if (h < H->params.theta) {
-							to_erase.push_back(b);
-						}
-					}
-							
-					for (auto b: to_erase)
-						M.erase(b);
-				}
-
-				// TODO: iterate by interval first, keep 2nd best, discard a
-				// bucket if worst than second, compute mapq, break if mapq is too low
-				//int from_i = i; // TODO: sort intervals by Matches
-				//for (auto &[b, cnt]: M) {
-				//	for (i = from_i; i < (int)kmers.size(); i++) {
+				//	for (auto &[b, cnt]: M) {
 				//		if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
 				//			cnt += kmers[i].occs_in_p;
-				//		if (hseed(kmers, S, cnt))
-				//		if (cnt <= i-S+1) {
+				//		auto h = hseed(m, matched_seeds, cnt);
+				//		//cerr << "cnt <= i-s+1: " << bool(cnt <= i-S+1) << ", h < theta: " << bool(h < H->params.theta) << endl;
+				//		//if (cnt <= i-S+1) {
+				//		//if (cnt < matched_seeds - S) {
+				//		if (h < H->params.theta) {
 				//			to_erase.push_back(b);
 				//		}
 				//	}
+				//			
+				//	for (auto b: to_erase)
+				//		M.erase(b);
 				//}
-				H->T.stop("match_frequent");
 
+				// TODO: discard a bucket if worst than second, compute mapq, break if mapq is too low
+				//int from_i = i, from_matched_seeds = matched_seeds;
 				vector<Mapping> mappings;
-				int total_matches = 0; //matches.size();
-				for (const auto &[b, cnt]: M) {
-					H->T.start("match_collect");
-					Matches matches;
-					for (const auto &kmer: kmers)
-						tidx.get_matches_in_t_interval(&matches, kmer, b*lmax, (b+2)*lmax);
-					H->T.stop("match_collect");
-					total_matches += matches.size();
-
-					H->T.start("sweep");
-						sweep(matches, P_sz, m, kmers, &mappings);
-						//fast_sweep(matches, P_sz, m, kmers, &mappings);
-					H->T.stop("sweep");
-				}
-
-				H->C.inc("mapped_reads");
-				//if (mappings.size() > 0) {
-					//H->C.inc("intersection_diff", t_abs - mappings[0].intersection);
-				//}
-				
+				int mappings_it = 0;
+				int total_matches = 0;
+				int best(-1), second_best(-1);
 				double J_best(0.0), J_second(H->params.theta);
-				auto best = mappings.end();
-				auto second = mappings.end();
-				for (auto it = mappings.begin(); it != mappings.end(); ++it) {
-					if (best == mappings.end() || it->J > best->J) {
-						second = best;
-						best = it;
-						J_best = it->J;
-					} else if (second == mappings.end() || it->J > second->J) {
-						second = it;
-						J_second = it->J;
+				vector<pair<int,int>> M_vec(M.begin(), M.end());
+				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second < b.second; });  // TODO: sort intervals by increasing number of matches
+
+				for (auto &[b, cnt]: M) {
+					if (is_bucket_interesting(kmers, lmax, m, b, cnt, i, matched_seeds, J_second)) {
+						H->T.start("match_collect");
+						Matches matches;
+						for (const auto &kmer: kmers)
+							tidx.get_matches_in_t_interval(&matches, kmer, b*lmax, (b+2)*lmax);
+						H->T.stop("match_collect");
+						total_matches += matches.size();
+
+						H->T.start("sweep");
+							sweep(matches, P_sz, m, kmers, &mappings);
+						H->T.stop("sweep");
+
+						for (; mappings_it < (int)mappings.size(); ++mappings_it) {
+							auto it = mappings.begin() + mappings_it;
+							if (best == -1 || it->J > mappings[best].J) {
+								second_best = best;
+								best = mappings_it;
+								J_best = it->J;
+							} else if (second_best == -1 || it->J > mappings[second_best].J) {
+								second_best = mappings_it;
+								J_second = it->J;
+							}
+						}
 					}
 				}
 
+				H->C.inc("mapped_reads");
 				if (H->params.onlybest && mappings.size() >= 1) {
-					Mapping best_copy = *best;
+					Mapping best_copy = mappings[best];
 					mappings.clear();
 
 					best_copy.J2 = J_second;
@@ -282,7 +285,7 @@ class JaccMapper : public Mapper {
 					//if (best_copy.mapq > 0)
 						mappings.push_back(best_copy);
 				}
-
+				
 				H->T.start("output");
 					read_mapping_time.stop();
 
