@@ -143,6 +143,11 @@ class JaccMapper : public Mapper {
 		return ret;
 	}
 	
+	double covered_frac(int bucket_a, int bucket_b, int gt_a, int gt_b) {
+		double intersection = max(0, min(bucket_b, gt_b) - max(bucket_a, gt_a));
+		return intersection / (gt_b - gt_a);
+	}
+	
 	bool is_safe(const string &query_id, const vector<pair<int,int>> &final_buckets, int lmax, int *gt_a, int *gt_b) {
 		std::vector<std::string> tokens;
 		std::stringstream ss(query_id);
@@ -155,12 +160,13 @@ class JaccMapper : public Mapper {
 			return true;
 
 		*gt_a = std::stoi(tokens[2]);
-		*gt_b = std::stoi(tokens[3]);
+		*gt_b = std::stoi(tokens[3]) + 1;
 
 		for (const auto &[b, cnt]: final_buckets) {
-			int our_a = b*lmax;
-			int our_b = (b+2)*lmax-1;
-			if (our_a <= *gt_a && *gt_b <= our_b)
+			int bucket_a = b*lmax;
+			int bucket_b = (b+2)*lmax;
+			//if (bucket_a <= *gt_a && *gt_b <= bucket_b)
+			if (covered_frac(bucket_a, bucket_b, *gt_a, *gt_b) >= 0.9)
 				return true;
 		}
 		return false;
@@ -287,8 +293,8 @@ class JaccMapper : public Mapper {
 				
 				if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
 					cerr << "After bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl;
-					cerr << "         best: " << best <<  ", bucket=" << best_bucket; if (best != -1) cerr << ", " << std::setprecision(5) << mappings[best] << endl; else cerr << endl;
-					cerr << "  second_best: " << second_best << ", bucket=" << second_best_bucket; if (second_best != -1) cerr << ", " << std::setprecision(5) << mappings[second_best] << endl; else cerr << endl;
+					cerr << "         best: " << best <<  ", bucket=" << best_bucket << "[" << best_bucket*lmax << ", " << (best_bucket+2)*lmax << ")"; if (best != -1) cerr << ", " << std::setprecision(5) << mappings[best] << endl; else cerr << endl;
+					cerr << "  second_best: " << second_best << ", bucket=" << second_best_bucket << "[" << second_best_bucket*lmax << ", " << (second_best_bucket+2)*lmax << ")"; if (second_best != -1) cerr << ", " << std::setprecision(5) << mappings[second_best] << endl; else cerr << endl;
 					//int gt_tpos = 
 					//int gt_bucket = gt_a / lmax;
 				}
