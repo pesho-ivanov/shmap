@@ -135,7 +135,7 @@ class JaccMapper : public Mapper {
 			if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
 				cnt += kmers[i].occs_in_p;
 			//if (hseed(m, matched_seeds, cnt) < min(J_second, J_best*0.95)) {  //if (cnt <= i-S+1)
-			if (hseed(m, matched_seeds, cnt) < J_second) {  //if (cnt <= i-S+1)
+			if (hseed(m, matched_seeds, cnt) < J_second) {
 				ret = false;
 				break;
 			}
@@ -312,7 +312,7 @@ class JaccMapper : public Mapper {
 					best_copy.seed_matches = seed_matches;
 					best_copy.max_buckets = max_buckets;
 					best_copy.final_buckets = final_buckets.size();
-					if (best_copy.mapq > 0)
+					//if (best_copy.mapq > 0)
 						mappings.push_back(best_copy);
 				}
 
@@ -325,7 +325,6 @@ class JaccMapper : public Mapper {
 						//int gt_tpos = 
 						//int gt_bucket = gt_a / lmax;
 					}
-
 				
 				H->T.start("output");
 					read_mapping_time.stop();
