@@ -60,8 +60,12 @@ class JaccMapper : public Mapper {
 		auto segm_id = mapping->segm_id;
 		int S_a = mapping->T_l, S_b = mapping->T_r;
 		char strand = mapping->strand;
-		
 		auto &ref = tidx.T[segm_id].seq;
+		
+		// TODO: remove
+		S_a = max(0, S_a - 1000);
+		S_b = min((int)ref.size()-1, S_b + 1000);
+		
 		S_a -= H->params.k + 1;
 		assert(S_a >= 0 && S_a < (int)ref.size());
 		assert(S_b >= 0 && S_b < (int)ref.size());
@@ -79,11 +83,18 @@ class JaccMapper : public Mapper {
 
 		// edlib query: s
 		// edlib target: p
-		auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
-		EdlibAlignResult result = edlibAlign(s, S_sz, P, P_sz, config);
+		//auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
+		auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0);
+		//EdlibAlignResult result = edlibAlign(s, S_sz, P, P_sz, config);
+		EdlibAlignResult result = edlibAlign(P, P_sz, s, S_sz, config);
 		assert(result.status == EDLIB_STATUS_OK);
-		//cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << endl;
 		mapping->ed = result.editDistance;
+		
+		string cigar = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_STANDARD);
+		if (P_sz == 10375) {
+			cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << endl;
+			cerr << cigar << endl;
+		}
 		edlibFreeAlignResult(result);
 	}
 			
@@ -397,6 +408,14 @@ class JaccMapper : public Mapper {
 					}
 				}
 				
+				if (mappings.size() == 1 && mappings.front().mapq > 0)
+					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
+						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
+//						cerr << "         mapq: " << mappings.front().mapq << endl;
+						cerr << "         best: " << best <<  ", bucket=" << best_bucket << "[" << best_bucket*lmax << ", " << (best_bucket+2)*lmax << ")"; if (best != -1) cerr << ", " << std::setprecision(5) << mappings[best] << endl; else cerr << endl;
+						cerr << "  second_best: " << second_best << ", bucket=" << second_best_bucket << "[" << second_best_bucket*lmax << ", " << (second_best_bucket+2)*lmax << ")"; if (second_best != -1) cerr << ", " << std::setprecision(5) << mappings[second_best] << endl; else cerr << endl;
+					}
+				
 				bool use_ed = true;
 
 				H->T.start("edit_distance");
@@ -443,16 +462,6 @@ class JaccMapper : public Mapper {
 					}
 				}
 
-				if (final_mappings.size() == 1 && final_mappings.front().mapq > 0)
-					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
-						cerr << "After bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl;
-						cerr << "         mapq: " << final_mappings.front().mapq << endl;
-						cerr << "         best: " << best <<  ", bucket=" << best_bucket << "[" << best_bucket*lmax << ", " << (best_bucket+2)*lmax << ")"; if (best != -1) cerr << ", " << std::setprecision(5) << final_mappings[best] << endl; else cerr << endl;
-						cerr << "  second_best: " << second_best << ", bucket=" << second_best_bucket << "[" << second_best_bucket*lmax << ", " << (second_best_bucket+2)*lmax << ")"; if (second_best != -1) cerr << ", " << std::setprecision(5) << final_mappings[second_best] << endl; else cerr << endl;
-						//int gt_tpos = 
-						//int gt_bucket = gt_a / lmax;
-					}
-				
 				H->T.start("output");
 					read_mapping_time.stop();
 
