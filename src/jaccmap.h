@@ -127,14 +127,14 @@ class JaccMapper : public Mapper {
 		return 1.0 - double(S - matches) / p;
 	}
 
-	bool is_bucket_interesting(const Seeds &kmers, int lmax, int m, int b, int cnt, int i, int matched_seeds, double J_second) {
+	bool is_bucket_interesting(const Seeds &kmers, int lmax, int m, int b, int cnt, int i, int matched_seeds, double J_best, double J_second) {
 		H->T.start("match_frequent");
 		bool ret = true;
 		for (; i < (int)kmers.size(); i++) {
 			matched_seeds += kmers[i].occs_in_p;
 			if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
 				cnt += kmers[i].occs_in_p;
-			if (hseed(m, matched_seeds, cnt) < J_second) {  //if (cnt <= i-S+1)
+			if (hseed(m, matched_seeds, cnt) < min(J_second, max(J_best*0.95, H->params.theta))) {  //if (cnt <= i-S+1)
 				ret = false;
 				break;
 			}
@@ -143,7 +143,7 @@ class JaccMapper : public Mapper {
 		return ret;
 	}
 	
-	bool is_safe(const string &query_id, const vector<pair<int,int>> &final_buckets, int lmax) {
+	bool is_safe(const string &query_id, const vector<pair<int,int>> &final_buckets, int lmax, int *gt_a, int *gt_b) {
 		std::vector<std::string> tokens;
 		std::stringstream ss(query_id);
 		std::string token;
@@ -154,13 +154,13 @@ class JaccMapper : public Mapper {
 		if (tokens.size() < 4)
 			return true;
 
-		int gt_a = std::stoi(tokens[2]);
-		int gt_b = std::stoi(tokens[3]);
+		*gt_a = std::stoi(tokens[2]);
+		*gt_b = std::stoi(tokens[3]);
 
 		for (const auto &[b, cnt]: final_buckets) {
 			int our_a = b*lmax;
 			int our_b = (b+2)*lmax-1;
-			if (our_a <= gt_a && gt_b <= our_b)
+			if (our_a <= *gt_a && *gt_b <= our_b)
 				return true;
 		}
 		return false;
@@ -242,19 +242,21 @@ class JaccMapper : public Mapper {
 				H->T.stop("match_infrequent");
 
 				vector<Mapping> mappings;
-				int mappings_it = 0;
 				int total_matches = 0;
 				int best(-1), second_best(-1);
+				int best_bucket(-1), second_best_bucket(-1);
 				double J_best(0.0), J_second(H->params.theta);
 				vector<pair<int,int>> M_vec(M.begin(), M.end());
 				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 
-				if (!is_safe(query_id, M_vec, lmax))
-					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
+				int gt_a, gt_b;
+				//if (!is_safe(query_id, M_vec, lmax, &gt_a, &gt_b))
+				//	cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
 
+				int mappings_it = 0;
 				vector<pair<int, int>> final_buckets;
 				for (auto &[b, cnt]: M) {
-					if (is_bucket_interesting(kmers, lmax, m, b, cnt, i, matched_seeds, J_second)) {
+					if (is_bucket_interesting(kmers, lmax, m, b, cnt, i, matched_seeds, J_best, J_second)) {
 						H->T.start("match_collect");
 						Matches matches;
 						for (const auto &kmer: kmers)
@@ -272,17 +274,24 @@ class JaccMapper : public Mapper {
 							if (best == -1 || it->J > mappings[best].J) {
 								second_best = best;
 								best = mappings_it;
+								best_bucket = b;
 								J_best = it->J;
 							} else if (second_best == -1 || it->J > mappings[second_best].J) {
 								second_best = mappings_it;
+								second_best_bucket = b;
 								J_second = it->J;
 							}
 						}
 					}
 				}
 				
-				if (!is_safe(query_id, final_buckets, lmax))
-					cerr << "After bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
+				if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
+					cerr << "After bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl;
+					cerr << "         best: " << best <<  ", bucket=" << best_bucket; if (best != -1) cerr << ", " << std::setprecision(5) << mappings[best] << endl; else cerr << endl;
+					cerr << "  second_best: " << second_best << ", bucket=" << second_best_bucket; if (second_best != -1) cerr << ", " << std::setprecision(5) << mappings[second_best] << endl; else cerr << endl;
+					//int gt_tpos = 
+					//int gt_bucket = gt_a / lmax;
+				}
 
 				H->C.inc("mapped_reads");
 				if (H->params.onlybest && mappings.size() >= 1) {
