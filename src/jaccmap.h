@@ -143,6 +143,29 @@ class JaccMapper : public Mapper {
 		H->T.stop("match_frequent");
 		return ret;
 	}
+	
+	bool is_safe(const string &query_id, const vector<pair<int,int>> &final_buckets, int lmax) {
+		std::vector<std::string> tokens;
+		std::stringstream ss(query_id);
+		std::string token;
+
+		while (std::getline(ss, token, '!'))
+			tokens.push_back(token);
+
+		if (tokens.size() < 4)
+			return true;
+
+		int gt_a = std::stoi(tokens[2]);
+		int gt_b = std::stoi(tokens[3]);
+
+		for (const auto [b, cnt]: final_buckets) {
+			int our_a = b*lmax;
+			int our_b = (b+2)*lmax-1;
+			if (our_a <= gt_a && gt_b <= our_b)
+				return true;
+		}
+		return false;
+	}
 
 	void map(const string &pFile) {
 		cerr << "Mapping reads using JaccMap " << "..." << endl;
@@ -194,7 +217,7 @@ class JaccMapper : public Mapper {
 
 				// stats
 				int seed_matches(0), max_seed_matches(0);
-				int max_buckets(0), final_buckets(0);
+				int max_buckets(0); //, final_buckets(0);
 
 				H->T.start("match_infrequent");
 				int i = 0;
@@ -227,6 +250,7 @@ class JaccMapper : public Mapper {
 				vector<pair<int,int>> M_vec(M.begin(), M.end());
 				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 
+				vector<pair<int, int>> final_buckets;
 				for (auto &[b, cnt]: M) {
 					if (is_bucket_interesting(kmers, lmax, m, b, cnt, i, matched_seeds, J_second)) {
 						H->T.start("match_collect");
@@ -235,7 +259,7 @@ class JaccMapper : public Mapper {
 							tidx.get_matches_in_t_interval(&matches, kmer, b*lmax, (b+2)*lmax);
 						H->T.stop("match_collect");
 						total_matches += matches.size();
-						++final_buckets;
+						final_buckets.push_back( make_pair(b, cnt) );
 
 						H->T.start("sweep");
 							sweep(matches, P_sz, m, kmers, &mappings);
@@ -254,6 +278,9 @@ class JaccMapper : public Mapper {
 						}
 					}
 				}
+				
+				if (!is_safe(query_id, final_buckets, lmax))
+					cerr << "Ground-truth mapping not covered by any bucket for query_id=" << query_id << endl; 
 
 				H->C.inc("mapped_reads");
 				if (H->params.onlybest && mappings.size() >= 1) {
@@ -267,7 +294,7 @@ class JaccMapper : public Mapper {
 					best_copy.max_seed_matches = max_seed_matches;
 					best_copy.seed_matches = seed_matches;
 					best_copy.max_buckets = max_buckets;
-					best_copy.final_buckets = final_buckets;
+					best_copy.final_buckets = final_buckets.size();
 					//if (best_copy.mapq > 0)
 						mappings.push_back(best_copy);
 				}
