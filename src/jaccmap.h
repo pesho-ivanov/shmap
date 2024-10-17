@@ -124,7 +124,6 @@ class JaccMapper : public Mapper {
     }
 
 	double hseed(int p, int S, int matches) {
-		//cerr << "hseed: " << p << " " << S << " " << matches << endl;
 		return 1.0 - double(S - matches) / p;
 	}
 
@@ -158,7 +157,7 @@ class JaccMapper : public Mapper {
 		int gt_a = std::stoi(tokens[2]);
 		int gt_b = std::stoi(tokens[3]);
 
-		for (const auto [b, cnt]: final_buckets) {
+		for (const auto &[b, cnt]: final_buckets) {
 			int our_a = b*lmax;
 			int our_b = (b+2)*lmax-1;
 			if (our_a <= gt_a && gt_b <= our_b)
@@ -250,6 +249,9 @@ class JaccMapper : public Mapper {
 				vector<pair<int,int>> M_vec(M.begin(), M.end());
 				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 
+				if (!is_safe(query_id, M_vec, lmax))
+					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
+
 				vector<pair<int, int>> final_buckets;
 				for (auto &[b, cnt]: M) {
 					if (is_bucket_interesting(kmers, lmax, m, b, cnt, i, matched_seeds, J_second)) {
@@ -280,7 +282,7 @@ class JaccMapper : public Mapper {
 				}
 				
 				if (!is_safe(query_id, final_buckets, lmax))
-					cerr << "Ground-truth mapping not covered by any bucket for query_id=" << query_id << endl; 
+					cerr << "After bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
 
 				H->C.inc("mapped_reads");
 				if (H->params.onlybest && mappings.size() >= 1) {
