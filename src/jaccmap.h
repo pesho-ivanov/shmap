@@ -134,7 +134,8 @@ class JaccMapper : public Mapper {
 			matched_seeds += kmers[i].occs_in_p;
 			if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
 				cnt += kmers[i].occs_in_p;
-			if (hseed(m, matched_seeds, cnt) < min(J_second, J_best*0.95)) {  //if (cnt <= i-S+1)
+			//if (hseed(m, matched_seeds, cnt) < min(J_second, J_best*0.95)) {  //if (cnt <= i-S+1)
+			if (hseed(m, matched_seeds, cnt) < J_second) {  //if (cnt <= i-S+1)
 				ret = false;
 				break;
 			}
@@ -170,6 +171,15 @@ class JaccMapper : public Mapper {
 				return true;
 		}
 		return false;
+	}
+	
+	int mapq(double J_best, double J_second) {
+		// minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
+		double bound = J_best * 0.95;
+		double r = max((J_second - bound) / (J_best - bound), 0.0);
+		return  60.0 * (1.0 - 1.0 * r);
+		//return 60.0 * (1.0 - 1.0 * pow(J_second / J_best, 0.5) );
+		//return  60.0 * (1.0 - 1.0 * pow(r, 2.0));
 	}
 
 	void map(const string &pFile) {
@@ -291,23 +301,13 @@ class JaccMapper : public Mapper {
 					}
 				}
 				
-				if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
-					cerr << "After bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl;
-					cerr << "         best: " << best <<  ", bucket=" << best_bucket << "[" << best_bucket*lmax << ", " << (best_bucket+2)*lmax << ")"; if (best != -1) cerr << ", " << std::setprecision(5) << mappings[best] << endl; else cerr << endl;
-					cerr << "  second_best: " << second_best << ", bucket=" << second_best_bucket << "[" << second_best_bucket*lmax << ", " << (second_best_bucket+2)*lmax << ")"; if (second_best != -1) cerr << ", " << std::setprecision(5) << mappings[second_best] << endl; else cerr << endl;
-					//int gt_tpos = 
-					//int gt_bucket = gt_a / lmax;
-				}
-
 				H->C.inc("mapped_reads");
 				if (H->params.onlybest && mappings.size() >= 1) {
 					Mapping best_copy = mappings[best];
 					mappings.clear();
 
 					best_copy.J2 = J_second;
-					// minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
-					double mapq_fl = 60.0 * (1.0 - 1.0 * (J_second - H->params.theta) / (J_best - H->params.theta));
-					best_copy.mapq = int(mapq_fl);
+					best_copy.mapq = mapq(J_best, J_second);
 					best_copy.max_seed_matches = max_seed_matches;
 					best_copy.seed_matches = seed_matches;
 					best_copy.max_buckets = max_buckets;
@@ -315,6 +315,17 @@ class JaccMapper : public Mapper {
 					if (best_copy.mapq > 0)
 						mappings.push_back(best_copy);
 				}
+
+				if (mappings.size() == 1 && mappings.front().mapq > 0)
+					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
+						cerr << "After bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl;
+						cerr << "         mapq: " << mappings.front().mapq << endl;
+						cerr << "         best: " << best <<  ", bucket=" << best_bucket << "[" << best_bucket*lmax << ", " << (best_bucket+2)*lmax << ")"; if (best != -1) cerr << ", " << std::setprecision(5) << mappings[best] << endl; else cerr << endl;
+						cerr << "  second_best: " << second_best << ", bucket=" << second_best_bucket << "[" << second_best_bucket*lmax << ", " << (second_best_bucket+2)*lmax << ")"; if (second_best != -1) cerr << ", " << std::setprecision(5) << mappings[second_best] << endl; else cerr << endl;
+						//int gt_tpos = 
+						//int gt_bucket = gt_a / lmax;
+					}
+
 				
 				H->T.start("output");
 					read_mapping_time.stop();

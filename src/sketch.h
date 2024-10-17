@@ -110,8 +110,11 @@ struct Mapping {
 		//cerr << "Jprev = " << 1.0*intersection / p_sz << ", Jnew = " << 1.0*intersection / (p_sz + s_sz - intersection) << endl;
 		J = 1.0*intersection / p_sz;
 		//J = 1.0*intersection / (p_sz + s_sz - intersection);
+		if (J > 1.0)
+			cerr << "s_sz = " << s_sz << ", intersection = " << intersection << ", p_sz = " << p_sz << ", J = " << J << endl;
 		assert(J >= -0.0);
 		assert(J <= 1.0);
+		J2 = -1.0;
 		mapq = 255;
 		strand = same_strand_seeds > 0 ? '+' : '-';
 
