@@ -134,7 +134,7 @@ class JaccMapper : public Mapper {
 			matched_seeds += kmers[i].occs_in_p;
 			if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
 				cnt += kmers[i].occs_in_p;
-			if (hseed(m, matched_seeds, cnt) < min(J_second, max(J_best*0.95, H->params.theta))) {  //if (cnt <= i-S+1)
+			if (hseed(m, matched_seeds, cnt) < min(J_second, J_best*0.95)) {  //if (cnt <= i-S+1)
 				ret = false;
 				break;
 			}
@@ -250,8 +250,8 @@ class JaccMapper : public Mapper {
 				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 
 				int gt_a, gt_b;
-				//if (!is_safe(query_id, M_vec, lmax, &gt_a, &gt_b))
-				//	cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
+				if (!is_safe(query_id, M_vec, lmax, &gt_a, &gt_b))
+					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
 
 				int mappings_it = 0;
 				vector<pair<int, int>> final_buckets;
@@ -306,7 +306,7 @@ class JaccMapper : public Mapper {
 					best_copy.seed_matches = seed_matches;
 					best_copy.max_buckets = max_buckets;
 					best_copy.final_buckets = final_buckets.size();
-					//if (best_copy.mapq > 0)
+					if (best_copy.mapq > 0)
 						mappings.push_back(best_copy);
 				}
 				

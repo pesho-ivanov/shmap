@@ -157,8 +157,8 @@ struct Mapping {
 			<< "\t" << "I:i:" << intersection  // intersection of `p` and `s` [kmers]
 			<< "\t" << "J:f:" << J   // Jaccard similarity [0; 1]
 			<< "\t" << "J2:f:" << J2   // second best mapping Jaccard similarity [0; 1]
-			<< "\t" << "MSM:i:" << max_seed_matches // maximum matches of a seed
-			<< "\t" << "SM:i:" << seed_matches // maximum matches of a seed
+			<< "\t" << "SMm:i:" << max_seed_matches
+			<< "\t" << "SM:i:" << seed_matches
 			<< "\t" << "M:i:" << total_matches
 			<< "\t" << "Bm:i:" << max_buckets
 			<< "\t" << "Bf:i:" << final_buckets
