@@ -96,6 +96,8 @@ struct Mapping {
 	char strand;    // '+' or '-'
 	bool unreasonable;  // reserved for filtering matches
 	std::vector<Match>::const_iterator l, r;
+	int ed;         // edit distance
+	int ed2;         // second best edit distance
 
 	// internal stats
 	int max_seed_matches;
@@ -112,10 +114,12 @@ struct Mapping {
 		//J = 1.0*intersection / (p_sz + s_sz - intersection);
 		if (J > 1.0)
 			cerr << "s_sz = " << s_sz << ", intersection = " << intersection << ", p_sz = " << p_sz << ", J = " << J << endl;
-		assert(J >= -0.0);
+		//assert(J >= -0.0);
 		assert(J <= 1.0);
 		J2 = -1.0;
 		mapq = 255;
+		ed = -1;
+		ed2 = -1;
 		strand = same_strand_seeds > 0 ? '+' : '-';
 
 		// stats
@@ -160,6 +164,8 @@ struct Mapping {
 			<< "\t" << "I:i:" << intersection  // intersection of `p` and `s` [kmers]
 			<< "\t" << "J:f:" << J   // Jaccard similarity [0; 1]
 			<< "\t" << "J2:f:" << J2   // second best mapping Jaccard similarity [0; 1]
+			<< "\t" << "ed:i:" << ed
+			<< "\t" << "ed2:i:" << ed2
 			<< "\t" << "SMm:i:" << max_seed_matches
 			<< "\t" << "SM:i:" << seed_matches
 			<< "\t" << "M:i:" << total_matches
@@ -169,7 +175,7 @@ struct Mapping {
 			<< endl;
 	}
 
-	std::string reverseComplement(const std::string& seq) const {
+	static std::string reverseComplement(const std::string& seq) {
 		std::string revComp;
 		revComp.reserve(seq.size());
 		for (int i = seq.size() - 1; i >= 0; --i) {

@@ -53,16 +53,90 @@ class JaccMapper : public Mapper {
 
 		return kmers;
 	}
-			
-	void edit_distance() {
-		EdlibAlignResult result = edlibAlign("hello", 5, "world!", 6, edlibDefaultAlignConfig());
-		printf("edit_distance('hello', 'world!') = %d\n", result.editDistance);
+
+	void add_edit_distance(Mapping *mapping, const char *P, const pos_t P_sz, const int m, const Seeds &kmers) {
+		int max_ed = 1000; // -1 for none
+
+		auto segm_id = mapping->segm_id;
+		int S_a = mapping->T_l, S_b = mapping->T_r;
+		char strand = mapping->strand;
+		
+		auto &ref = tidx.T[segm_id].seq;
+		S_a -= H->params.k + 1;
+		assert(S_a >= 0 && S_a < (int)ref.size());
+		assert(S_b >= 0 && S_b < (int)ref.size());
+		
+		int S_sz = S_b - S_a;
+		const char *s;
+		string s_rev;
+		if (strand == '+')
+			s = ref.c_str() + S_a;
+		else {
+			assert(strand == '-');
+			s_rev = Mapping::reverseComplement(ref.substr(S_a, S_sz));
+			s = s_rev.c_str();
+		}
+
+		// edlib query: s
+		// edlib target: p
+		auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
+		EdlibAlignResult result = edlibAlign(s, S_sz, P, P_sz, config);
+		assert(result.status == EDLIB_STATUS_OK);
+		cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << endl;
+		mapping->ed = result.editDistance;
 		edlibFreeAlignResult(result);
 	}
+			
+	//void edit_distance(vector<Match> &M, const char *P, const pos_t P_sz, const int m, const Seeds &kmers, vector<Mapping> *mappings) {
+	//	int max_ed = 600; // -1 for none
+
+	//	if (M.size() == 0)
+	//		return;
+
+	//	Match f = M.front();
+	//	auto segm_id = f.hit.segm_id;
+	//	int S_a = f.hit.r, S_b = f.hit.r;
+	//	int same_strand_seeds = 0;
+	//	for (auto &match: M) {
+	//		if (match.hit.r < S_a) S_a = match.hit.r;
+	//		else if (match.hit.r > S_b) S_b = match.hit.r;
+	//		same_strand_seeds += match.seed.occs_in_p * (match.is_same_strand() ? +1 : -1);  // todo: kmer multiplicity
+	//	}
+	//	
+	//	auto &ref = tidx.T[segm_id].seq;
+	//	S_a -= H->params.k + 1;
+	//	assert(S_a >= 0 && S_a < (int)ref.size());
+	//	assert(S_b >= 0 && S_b < (int)ref.size());
+	//	
+	//	int S_sz = S_b - S_a;
+	//	const char *s;
+	//	string s_rev;
+	//	if (same_strand_seeds > 0)
+	//		s = ref.c_str() + S_a;
+	//	else {
+	//		s_rev = Mapping::reverseComplement(ref.substr(S_a, S_sz));
+	//		s = s_rev.c_str();
+	//	}
+
+	//	// edlib query: s
+	//	// edlib target: p
+	//	auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
+	//	EdlibAlignResult result = edlibAlign(s, S_sz, P, P_sz, config);
+	//	assert(result.status == EDLIB_STATUS_OK);
+
+	//	cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << endl;
+	//	
+	//	int from = S_a; // todo: change to result.
+	//	int to = S_b;
+	//	int intersection = -1;
+	//	auto mapping = Mapping(H->params.k, P_sz, m, from, to, segm_id, intersection, same_strand_seeds, M.begin(), M.begin());
+	//	mapping.ed = result.editDistance;
+	//	mappings->push_back(mapping);
+	//	edlibFreeAlignResult(result);
+	//}
 
 	void sweep(vector<Match> &M, const pos_t P_sz, const int m, const Seeds &kmers, vector<Mapping> *mappings) {
 		unordered_map<int, int> diff_hist;
-        //unordered_multiset<int> diff_hist;
 
 		for (auto &kmer: kmers)
 			diff_hist[kmer.kmer.h] += kmer.occs_in_p;
@@ -74,7 +148,6 @@ class JaccMapper : public Mapper {
 		H->T.start("sweep-sort");
 			sort(M.begin(), M.end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; });   // TODO: remove sort by a linear pass through the bucket
 		H->T.stop("sweep-sort");
-		//edit_distance();
 		
 		for (int i=1; i<(int)M.size(); i++)
 			assert(M[i-1].hit.tpos < M[i].hit.tpos);
@@ -181,12 +254,20 @@ class JaccMapper : public Mapper {
 		}
 		return false;
 	}
+
+	int mapq_ed(int ed_best, int ed_second) {
+		if (ed_second == -1)
+			return 60;
+		double bound = ed_best * 1.05;
+		double r = max((bound - ed_second) / (bound - ed_best), 0.0);  // small r is good
+		return int(60.0 * (1.0 - 1.0 * r));  // big score is good
+	}
 	
-	int mapq(double J_best, double J_second) {
+	int mapq_J(double J_best, double J_second) {
 		// minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
 		double bound = J_best * 0.95;
 		double r = max((J_second - bound) / (J_best - bound), 0.0);
-		return  60.0 * (1.0 - 1.0 * r);
+		return int(60.0 * (1.0 - 1.0 * r));
 		//return 60.0 * (1.0 - 1.0 * pow(J_second / J_best, 0.5) );
 		//return  60.0 * (1.0 - 1.0 * pow(r, 2.0));
 	}
@@ -214,7 +295,8 @@ class JaccMapper : public Mapper {
 			H->T.stop("query_reading");
 			H->T.start("query_mapping");
 				H->T.start("sketching");
-					sketch_t p = H->sketcher.sketch(seq->seq.s);
+					const char *P = seq->seq.s;
+					sketch_t p = H->sketcher.sketch(P);
 					H->T.stop("sketching");
 
 				H->T.start("prepare");
@@ -241,7 +323,7 @@ class JaccMapper : public Mapper {
 
 				// stats
 				int seed_matches(0), max_seed_matches(0);
-				int max_buckets(0); //, final_buckets(0);
+				int max_buckets(0);
 
 				H->T.start("match_infrequent");
 				int i = 0;
@@ -278,7 +360,7 @@ class JaccMapper : public Mapper {
 				if (!is_safe(query_id, M_vec, lmax, &gt_a, &gt_b))
 					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
 
-				int mappings_it = 0;
+				int mappings_idx = 0;
 				vector<pair<int, int>> final_buckets;
 				for (auto &[b, cnt]: M) {
 					if (is_bucket_interesting(kmers, lmax, m, b, cnt, i, matched_seeds, J_best, J_second)) {
@@ -292,17 +374,18 @@ class JaccMapper : public Mapper {
 
 						H->T.start("sweep");
 							sweep(matches, P_sz, m, kmers, &mappings);
+							//edit_distance(matches, P, P_sz, m, kmers, &mappings);
 						H->T.stop("sweep");
 
-						for (; mappings_it < (int)mappings.size(); ++mappings_it) {
-							auto it = mappings.begin() + mappings_it;
+						for (; mappings_idx < (int)mappings.size(); ++mappings_idx) {
+							auto it = mappings.begin() + mappings_idx;
 							if (best == -1 || it->J > mappings[best].J) {
 								second_best = best;
-								best = mappings_it;
+								best = mappings_idx;
 								best_bucket = b;
 								J_best = it->J;
 							} else if (second_best == -1 || it->J > mappings[second_best].J) {
-								second_best = mappings_it;
+								second_best = mappings_idx;
 								second_best_bucket = b;
 								J_second = it->J;
 							}
@@ -310,27 +393,52 @@ class JaccMapper : public Mapper {
 					}
 				}
 				
+				bool use_ed = true;
+
+				H->T.start("edit_distance");
+				int best_ed_idx = -1, second_best_ed_idx = -1; 
+				if (use_ed) {
+					for (int i=0; i < (int)mappings.size(); ++i) {
+						auto &mapping = mappings[i];
+						add_edit_distance(&mapping, P, P_sz, m, kmers);
+						if (best_ed_idx == -1 || (mapping.ed != -1 && mapping.ed < mappings[best_ed_idx].ed)) {
+							second_best_ed_idx = best_ed_idx;
+							best_ed_idx = i;
+						} else if (second_best_ed_idx == -1 || (mapping.ed != -1 && mapping.ed > mappings[second_best_ed_idx].ed)) {
+							second_best_ed_idx = i;
+						}
+					}
+				}
+				H->T.stop("edit_distance");
+				
+				vector<Mapping> final_mappings;
 				H->C.inc("mapped_reads");
 				if (H->params.onlybest && mappings.size() >= 1) {
-					Mapping best_copy = mappings[best];
-					mappings.clear();
+					Mapping final_mapping;
+					if (use_ed) {
+						final_mapping = mappings[best_ed_idx];
+						final_mapping.ed2 = second_best_ed_idx == -1 ? -1 : mappings[second_best_ed_idx].ed;
+						final_mapping.mapq = mapq_ed(final_mapping.ed, final_mapping.ed2);
+					} else {
+						final_mapping = mappings[best];
+						final_mapping.mapq = mapq_J(J_best, J_second);
+					}
 
-					best_copy.J2 = J_second;
-					best_copy.mapq = mapq(J_best, J_second);
-					best_copy.max_seed_matches = max_seed_matches;
-					best_copy.seed_matches = seed_matches;
-					best_copy.max_buckets = max_buckets;
-					best_copy.final_buckets = final_buckets.size();
-					//if (best_copy.mapq > 0)
-						mappings.push_back(best_copy);
+					final_mapping.J2 = J_second;
+					final_mapping.max_seed_matches = max_seed_matches;
+					final_mapping.seed_matches = seed_matches;
+					final_mapping.max_buckets = max_buckets;
+					final_mapping.final_buckets = final_buckets.size();
+					//if (final_mapping.mapq > 0)
+						final_mappings.push_back(final_mapping);
 				}
 
-				if (mappings.size() == 1 && mappings.front().mapq > 0)
+				if (final_mappings.size() == 1 && final_mappings.front().mapq > 0)
 					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
 						cerr << "After bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl;
-						cerr << "         mapq: " << mappings.front().mapq << endl;
-						cerr << "         best: " << best <<  ", bucket=" << best_bucket << "[" << best_bucket*lmax << ", " << (best_bucket+2)*lmax << ")"; if (best != -1) cerr << ", " << std::setprecision(5) << mappings[best] << endl; else cerr << endl;
-						cerr << "  second_best: " << second_best << ", bucket=" << second_best_bucket << "[" << second_best_bucket*lmax << ", " << (second_best_bucket+2)*lmax << ")"; if (second_best != -1) cerr << ", " << std::setprecision(5) << mappings[second_best] << endl; else cerr << endl;
+						cerr << "         mapq: " << final_mappings.front().mapq << endl;
+						cerr << "         best: " << best <<  ", bucket=" << best_bucket << "[" << best_bucket*lmax << ", " << (best_bucket+2)*lmax << ")"; if (best != -1) cerr << ", " << std::setprecision(5) << final_mappings[best] << endl; else cerr << endl;
+						cerr << "  second_best: " << second_best << ", bucket=" << second_best_bucket << "[" << second_best_bucket*lmax << ", " << (second_best_bucket+2)*lmax << ")"; if (second_best != -1) cerr << ", " << std::setprecision(5) << final_mappings[second_best] << endl; else cerr << endl;
 						//int gt_tpos = 
 						//int gt_bucket = gt_a / lmax;
 					}
@@ -338,8 +446,8 @@ class JaccMapper : public Mapper {
 				H->T.start("output");
 					read_mapping_time.stop();
 
-					for (auto &m: mappings) {
-						m.map_time = read_mapping_time.secs() / (double)mappings.size();
+					for (auto &m: final_mappings) {
+						m.map_time = read_mapping_time.secs() / (double)final_mappings.size();
 						const auto &segm = tidx.T[m.segm_id];
 		//				if (H->params.sam) {
 		//					auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
@@ -405,7 +513,8 @@ class JaccMapper : public Mapper {
         cerr << " |  | sweep:                  "     << setw(5) << right << H->T.secs("sweep")             << " (" << setw(4) << right << H->T.perc("sweep", "mapping")               << "\%, " << setw(5) << right << H->T.range_ratio("sweep") << "x)" << endl;
         cerr << " |  |  | sort matches:            " << setw(5) << right << H->T.secs("sweep-sort")        << " (" << setw(4) << right << H->T.perc("sweep-sort", "sweep")            << "\%, " << setw(5) << right << H->T.range_ratio("sweep-sort") << "x)" << endl;
         cerr << " |  |  | main:                    " << setw(5) << right << H->T.secs("sweep-main")        << " (" << setw(4) << right << H->T.perc("sweep-main", "sweep")            << "\%, " << setw(5) << right << H->T.range_ratio("sweep-main") << "x)" << endl;
-        cerr << " |  | prepare:                "     << setw(5) << right << H->T.secs("output")            << " (" << setw(4) << right << H->T.perc("output", "mapping")              << "\%, " << setw(5) << right << H->T.range_ratio("output") << "x)" << endl;
+        cerr << " |  | edit distance:          "     << setw(5) << right << H->T.secs("edit_distance")     << " (" << setw(4) << right << H->T.perc("edit_distance", "mapping")       << "\%, " << setw(5) << right << H->T.range_ratio("edit_distance") << "x)" << endl;
+        cerr << " |  | output:                 "     << setw(5) << right << H->T.secs("output")            << " (" << setw(4) << right << H->T.perc("output", "mapping")              << "\%, " << setw(5) << right << H->T.range_ratio("output") << "x)" << endl;
 //        cerr << " |  | post proc:              "     << setw(5) << right << H->T.secs("postproc")          << " (" << setw(4) << right << H->T.perc("postproc", "mapping")            << "\%, " << setw(5) << right << H->T.range_ratio("postproc") << "x)" << endl;
     }
 };
