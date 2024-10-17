@@ -10,6 +10,8 @@
 #include "handler.h"
 #include "mapper.h"
 
+#include "edlib.h"
+
 namespace sweepmap {
 	
 class JaccMapper : public Mapper {
@@ -51,6 +53,12 @@ class JaccMapper : public Mapper {
 
 		return kmers;
 	}
+			
+	void edit_distance() {
+		EdlibAlignResult result = edlibAlign("hello", 5, "world!", 6, edlibDefaultAlignConfig());
+		printf("edit_distance('hello', 'world!') = %d\n", result.editDistance);
+		edlibFreeAlignResult(result);
+	}
 
 	void sweep(vector<Match> &M, const pos_t P_sz, const int m, const Seeds &kmers, vector<Mapping> *mappings) {
 		unordered_map<int, int> diff_hist;
@@ -66,6 +74,7 @@ class JaccMapper : public Mapper {
 		H->T.start("sweep-sort");
 			sort(M.begin(), M.end(), [](const Match &a, const Match &b) { return a.hit.r < b.hit.r; });   // TODO: remove sort by a linear pass through the bucket
 		H->T.stop("sweep-sort");
+		//edit_distance();
 		
 		for (int i=1; i<(int)M.size(); i++)
 			assert(M[i-1].hit.tpos < M[i].hit.tpos);
