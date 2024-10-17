@@ -55,7 +55,7 @@ class JaccMapper : public Mapper {
 	}
 
 	void add_edit_distance(Mapping *mapping, const char *P, const pos_t P_sz, const int m, const Seeds &kmers) {
-		int max_ed = 1000; // -1 for none
+		int max_ed = 1000; // -1 for none // TODO: make it a function of theta
 
 		auto segm_id = mapping->segm_id;
 		int S_a = mapping->T_l, S_b = mapping->T_r;
@@ -82,7 +82,7 @@ class JaccMapper : public Mapper {
 		auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
 		EdlibAlignResult result = edlibAlign(s, S_sz, P, P_sz, config);
 		assert(result.status == EDLIB_STATUS_OK);
-		cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << endl;
+		//cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << endl;
 		mapping->ed = result.editDistance;
 		edlibFreeAlignResult(result);
 	}
@@ -256,10 +256,14 @@ class JaccMapper : public Mapper {
 	}
 
 	int mapq_ed(int ed_best, int ed_second) {
+		if (ed_best == -1)
+			return 0;
 		if (ed_second == -1)
 			return 60;
-		double bound = ed_best * 1.05;
+		assert(ed_best <= ed_second);
+		double bound = ed_best * 1.25;
 		double r = max((bound - ed_second) / (bound - ed_best), 0.0);  // small r is good
+		assert(r <= 1.0);
 		return int(60.0 * (1.0 - 1.0 * r));  // big score is good
 	}
 	
@@ -401,10 +405,10 @@ class JaccMapper : public Mapper {
 					for (int i=0; i < (int)mappings.size(); ++i) {
 						auto &mapping = mappings[i];
 						add_edit_distance(&mapping, P, P_sz, m, kmers);
-						if (best_ed_idx == -1 || (mapping.ed != -1 && mapping.ed < mappings[best_ed_idx].ed)) {
+						if (mapping.ed != -1 && (best_ed_idx == -1 || mapping.ed < mappings[best_ed_idx].ed)) {
 							second_best_ed_idx = best_ed_idx;
 							best_ed_idx = i;
-						} else if (second_best_ed_idx == -1 || (mapping.ed != -1 && mapping.ed > mappings[second_best_ed_idx].ed)) {
+						} else if (mapping.ed != -1 && (second_best_ed_idx == -1 || mapping.ed > mappings[second_best_ed_idx].ed)) {
 							second_best_ed_idx = i;
 						}
 					}
@@ -414,23 +418,29 @@ class JaccMapper : public Mapper {
 				vector<Mapping> final_mappings;
 				H->C.inc("mapped_reads");
 				if (H->params.onlybest && mappings.size() >= 1) {
-					Mapping final_mapping;
-					if (use_ed) {
-						final_mapping = mappings[best_ed_idx];
-						final_mapping.ed2 = second_best_ed_idx == -1 ? -1 : mappings[second_best_ed_idx].ed;
-						final_mapping.mapq = mapq_ed(final_mapping.ed, final_mapping.ed2);
-					} else {
-						final_mapping = mappings[best];
-						final_mapping.mapq = mapq_J(J_best, J_second);
-					}
+					if ((use_ed && best_ed_idx != -1) || (!use_ed && best != -1))  {
+						Mapping final_mapping = use_ed ? mappings[best_ed_idx] : mappings[best];
 
-					final_mapping.J2 = J_second;
-					final_mapping.max_seed_matches = max_seed_matches;
-					final_mapping.seed_matches = seed_matches;
-					final_mapping.max_buckets = max_buckets;
-					final_mapping.final_buckets = final_buckets.size();
-					//if (final_mapping.mapq > 0)
-						final_mappings.push_back(final_mapping);
+						final_mapping.J2 = J_second;
+						final_mapping.max_seed_matches = max_seed_matches;
+						final_mapping.seed_matches = seed_matches;
+						final_mapping.max_buckets = max_buckets;
+						final_mapping.final_buckets = final_buckets.size();
+
+						if (use_ed) {
+							//cerr << "best_ed_idx=" << best_ed_idx << " second_best_ed_idx=" << second_best_ed_idx << " final_mapping.ed=" << final_mapping.ed << endl;
+							assert(best_ed_idx != -1);
+							assert(final_mapping.ed != -1);
+							final_mapping.ed2 = second_best_ed_idx == -1 ? -1 : mappings[second_best_ed_idx].ed;
+							final_mapping.mapq = mapq_ed(final_mapping.ed, final_mapping.ed2);
+							//if (final_mapping.mapq > 0)
+								final_mappings.push_back(final_mapping);
+						} else {
+							final_mapping.mapq = mapq_J(J_best, J_second);
+							//if (final_mapping.mapq > 0)
+								final_mappings.push_back(final_mapping);
+						}
+					}
 				}
 
 				if (final_mappings.size() == 1 && final_mappings.front().mapq > 0)
