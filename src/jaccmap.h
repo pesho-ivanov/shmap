@@ -56,6 +56,7 @@ class JaccMapper : public Mapper {
 
 	void add_edit_distance(Mapping *mapping, const char *P, const pos_t P_sz, const int m, const Seeds &kmers) {
 		int max_ed = 1000; // -1 for none // TODO: make it a function of theta
+		int delta = 10000;  // TODO: remove delta
 
 		auto segm_id = mapping->segm_id;
 		int S_a = mapping->T_l, S_b = mapping->T_r;
@@ -63,8 +64,8 @@ class JaccMapper : public Mapper {
 		auto &ref = tidx.T[segm_id].seq;
 		
 		// TODO: remove
-		S_a = max(0, S_a - 1000);
-		S_b = min((int)ref.size()-1, S_b + 1000);
+		S_a = max(0, S_a - delta);
+		S_b = min((int)ref.size()-1, S_b + delta);
 		
 		S_a -= H->params.k + 1;
 		assert(S_a >= 0 && S_a < (int)ref.size());
@@ -93,7 +94,7 @@ class JaccMapper : public Mapper {
 		string cigar = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_STANDARD);
 		if (P_sz == 10375) {
 			cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << endl;
-			cerr << cigar << endl;
+			//cerr << cigar << endl;
 		}
 		edlibFreeAlignResult(result);
 	}
