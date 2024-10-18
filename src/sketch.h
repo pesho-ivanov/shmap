@@ -106,7 +106,7 @@ struct Mapping {
 	int final_buckets;   // the number of buckets after pruning with all kmers
 	int bucket;			 // the bucket where the mapping is found
 	int bucket2;  // the bucket of the second best mapping
-	int second_best_intersection; // number of matches in the second best mapping
+	int intersection2; // number of matches in the second best mapping
 
     Mapping() {}
 	Mapping(int k, pos_t P_sz, int p_sz, pos_t T_l, pos_t T_r, segm_t segm_id, int intersection, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r, int bucket=-1)
@@ -119,7 +119,6 @@ struct Mapping {
 			cerr << "s_sz = " << s_sz << ", intersection = " << intersection << ", p_sz = " << p_sz << ", J = " << J << endl;
 		//assert(J >= -0.0);
 		assert(J <= 1.0);
-		J2 = -1.0;
 		mapq = 255;
 		ed = -1;
 		ed2 = -1;
@@ -130,6 +129,10 @@ struct Mapping {
 		seed_matches = -1;
 		max_buckets = -1;
 		final_buckets = -1;
+
+		J2 = -1.0;
+		bucket2 = -1;
+		intersection2 = -1;
 	}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
@@ -165,7 +168,7 @@ struct Mapping {
 			<< "\t" << "p:i:" << p_sz  // sketches
 			<< "\t" << "s:i:" << s_sz
 			<< "\t" << "I:i:" << intersection  // intersection of `p` and `s` [kmers]
-			<< "\t" << "I2:i:" << second_best_intersection
+			<< "\t" << "I2:i:" << intersection2
 			<< "\t" << "J:f:" << J   // Jaccard similarity [0; 1]
 			<< "\t" << "J2:f:" << J2   // second best mapping Jaccard similarity [0; 1]
 			<< "\t" << "ed:i:" << ed

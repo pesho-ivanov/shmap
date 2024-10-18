@@ -283,6 +283,8 @@ class JaccMapper : public Mapper {
 	
 	int mapq_J(double J_best, double J_second) {
 		// minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
+		if (J_second < 0.0)
+			return 60;
 		double bound = J_best * 0.9;
 		double r = max(J_second - bound, 0.0) / (J_best - bound);  // low is good
 		double J_fl = 60.0 * (1.0 - 1.0 * r);  // high is good
@@ -398,12 +400,11 @@ class JaccMapper : public Mapper {
 						for (; mappings_idx < (int)mappings.size(); ++mappings_idx) {
 							auto it = mappings.begin() + mappings_idx;
 							if (best_idx == -1 || it->J > mappings[best_idx].J) {
-								if (abs(mappings[best2_idx].bucket - mappings[best_idx].bucket) > 1)
+								if (best2_idx == -1 || abs(mappings[best2_idx].bucket - mappings[best_idx].bucket) > 1)
 									best2_idx = best_idx;
 								best_idx = mappings_idx;
-							} else if (best2_idx == -1 || it->J > mappings[best2_idx].J)
-								if (abs(mappings[best2_idx].bucket - it->bucket) > 1)
-									best2_idx = mappings_idx;
+							} else if (best2_idx == -1 || (it->J > mappings[best2_idx].J && abs(mappings[best2_idx].bucket - it->bucket) > 1))
+								best2_idx = mappings_idx;
 						}
 					}
 				}
@@ -440,9 +441,12 @@ class JaccMapper : public Mapper {
 					if ((use_ed && best_ed_idx != -1) || (!use_ed && best_idx != -1))  {
 						Mapping final_mapping = use_ed ? mappings[best_ed_idx] : mappings[best_idx];
 
-						final_mapping.J2 = mappings[best2_idx].J;
-						final_mapping.bucket2 = mappings[best2_idx].bucket;
-						final_mapping.second_best_intersection = mappings[best2_idx].intersection;
+						if (best2_idx != -1) {
+							final_mapping.J2 = mappings[best2_idx].J;
+							final_mapping.bucket2 = mappings[best2_idx].bucket;
+							final_mapping.intersection2 = mappings[best2_idx].intersection;
+						}
+
 						final_mapping.max_seed_matches = max_seed_matches;
 						final_mapping.seed_matches = seed_matches;
 						final_mapping.max_buckets = max_buckets;
