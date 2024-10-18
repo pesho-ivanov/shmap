@@ -376,7 +376,7 @@ class JaccMapper : public Mapper {
 				vector<pair<int,int>> M_vec(M.begin(), M.end());
 				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 
-//				int gt_a, gt_b;
+				int gt_a, gt_b;
 //				if (!is_safe(query_id, M_vec, lmax, &gt_a, &gt_b))
 //					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
 
@@ -409,13 +409,21 @@ class JaccMapper : public Mapper {
 					}
 				}
 				
-//				if (mappings.size() == 1 && mappings.front().mapq > 0)
-//					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
-//						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
-//						//cerr << "         mapq: " << mappings.front().mapq << endl;
-//						cerr << "         best: " << best_idx <<  ", bucket=" << best_bucket << "[" << best_bucket*lmax << ", " << (best_bucket+2)*lmax << ")"; if (best_idx != -1) cerr << ", " << std::setprecision(5) << mappings[best_idx] << endl; else cerr << endl;
-//						cerr << "  best2_idx: " << best2_idx << ", bucket=" << second_best_bucket << "[" << second_best_bucket*lmax << ", " << (second_best_bucket+2)*lmax << ")"; if (best2_idx != -1) cerr << ", " << std::setprecision(5) << mappings[best2_idx] << endl; else cerr << endl;
-//					}
+				H->C.inc("safe_bucketing", 0);
+				if (mappings.size() == 1 && mappings.front().mapq > 0)
+					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
+						H->C.inc("safe_bucketing");
+						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
+						//cerr << "         mapq: " << mappings.front().mapq << endl;
+						if (best_idx != -1) {
+							int bb = mappings[best_idx].bucket;
+							cerr << "         best: " << best_idx <<  ", bucket=" << bb << "[" << bb*lmax << ", " << (bb+2)*lmax << ")"; if (best_idx != -1) cerr << ", " << std::setprecision(5) << mappings[best_idx] << endl; else cerr << endl;
+						}
+						if (best2_idx != -1) {
+							int bb2 = mappings[best2_idx].bucket;
+							cerr << "  best2_idx: " << best2_idx << ", bucket=" << bb2 << "[" << bb2*lmax << ", " << (bb2+2)*lmax << ")"; if (best2_idx != -1) cerr << ", " << std::setprecision(5) << mappings[best2_idx] << endl; else cerr << endl;
+						}
+					}
 				
 				bool use_ed = false;
 
@@ -472,17 +480,17 @@ class JaccMapper : public Mapper {
 								final_mappings.push_back(final_mapping);
 						}
 
-						if (best2_idx != -1 && final_mapping.mapq == 0) {
-							string cigar1, cigar2;
-							cigar1 = add_edit_distance(&mappings[best_idx], P, P_sz, m, kmers);
-							cigar2 = add_edit_distance(&mappings[best2_idx], P, P_sz, m, kmers);
-							if (mappings[best_idx].ed != mappings[best2_idx].ed) {
-								cerr << endl;
-								cerr << "mapq = 0 for read " << query_id << endl;
-								cerr << mappings[best_idx] << " " << cigar1 << endl;
-								cerr << mappings[best2_idx] << " " << cigar2 << endl;
-							}
-						}
+//						if (best2_idx != -1 && final_mapping.mapq == 0) {
+//							string cigar1, cigar2;
+//							cigar1 = add_edit_distance(&mappings[best_idx], P, P_sz, m, kmers);
+//							cigar2 = add_edit_distance(&mappings[best2_idx], P, P_sz, m, kmers);
+//							if (mappings[best_idx].ed != mappings[best2_idx].ed) {
+//								cerr << endl;
+//								cerr << "mapq = 0 for read " << query_id << endl;
+//								cerr << mappings[best_idx] << " " << cigar1 << endl;
+//								cerr << mappings[best2_idx] << " " << cigar2 << endl;
+//							}
+//						}
 					}
 				}
 
@@ -519,6 +527,7 @@ class JaccMapper : public Mapper {
 		cerr << std::fixed << std::setprecision(1);
 		cerr << "Mapping:" << endl;
 		cerr << " | Total reads:           " << H->C.count("reads") << " (~" << 1.0*H->C.count("read_len") / H->C.count("reads") << " nb per read)" << endl;
+		cerr << " |  | safe bucketing:       " << H->C.count("safe_bucketing") << " (" << H->C.perc("safe_bucketing", "reads") << "%)" << endl;
 		cerr << " |  | mapped:               " << H->C.count("mapped_reads") << " (" << H->C.perc("mapped_reads", "reads") << "%)" << endl;
 		cerr << " |  |  | intersect. diff:     " << H->C.frac("intersection_diff", "mapped_reads") << " per mapped read" << endl;
 		cerr << " | Read kmers (total):    " << H->C.count("kmers") << " (" << H->C.frac("kmers", "reads") << " per read)" << endl;
