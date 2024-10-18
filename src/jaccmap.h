@@ -245,7 +245,8 @@ class JaccMapper : public Mapper {
 		return 1.0*max(0, min(bucket_b, gt_b) - max(bucket_a, gt_a)) / (gt_b - gt_a);
 	}
 	
-	bool is_safe(const string &query_id, const vector<pair<int,int>> &final_buckets, int lmax, int *gt_a, int *gt_b) {
+	// TODO: works only in original coordinates
+	bool is_safe(const string &query_id, const vector<pair<int,int>> &potential_buckets, int lmax, int *gt_a, int *gt_b) {
 		std::vector<std::string> tokens;
 		std::stringstream ss(query_id);
 		std::string token;
@@ -259,12 +260,16 @@ class JaccMapper : public Mapper {
 		*gt_a = std::stoi(tokens[2]);
 		*gt_b = std::stoi(tokens[3]) + 1;
 
-		for (const auto &[b, cnt]: final_buckets) {
+		//cerr << "safety check: " << query_id << " " << *gt_a << " " << *gt_b << " among " << potential_buckets.size() << " buckets." << endl;
+		for (const auto &[b, cnt]: potential_buckets) {
 			int bucket_a = b*lmax;
 			int bucket_b = (b+2)*lmax;
 			//if (bucket_a <= *gt_a && *gt_b <= bucket_b)
-			if (covered_frac(bucket_a, bucket_b, *gt_a, *gt_b) >= 0.9)
+			cerr << "safety check: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
+			if (covered_frac(bucket_a, bucket_b, *gt_a, *gt_b) >= 0.9) {
+				cerr << "SAFE: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
 				return true;
+			}
 		}
 		return false;
 	}
@@ -377,8 +382,10 @@ class JaccMapper : public Mapper {
 				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 
 				int gt_a, gt_b;
+				int lost_on_seeding = !is_safe(query_id, M_vec, lmax, &gt_a, &gt_b);
 //				if (!is_safe(query_id, M_vec, lmax, &gt_a, &gt_b))
 //					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
+				H->C.inc("lost_on_seeding", lost_on_seeding);
 
 				int mappings_idx = 0;
 				vector<pair<int, int>> final_buckets;
@@ -409,22 +416,24 @@ class JaccMapper : public Mapper {
 					}
 				}
 				
-				H->C.inc("safe_bucketing", 0);
-				if (mappings.size() == 1 && mappings.front().mapq > 0)
+				int lost_on_pruning = 1;
+				if (mappings.size() == 1) { // && mappings.front().mapq > 0) {
 					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
-						H->C.inc("safe_bucketing");
-						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
-						//cerr << "         mapq: " << mappings.front().mapq << endl;
-						if (best_idx != -1) {
-							int bb = mappings[best_idx].bucket;
-							cerr << "         best: " << best_idx <<  ", bucket=" << bb << "[" << bb*lmax << ", " << (bb+2)*lmax << ")"; if (best_idx != -1) cerr << ", " << std::setprecision(5) << mappings[best_idx] << endl; else cerr << endl;
-						}
-						if (best2_idx != -1) {
-							int bb2 = mappings[best2_idx].bucket;
-							cerr << "  best2_idx: " << best2_idx << ", bucket=" << bb2 << "[" << bb2*lmax << ", " << (bb2+2)*lmax << ")"; if (best2_idx != -1) cerr << ", " << std::setprecision(5) << mappings[best2_idx] << endl; else cerr << endl;
-						}
-					}
-				
+//						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
+//						//cerr << "         mapq: " << mappings.front().mapq << endl;
+//						if (best_idx != -1) {
+//							int bb = mappings[best_idx].bucket;
+//							cerr << "         best: " << best_idx <<  ", bucket=" << bb << "[" << bb*lmax << ", " << (bb+2)*lmax << ")"; if (best_idx != -1) cerr << ", " << std::setprecision(5) << mappings[best_idx] << endl; else cerr << endl;
+//						}
+//						if (best2_idx != -1) {
+//							int bb2 = mappings[best2_idx].bucket;
+//							cerr << "  best2_idx: " << best2_idx << ", bucket=" << bb2 << "[" << bb2*lmax << ", " << (bb2+2)*lmax << ")"; if (best2_idx != -1) cerr << ", " << std::setprecision(5) << mappings[best2_idx] << endl; else cerr << endl;
+//						}
+					} else
+						lost_on_pruning = 0;
+				}
+				H->C.inc("lost_on_pruning", lost_on_pruning);
+
 				bool use_ed = false;
 
 				H->T.start("edit_distance");
@@ -527,7 +536,8 @@ class JaccMapper : public Mapper {
 		cerr << std::fixed << std::setprecision(1);
 		cerr << "Mapping:" << endl;
 		cerr << " | Total reads:           " << H->C.count("reads") << " (~" << 1.0*H->C.count("read_len") / H->C.count("reads") << " nb per read)" << endl;
-		cerr << " |  | safe bucketing:       " << H->C.count("safe_bucketing") << " (" << H->C.perc("safe_bucketing", "reads") << "%)" << endl;
+		cerr << " |  | lost on seeding:      " << H->C.count("lost_on_seeding") << " (" << H->C.perc("lost_on_seeding", "reads") << "%)" << endl;
+		cerr << " |  | lost on pruning:      " << H->C.count("lost_on_pruning") << " (" << H->C.perc("lost_on_pruning", "reads") << "%)" << endl;
 		cerr << " |  | mapped:               " << H->C.count("mapped_reads") << " (" << H->C.perc("mapped_reads", "reads") << "%)" << endl;
 		cerr << " |  |  | intersect. diff:     " << H->C.frac("intersection_diff", "mapped_reads") << " per mapped read" << endl;
 		cerr << " | Read kmers (total):    " << H->C.count("kmers") << " (" << H->C.frac("kmers", "reads") << " per read)" << endl;
