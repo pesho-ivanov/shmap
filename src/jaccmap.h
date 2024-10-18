@@ -397,14 +397,15 @@ class JaccMapper : public Mapper {
 						for (; mappings_idx < (int)mappings.size(); ++mappings_idx) {
 							auto it = mappings.begin() + mappings_idx;
 							if (best_idx == -1 || it->J > mappings[best_idx].J) {
-								//if (abs(mappings[second_best_idx].bucket - mappings[best_idx].bucket) > 1)
+								if (abs(mappings[second_best_idx].bucket - mappings[best_idx].bucket) > 1)
 									second_best_idx = best_idx;
 								best_idx = mappings_idx;
 								J_best = it->J;
 							} else if (second_best_idx == -1 || it->J > mappings[second_best_idx].J) {
-								//if (abs(second_best_bucket - best_bucket) > 1)
-								second_best_idx = mappings_idx;
-								J_second = it->J;
+								if (abs(mappings[second_best_idx].bucket - it->bucket) > 1) {
+									second_best_idx = mappings_idx;
+									J_second = it->J;
+								}
 							}
 						}
 					}
