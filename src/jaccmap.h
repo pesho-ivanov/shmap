@@ -400,7 +400,7 @@ class JaccMapper : public Mapper {
 						for (; mappings_idx < (int)mappings.size(); ++mappings_idx) {
 							auto it = mappings.begin() + mappings_idx;
 							if (best_idx == -1 || it->J > mappings[best_idx].J) {
-								if (best2_idx == -1 || abs(mappings[best2_idx].bucket - mappings[best_idx].bucket) > 1)
+								if (abs(mappings[best_idx].bucket - it->bucket) > 1)
 									best2_idx = best_idx;
 								best_idx = mappings_idx;
 							} else if (best2_idx == -1 || (it->J > mappings[best2_idx].J && abs(mappings[best2_idx].bucket - it->bucket) > 1))
