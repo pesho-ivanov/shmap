@@ -272,7 +272,7 @@ class SweepMapper : public Mapper {
 			sketch_t p = H->sketcher.sketch(seq->seq.s);
 			H->T.stop("sketching");
 
-			string query_id = seq->name.s;
+			char *query_id = seq->name.s;
 			pos_t P_sz = (pos_t)seq->seq.l;
 			H->C.inc("kmers", p.size());
 			H->C.inc("read_len", P_sz);
@@ -301,11 +301,15 @@ class SweepMapper : public Mapper {
 			for (auto &m: mappings) {
 				const auto &segm = tidx.T[m.segm_id];
 				m.map_time = read_mapping_time.secs() / (double)mappings.size();
+				m.query_id = query_id;
+				m.segm_sz = segm.sz;
+				m.segm_name = segm.name.c_str();
+				m.total_matches = matches.size();
 				if (H->params.sam) {
 					auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
 					H->C.inc("total_edit_distance", ed);
 				}
-				else m.print_paf(query_id, segm, matches.size());
+				else m.print_paf();
                 H->C.inc("spurious_matches", spurious_matches(m, matches));
 				H->C.inc("J", int(10000.0*m.J));
 				H->C.inc("mappings");

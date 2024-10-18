@@ -54,7 +54,8 @@ class JaccMapper : public Mapper {
 		return kmers;
 	}
 
-	void add_edit_distance(Mapping *mapping, const char *P, const pos_t P_sz, const int m, const Seeds &kmers) {
+	// returns cigar
+	string add_edit_distance(Mapping *mapping, const char *P, const pos_t P_sz, const int m, const Seeds &kmers) {
 		int max_ed = 1000; // -1 for none // TODO: make it a function of theta
 		int delta = 10000;  // TODO: remove delta
 
@@ -92,11 +93,10 @@ class JaccMapper : public Mapper {
 		mapping->ed = result.editDistance;
 		
 		string cigar = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_STANDARD);
-		//if (P_sz == 10375) {
-		//	cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << endl;
-			//cerr << cigar << endl;
-		//}
+		//cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << ", mapping: " << *mapping << endl;
+		//cerr << cigar << endl;
 		edlibFreeAlignResult(result);
+		return cigar;
 	}
 			
 	//void edit_distance(vector<Match> &M, const char *P, const pos_t P_sz, const int m, const Seeds &kmers, vector<Mapping> *mappings) {
@@ -321,7 +321,7 @@ class JaccMapper : public Mapper {
 					H->T.stop("sketching");
 
 				H->T.start("prepare");
-					string query_id = seq->name.s;
+					char *query_id = seq->name.s;
 					pos_t P_sz = (pos_t)seq->seq.l;
 
 					H->C.inc("kmers", p.size());
@@ -447,10 +447,15 @@ class JaccMapper : public Mapper {
 							final_mapping.intersection2 = mappings[best2_idx].intersection;
 						}
 
+						const auto &segm = tidx.T[final_mapping.segm_id];
+						final_mapping.total_matches = total_matches;
 						final_mapping.max_seed_matches = max_seed_matches;
 						final_mapping.seed_matches = seed_matches;
 						final_mapping.max_buckets = max_buckets;
 						final_mapping.final_buckets = final_buckets.size();
+						final_mapping.query_id = query_id;
+						final_mapping.segm_name = segm.name.c_str();
+						final_mapping.segm_sz = segm.sz;
 
 						if (use_ed) {
 							//cerr << "best_ed_idx=" << best_ed_idx << " best2_ed_idx=" << best2_ed_idx << " final_mapping.ed=" << final_mapping.ed << endl;
@@ -465,6 +470,18 @@ class JaccMapper : public Mapper {
 							//if (final_mapping.mapq > 0)
 								final_mappings.push_back(final_mapping);
 						}
+
+						//if (final_mapping.mapq == 0) {
+						//	string cigar1, cigar2;
+						//	if (best_idx != -1) cigar1 = add_edit_distance(&mappings[best_idx], P, P_sz, m, kmers);
+						//	if (best2_idx != -1) cigar2 = add_edit_distance(&mappings[best2_idx], P, P_sz, m, kmers);
+						//	if (mappings[best_idx].ed != mappings[best2_idx].ed) {
+						//		cerr << endl;
+						//		cerr << query_id << endl;
+						//		cerr << mappings[best_idx] << " " << cigar1 << endl;
+						//		cerr << mappings[best2_idx] << " " << cigar2 << endl;
+						//	}
+						//}
 					}
 				}
 
@@ -473,13 +490,12 @@ class JaccMapper : public Mapper {
 
 					for (auto &m: final_mappings) {
 						m.map_time = read_mapping_time.secs() / (double)final_mappings.size();
-						const auto &segm = tidx.T[m.segm_id];
 		//				if (H->params.sam) {
 		//					auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
 		//					H->C.inc("total_edit_distance", ed);
 		//				}
 		//				else
-							m.print_paf(query_id, segm, total_matches);
+							m.print_paf();
 						//  H->C.inc("spurious_matches", spurious_matches(m, matches));
 						H->C.inc("J", int(10000.0*m.J));
 						H->C.inc("mappings");

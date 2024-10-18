@@ -83,11 +83,16 @@ struct RefSegment {
 
 struct Mapping {
 	int k; 	   // kmer size
+	char *query_id;
+	int P_start;
+	int P_end;
 	pos_t P_sz;     // pattern size |P| bp 
 	pos_t p_sz;     // number of seeds (subset of the sketch kmers)
 	pos_t T_l;      // the position of the leftmost nucleotide of the mapping
 	pos_t T_r;      // the position of the rightmost nucleotide of the mapping
 	segm_t segm_id;
+	const char *segm_name;
+	segm_t segm_sz;
 	pos_t s_sz;      // the position of the rightmost nucleotide of the mapping
 	int intersection;     // the number of kmers in the intersection between the pattern and its mapping in `t'
 	double J, J2;     // Jaccard similarity in [0;1] for the best and for the second best mapping
@@ -100,6 +105,7 @@ struct Mapping {
 	int ed2;         // second best edit distance
 
 	// internal stats
+	int total_matches;   // number of matches of all kmers
 	int max_seed_matches;// number of matches of the most frequent seed
 	int seed_matches;    // number of matches of seeds
 	int max_buckets;     // the initial number of buckets
@@ -123,20 +129,22 @@ struct Mapping {
 		ed = -1;
 		ed2 = -1;
 		strand = same_strand_seeds > 0 ? '+' : '-';
+		P_start = 0;
+		P_end = P_sz-1;
 
 		// stats
+		total_matches = -1;
 		max_seed_matches = -1;
 		seed_matches = -1;
 		max_buckets = -1;
 		final_buckets = -1;
-
 		J2 = -1.0;
 		bucket2 = -1;
 		intersection2 = -1;
 	}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
-    void print_paf(const string &query_id, const RefSegment &segm, int total_matches) const {
+    void print_paf() const {
 		//cerr << "P_sz=" << P_sz << " T_l=" << T_l << " T_r=" << T_r << " segm.sz=" << segm.sz << " p_sz=" << p_sz << " intersection=" << intersection << " J=" << J << " map_time=" << map_time << " mapq=" << mapq << " strand=" << strand << " unreasonable=" << unreasonable << endl;
 //		int P_start = P_sz, P_end = -1;
 //		for (auto m = l; m != r; ++m) {
@@ -148,40 +156,7 @@ struct Mapping {
 //		assert(0 <= P_start);
 //		assert(P_start <= P_end);
 //		assert(P_end <= P_sz);
-
-		int P_start = 0, P_end = P_sz-1;
-
-		std::cout << query_id  			// Query sequence name
-			<< "\t" << P_sz     // query sequence length
-			<< "\t" << P_start   // query start (0-based; closed)
-			<< "\t" << P_end  // query end (0-based; open)
-			<< "\t" << strand   // '+' or '-'
-			<< "\t" << segm.name // reference segment name
-			<< "\t" << segm.sz // T_sz -- target sequence length
-			<< "\t" << T_l  // target start on original strand (0-based)
-			<< "\t" << T_r  // target end on original strand (0-based)
-			<< "\t" << P_sz  // TODO: fix; Number of residue matches (number of nucleotide matches)
-			<< "\t" << P_sz  // TODO: fix; Alignment block length: total number of sequence matches, mismatches, insertions and deletions in the alignment
-			<< "\t" << mapq  // Mapping quality (0-255; 255 for missing)
-// ----- end of required PAF fields -----
-			<< "\t" << "k:i:" << k
-			<< "\t" << "p:i:" << p_sz  // sketches
-			<< "\t" << "s:i:" << s_sz
-			<< "\t" << "I:i:" << intersection  // intersection of `p` and `s` [kmers]
-			<< "\t" << "I2:i:" << intersection2
-			<< "\t" << "J:f:" << J   // Jaccard similarity [0; 1]
-			<< "\t" << "J2:f:" << J2   // second best mapping Jaccard similarity [0; 1]
-			<< "\t" << "ed:i:" << ed
-			<< "\t" << "ed2:i:" << ed2
-			<< "\t" << "MSeedmax:i:" << max_seed_matches
-			<< "\t" << "MSeed:i:" << seed_matches
-			<< "\t" << "M:i:" << total_matches
-			<< "\t" << "Bmax:i:" << max_buckets
-			<< "\t" << "Bfinal:i:" << final_buckets
-			<< "\t" << "b:i:" << bucket
-			<< "\t" << "b2:i:" << bucket2
-			<< "\t" << "t:f:" << map_time
-			<< endl;
+		std::cout << *this;
 	}
 
 	static std::string reverseComplement(const std::string& seq) {
@@ -250,7 +225,38 @@ struct Mapping {
 	}
 
 	friend std::ostream& operator<<(std::ostream& os, const Mapping& mapping) {
-		os << "Mapping(k=" << mapping.k << ", P_sz=" << mapping.P_sz << ", p_sz=" << mapping.p_sz << ", T_l=" << mapping.T_l << ", T_r=" << mapping.T_r << ", segm_id=" << mapping.segm_id << ", s_sz=" << mapping.s_sz << ", intersection=" << mapping.intersection << ", J=" << mapping.J << ", J2=" << mapping.J2 << ", map_time=" << mapping.map_time << ", mapq=" << mapping.mapq << ", strand=" << mapping.strand << ", unreasonable=" << mapping.unreasonable << ")";
+		//os << "Mapping(k=" << mapping.k << ", P_sz=" << mapping.P_sz << ", p_sz=" << mapping.p_sz << ", T_l=" << mapping.T_l << ", T_r=" << mapping.T_r << ", segm_id=" << mapping.segm_id << ", s_sz=" << mapping.s_sz << ", intersection=" << mapping.intersection << ", J=" << mapping.J << ", J2=" << mapping.J2 << ", map_time=" << mapping.map_time << ", mapq=" << mapping.mapq << ", strand=" << mapping.strand << ", unreasonable=" << mapping.unreasonable << ")";
+		os  << mapping.query_id  	// Query sequence name
+			<< "\t" << mapping.P_sz     // query sequence length
+			<< "\t" << mapping.P_start   // query start (0-based; closed)
+			<< "\t" << mapping.P_end  // query end (0-based; open)
+			<< "\t" << mapping.strand   // '+' or '-'
+			<< "\t" << mapping.segm_name // reference segment name
+			<< "\t" << mapping.segm_sz // T_sz -- target sequence length
+			<< "\t" << mapping.T_l  // target start on original strand (0-based)
+			<< "\t" << mapping.T_r  // target end on original strand (0-based)
+			<< "\t" << mapping.P_sz  // TODO: fix; Number of residue matches (number of nucleotide matches)
+			<< "\t" << mapping.P_sz  // TODO: fix; Alignment block length: total number of sequence matches, mismatches, insertions and deletions in the alignment
+			<< "\t" << mapping.mapq  // Mapping quality (0-255; 255 for missing)
+// ----- end of required PAF fields -----
+			<< "\t" << "k:i:" 			<< mapping.k
+			<< "\t" << "p:i:" 			<< mapping.p_sz  // sketches
+			<< "\t" << "s:i:" 			<< mapping.s_sz
+			<< "\t" << "I:i:" 			<< mapping.intersection  // intersection of `p` and `s` [kmers]
+			<< "\t" << "I2:i:"			<< mapping.intersection2
+			<< "\t" << "J:f:"			<< mapping.J   // Jaccard similarity [0; 1]
+			<< "\t" << "J2:f:"			<< mapping.J2   // second best mapping Jaccard similarity [0; 1]
+			<< "\t" << "ed:i:"			<< mapping.ed
+			<< "\t" << "ed2:i:"			<< mapping.ed2
+			<< "\t" << "MSeedmax:i:"	<< mapping.max_seed_matches
+			<< "\t" << "MSeed:i:"		<< mapping.seed_matches
+			<< "\t" << "M:i:"			<< mapping.total_matches
+			<< "\t" << "Bmax:i:"		<< mapping.max_buckets
+			<< "\t" << "Bfinal:i:"		<< mapping.final_buckets
+			<< "\t" << "b:i:"			<< mapping.bucket
+			<< "\t" << "b2:i:"			<< mapping.bucket2
+			<< "\t" << "t:f:"			<< mapping.map_time
+			<< endl;
 		return os;
 	}
 };
