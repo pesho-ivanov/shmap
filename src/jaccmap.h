@@ -241,8 +241,7 @@ class JaccMapper : public Mapper {
 	}
 	
 	double covered_frac(int bucket_a, int bucket_b, int gt_a, int gt_b) {
-		double intersection = max(0, min(bucket_b, gt_b) - max(bucket_a, gt_a));
-		return intersection / (gt_b - gt_a);
+		return 1.0*max(0, min(bucket_b, gt_b) - max(bucket_a, gt_a)) / (gt_b - gt_a);
 	}
 	
 	bool is_safe(const string &query_id, const vector<pair<int,int>> &final_buckets, int lmax, int *gt_a, int *gt_b) {
@@ -399,6 +398,7 @@ class JaccMapper : public Mapper {
 						for (; mappings_idx < (int)mappings.size(); ++mappings_idx) {
 							auto it = mappings.begin() + mappings_idx;
 							if (best == -1 || it->J > mappings[best].J) {
+								//	if (abs(b - best_bucket) > 1) {
 								second_best = best;
 								best = mappings_idx;
 								best_bucket = b;
@@ -444,7 +444,11 @@ class JaccMapper : public Mapper {
 					if ((use_ed && best_ed_idx != -1) || (!use_ed && best != -1))  {
 						Mapping final_mapping = use_ed ? mappings[best_ed_idx] : mappings[best];
 
+						assert(fabs(J_second-mappings[second_best].J) < 1e-7);
 						final_mapping.J2 = J_second;
+						final_mapping.best_bucket = best_bucket;
+						final_mapping.second_best_bucket = second_best_bucket;
+						final_mapping.second_best_intersection = mappings[second_best].intersection;
 						final_mapping.max_seed_matches = max_seed_matches;
 						final_mapping.seed_matches = seed_matches;
 						final_mapping.max_buckets = max_buckets;

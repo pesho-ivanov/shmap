@@ -100,10 +100,13 @@ struct Mapping {
 	int ed2;         // second best edit distance
 
 	// internal stats
-	int max_seed_matches;
-	int seed_matches;
-	int max_buckets;
-	int final_buckets;
+	int max_seed_matches;// number of matches of the most frequent seed
+	int seed_matches;    // number of matches of seeds
+	int max_buckets;     // the initial number of buckets
+	int final_buckets;   // the number of buckets after pruning with all kmers
+	int best_bucket;  // the bucket of the best mapping
+	int second_best_bucket;  // the bucket of the second best mapping
+	int second_best_intersection; // number of matches in the second best mapping
 
     Mapping() {}
 	Mapping(int k, pos_t P_sz, int p_sz, pos_t T_l, pos_t T_r, segm_t segm_id, int intersection, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r)
@@ -162,15 +165,18 @@ struct Mapping {
 			<< "\t" << "p:i:" << p_sz  // sketches
 			<< "\t" << "s:i:" << s_sz
 			<< "\t" << "I:i:" << intersection  // intersection of `p` and `s` [kmers]
+			<< "\t" << "I2:i:" << second_best_intersection
 			<< "\t" << "J:f:" << J   // Jaccard similarity [0; 1]
 			<< "\t" << "J2:f:" << J2   // second best mapping Jaccard similarity [0; 1]
 			<< "\t" << "ed:i:" << ed
 			<< "\t" << "ed2:i:" << ed2
-			<< "\t" << "SMm:i:" << max_seed_matches
-			<< "\t" << "SM:i:" << seed_matches
+			<< "\t" << "MSeedmax:i:" << max_seed_matches
+			<< "\t" << "MSeed:i:" << seed_matches
 			<< "\t" << "M:i:" << total_matches
-			<< "\t" << "Bm:i:" << max_buckets
-			<< "\t" << "Bf:i:" << final_buckets
+			<< "\t" << "Bmax:i:" << max_buckets
+			<< "\t" << "Bfinal:i:" << final_buckets
+			<< "\t" << "b:i:" << best_bucket
+			<< "\t" << "b2:i:" << second_best_bucket
 			<< "\t" << "t:f:" << map_time
 			<< endl;
 	}
