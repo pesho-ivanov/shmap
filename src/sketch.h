@@ -104,13 +104,13 @@ struct Mapping {
 	int seed_matches;    // number of matches of seeds
 	int max_buckets;     // the initial number of buckets
 	int final_buckets;   // the number of buckets after pruning with all kmers
-	int best_bucket;  // the bucket of the best mapping
-	int second_best_bucket;  // the bucket of the second best mapping
+	int bucket;			 // the bucket where the mapping is found
+	int bucket2;  // the bucket of the second best mapping
 	int second_best_intersection; // number of matches in the second best mapping
 
     Mapping() {}
-	Mapping(int k, pos_t P_sz, int p_sz, pos_t T_l, pos_t T_r, segm_t segm_id, int intersection, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r)
-		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), intersection(intersection), unreasonable(false), l(l), r(r) {
+	Mapping(int k, pos_t P_sz, int p_sz, pos_t T_l, pos_t T_r, segm_t segm_id, int intersection, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r, int bucket=-1)
+		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), intersection(intersection), unreasonable(false), l(l), r(r), bucket(bucket) {
 		s_sz = r->hit.tpos - l->hit.tpos + 1;
 		//cerr << "Jprev = " << 1.0*intersection / p_sz << ", Jnew = " << 1.0*intersection / (p_sz + s_sz - intersection) << endl;
 		J = 1.0*intersection / p_sz;
@@ -175,8 +175,8 @@ struct Mapping {
 			<< "\t" << "M:i:" << total_matches
 			<< "\t" << "Bmax:i:" << max_buckets
 			<< "\t" << "Bfinal:i:" << final_buckets
-			<< "\t" << "b:i:" << best_bucket
-			<< "\t" << "b2:i:" << second_best_bucket
+			<< "\t" << "b:i:" << bucket
+			<< "\t" << "b2:i:" << bucket2
 			<< "\t" << "t:f:" << map_time
 			<< endl;
 	}

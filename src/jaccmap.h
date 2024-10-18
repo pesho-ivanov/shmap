@@ -147,7 +147,7 @@ class JaccMapper : public Mapper {
 	//	edlibFreeAlignResult(result);
 	//}
 
-	void sweep(vector<Match> &M, const pos_t P_sz, const int m, const Seeds &kmers, vector<Mapping> *mappings) {
+	void sweep(vector<Match> &M, const pos_t P_sz, const int m, const Seeds &kmers, vector<Mapping> *mappings, int bucket) {
 		H->T.start("sweep-prepare");
 		unordered_map<int, int> diff_hist;
 
@@ -187,7 +187,7 @@ class JaccMapper : public Mapper {
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			auto mapping = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, same_strand_seeds, l, prev(r));
+			auto mapping = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, same_strand_seeds, l, prev(r), bucket);
 			if (mapping.J > best.J)
 				best = mapping;
 
@@ -368,8 +368,7 @@ class JaccMapper : public Mapper {
 
 				vector<Mapping> mappings;
 				int total_matches = 0;
-				int best(-1), second_best(-1);
-				int best_bucket(-1), second_best_bucket(-1);
+				int best_idx(-1), second_best_idx(-1);
 				double J_best(0.0), J_second(H->params.theta);
 				vector<pair<int,int>> M_vec(M.begin(), M.end());
 				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
@@ -391,21 +390,20 @@ class JaccMapper : public Mapper {
 						final_buckets.push_back( make_pair(b, cnt) );
 
 						H->T.start("sweep");
-							sweep(matches, P_sz, m, kmers, &mappings);
+							sweep(matches, P_sz, m, kmers, &mappings, b);
 							//edit_distance(matches, P, P_sz, m, kmers, &mappings);
 						H->T.stop("sweep");
 
 						for (; mappings_idx < (int)mappings.size(); ++mappings_idx) {
 							auto it = mappings.begin() + mappings_idx;
-							if (best == -1 || it->J > mappings[best].J) {
-								//	if (abs(b - best_bucket) > 1) {
-								second_best = best;
-								best = mappings_idx;
-								best_bucket = b;
+							if (best_idx == -1 || it->J > mappings[best_idx].J) {
+								//if (abs(mappings[second_best_idx].bucket - mappings[best_idx].bucket) > 1)
+									second_best_idx = best_idx;
+								best_idx = mappings_idx;
 								J_best = it->J;
-							} else if (second_best == -1 || it->J > mappings[second_best].J) {
-								second_best = mappings_idx;
-								second_best_bucket = b;
+							} else if (second_best_idx == -1 || it->J > mappings[second_best_idx].J) {
+								//if (abs(second_best_bucket - best_bucket) > 1)
+								second_best_idx = mappings_idx;
 								J_second = it->J;
 							}
 						}
@@ -416,8 +414,8 @@ class JaccMapper : public Mapper {
 //					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
 //						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
 //						//cerr << "         mapq: " << mappings.front().mapq << endl;
-//						cerr << "         best: " << best <<  ", bucket=" << best_bucket << "[" << best_bucket*lmax << ", " << (best_bucket+2)*lmax << ")"; if (best != -1) cerr << ", " << std::setprecision(5) << mappings[best] << endl; else cerr << endl;
-//						cerr << "  second_best: " << second_best << ", bucket=" << second_best_bucket << "[" << second_best_bucket*lmax << ", " << (second_best_bucket+2)*lmax << ")"; if (second_best != -1) cerr << ", " << std::setprecision(5) << mappings[second_best] << endl; else cerr << endl;
+//						cerr << "         best: " << best_idx <<  ", bucket=" << best_bucket << "[" << best_bucket*lmax << ", " << (best_bucket+2)*lmax << ")"; if (best_idx != -1) cerr << ", " << std::setprecision(5) << mappings[best_idx] << endl; else cerr << endl;
+//						cerr << "  second_best_idx: " << second_best_idx << ", bucket=" << second_best_bucket << "[" << second_best_bucket*lmax << ", " << (second_best_bucket+2)*lmax << ")"; if (second_best_idx != -1) cerr << ", " << std::setprecision(5) << mappings[second_best_idx] << endl; else cerr << endl;
 //					}
 				
 				bool use_ed = false;
@@ -441,14 +439,13 @@ class JaccMapper : public Mapper {
 				vector<Mapping> final_mappings;
 				H->C.inc("mapped_reads");
 				if (H->params.onlybest && mappings.size() >= 1) {
-					if ((use_ed && best_ed_idx != -1) || (!use_ed && best != -1))  {
-						Mapping final_mapping = use_ed ? mappings[best_ed_idx] : mappings[best];
+					if ((use_ed && best_ed_idx != -1) || (!use_ed && best_idx != -1))  {
+						Mapping final_mapping = use_ed ? mappings[best_ed_idx] : mappings[best_idx];
 
-						assert(fabs(J_second-mappings[second_best].J) < 1e-7);
+						assert(fabs(J_second-mappings[second_best_idx].J) < 1e-7);
 						final_mapping.J2 = J_second;
-						final_mapping.best_bucket = best_bucket;
-						final_mapping.second_best_bucket = second_best_bucket;
-						final_mapping.second_best_intersection = mappings[second_best].intersection;
+						final_mapping.bucket2 = mappings[second_best_idx].bucket;
+						final_mapping.second_best_intersection = mappings[second_best_idx].intersection;
 						final_mapping.max_seed_matches = max_seed_matches;
 						final_mapping.seed_matches = seed_matches;
 						final_mapping.max_buckets = max_buckets;
