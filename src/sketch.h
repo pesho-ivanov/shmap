@@ -83,7 +83,7 @@ struct RefSegment {
 
 struct Mapping {
 	int k; 	   // kmer size
-	char *query_id;
+	const char *query_id;
 	int P_start;
 	int P_end;
 	pos_t P_sz;     // pattern size |P| bp 
@@ -117,6 +117,8 @@ struct Mapping {
     Mapping() {}
 	Mapping(int k, pos_t P_sz, int p_sz, pos_t T_l, pos_t T_r, segm_t segm_id, int intersection, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r, int bucket=-1)
 		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), intersection(intersection), unreasonable(false), l(l), r(r), bucket(bucket) {
+		query_id = "";
+		segm_name = "";
 		s_sz = r->hit.tpos - l->hit.tpos + 1;
 		//cerr << "Jprev = " << 1.0*intersection / p_sz << ", Jnew = " << 1.0*intersection / (p_sz + s_sz - intersection) << endl;
 		J = 1.0*intersection / p_sz;
@@ -226,7 +228,8 @@ struct Mapping {
 
 	friend std::ostream& operator<<(std::ostream& os, const Mapping& mapping) {
 		//os << "Mapping(k=" << mapping.k << ", P_sz=" << mapping.P_sz << ", p_sz=" << mapping.p_sz << ", T_l=" << mapping.T_l << ", T_r=" << mapping.T_r << ", segm_id=" << mapping.segm_id << ", s_sz=" << mapping.s_sz << ", intersection=" << mapping.intersection << ", J=" << mapping.J << ", J2=" << mapping.J2 << ", map_time=" << mapping.map_time << ", mapq=" << mapping.mapq << ", strand=" << mapping.strand << ", unreasonable=" << mapping.unreasonable << ")";
-		os  << mapping.query_id  	// Query sequence name
+		os 
+			<< mapping.query_id  	// Query sequence name
 			<< "\t" << mapping.P_sz     // query sequence length
 			<< "\t" << mapping.P_start   // query start (0-based; closed)
 			<< "\t" << mapping.P_end  // query end (0-based; open)

@@ -471,17 +471,17 @@ class JaccMapper : public Mapper {
 								final_mappings.push_back(final_mapping);
 						}
 
-						//if (final_mapping.mapq == 0) {
-						//	string cigar1, cigar2;
-						//	if (best_idx != -1) cigar1 = add_edit_distance(&mappings[best_idx], P, P_sz, m, kmers);
-						//	if (best2_idx != -1) cigar2 = add_edit_distance(&mappings[best2_idx], P, P_sz, m, kmers);
-						//	if (mappings[best_idx].ed != mappings[best2_idx].ed) {
-						//		cerr << endl;
-						//		cerr << query_id << endl;
-						//		cerr << mappings[best_idx] << " " << cigar1 << endl;
-						//		cerr << mappings[best2_idx] << " " << cigar2 << endl;
-						//	}
-						//}
+						if (final_mapping.mapq == 0) {
+							string cigar1, cigar2;
+							if (best_idx != -1) cigar1 = add_edit_distance(&mappings[best_idx], P, P_sz, m, kmers);
+							if (best2_idx != -1) cigar2 = add_edit_distance(&mappings[best2_idx], P, P_sz, m, kmers);
+							if (best_idx != -1 && best2_idx != -1 && mappings[best_idx].ed != mappings[best2_idx].ed) {
+								cerr << endl;
+								cerr << "mapq = 0 for read " << query_id << endl;
+								cerr << mappings[best_idx] << " " << cigar1 << endl;
+								cerr << mappings[best2_idx] << " " << cigar2 << endl;
+							}
+						}
 					}
 				}
 
