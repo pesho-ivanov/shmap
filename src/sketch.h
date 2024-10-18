@@ -119,6 +119,7 @@ struct Mapping {
 		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), intersection(intersection), unreasonable(false), l(l), r(r), bucket(bucket) {
 		query_id = "";
 		segm_name = "";
+		segm_sz = -1;
 		s_sz = r->hit.tpos - l->hit.tpos + 1;
 		//cerr << "Jprev = " << 1.0*intersection / p_sz << ", Jnew = " << 1.0*intersection / (p_sz + s_sz - intersection) << endl;
 		J = 1.0*intersection / p_sz;

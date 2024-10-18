@@ -420,7 +420,7 @@ class JaccMapper : public Mapper {
 				bool use_ed = false;
 
 				H->T.start("edit_distance");
-				int best_ed_idx = -1, best2_ed_idx = -1; 
+				//int best_ed_idx = -1, best2_ed_idx = -1; 
 				//if (use_ed) {
 				//	for (int i=0; i < (int)mappings.size(); ++i) {
 				//		auto &mapping = mappings[i];
@@ -438,14 +438,9 @@ class JaccMapper : public Mapper {
 				vector<Mapping> final_mappings;
 				H->C.inc("mapped_reads");
 				if (H->params.onlybest && mappings.size() >= 1) {
-					if ((use_ed && best_ed_idx != -1) || (!use_ed && best_idx != -1))  {
-						Mapping final_mapping = use_ed ? mappings[best_ed_idx] : mappings[best_idx];
-
-						if (best2_idx != -1) {
-							final_mapping.J2 = mappings[best2_idx].J;
-							final_mapping.bucket2 = mappings[best2_idx].bucket;
-							final_mapping.intersection2 = mappings[best2_idx].intersection;
-						}
+					if (best_idx != -1) {
+						assert(0 <= best_idx && best_idx < mappings.size());
+						Mapping &final_mapping = mappings[best_idx];
 
 						const auto &segm = tidx.T[final_mapping.segm_id];
 						final_mapping.total_matches = total_matches;
@@ -457,25 +452,31 @@ class JaccMapper : public Mapper {
 						final_mapping.segm_name = segm.name.c_str();
 						final_mapping.segm_sz = segm.sz;
 
+						if (best2_idx != -1) {
+							final_mapping.J2 = mappings[best2_idx].J;
+							final_mapping.bucket2 = mappings[best2_idx].bucket;
+							final_mapping.intersection2 = mappings[best2_idx].intersection;
+						}
+
 						if (use_ed) {
-							//cerr << "best_ed_idx=" << best_ed_idx << " best2_ed_idx=" << best2_ed_idx << " final_mapping.ed=" << final_mapping.ed << endl;
-							assert(best_ed_idx != -1);
-							assert(final_mapping.ed != -1);
-							final_mapping.ed2 = best2_ed_idx == -1 ? -1 : mappings[best2_ed_idx].ed;
-							final_mapping.mapq = mapq_ed(final_mapping.ed, final_mapping.ed2);
-							//if (final_mapping.mapq > 0)
-								final_mappings.push_back(final_mapping);
+//							//cerr << "best_ed_idx=" << best_ed_idx << " best2_ed_idx=" << best2_ed_idx << " final_mapping.ed=" << final_mapping.ed << endl;
+//							assert(best_ed_idx != -1);
+//							assert(final_mapping.ed != -1);
+//							final_mapping.ed2 = best2_ed_idx == -1 ? -1 : mappings[best2_ed_idx].ed;
+//							final_mapping.mapq = mapq_ed(final_mapping.ed, final_mapping.ed2);
+//							//if (final_mapping.mapq > 0)
+//								final_mappings.push_back(final_mapping);
 						} else {
 							final_mapping.mapq = mapq_J(final_mapping.J, final_mapping.J2);
 							//if (final_mapping.mapq > 0)
 								final_mappings.push_back(final_mapping);
 						}
 
-						if (final_mapping.mapq == 0) {
+						if (best2_idx != -1 && final_mapping.mapq == 0) {
 							string cigar1, cigar2;
-							if (best_idx != -1) cigar1 = add_edit_distance(&mappings[best_idx], P, P_sz, m, kmers);
-							if (best2_idx != -1) cigar2 = add_edit_distance(&mappings[best2_idx], P, P_sz, m, kmers);
-							if (best_idx != -1 && best2_idx != -1 && mappings[best_idx].ed != mappings[best2_idx].ed) {
+							cigar1 = add_edit_distance(&mappings[best_idx], P, P_sz, m, kmers);
+							cigar2 = add_edit_distance(&mappings[best2_idx], P, P_sz, m, kmers);
+							if (mappings[best_idx].ed != mappings[best2_idx].ed) {
 								cerr << endl;
 								cerr << "mapq = 0 for read " << query_id << endl;
 								cerr << mappings[best_idx] << " " << cigar1 << endl;
