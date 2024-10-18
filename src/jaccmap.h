@@ -223,7 +223,7 @@ class JaccMapper : public Mapper {
 		return 1.0 - double(S - matches) / p;
 	}
 
-	bool is_bucket_interesting(const Seeds &kmers, int lmax, int m, int b, int cnt, int i, int matched_seeds, double J_best, double J_second) {
+	bool is_bucket_interesting(const vector<Mapping> &mappings, const Seeds &kmers, int lmax, int m, int b, int cnt, int i, int matched_seeds, int best_idx, double best2_idx) {
 		H->T.start("match_frequent");
 		bool ret = true;
 		for (; i < (int)kmers.size(); i++) {
@@ -231,7 +231,8 @@ class JaccMapper : public Mapper {
 			if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
 				cnt += kmers[i].occs_in_p;
 			//if (hseed(m, matched_seeds, cnt) < min(J_second, J_best*0.95)) {  //if (cnt <= i-S+1)
-			if (hseed(m, matched_seeds, cnt) < J_second) {
+			double thr = best2_idx == -1 ? H->params.theta : mappings[best2_idx].J; 
+			if (hseed(m, matched_seeds, cnt) < thr) {
 				ret = false;
 				break;
 			}
@@ -368,8 +369,8 @@ class JaccMapper : public Mapper {
 
 				vector<Mapping> mappings;
 				int total_matches = 0;
-				int best_idx(-1), second_best_idx(-1);
-				double J_best(0.0), J_second(H->params.theta);
+				int best_idx(-1), best2_idx(-1);
+				//double J_best(0.0), J_second(H->params.theta);
 				vector<pair<int,int>> M_vec(M.begin(), M.end());
 				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 
@@ -380,7 +381,7 @@ class JaccMapper : public Mapper {
 				int mappings_idx = 0;
 				vector<pair<int, int>> final_buckets;
 				for (auto &[b, cnt]: M) {
-					if (is_bucket_interesting(kmers, lmax, m, b, cnt, i, matched_seeds, J_best, J_second)) {
+					if (is_bucket_interesting(mappings, kmers, lmax, m, b, cnt, i, matched_seeds, best_idx, best2_idx)) {
 						H->T.start("match_collect");
 						Matches matches;
 						for (const auto &kmer: kmers)
@@ -397,16 +398,12 @@ class JaccMapper : public Mapper {
 						for (; mappings_idx < (int)mappings.size(); ++mappings_idx) {
 							auto it = mappings.begin() + mappings_idx;
 							if (best_idx == -1 || it->J > mappings[best_idx].J) {
-								if (abs(mappings[second_best_idx].bucket - mappings[best_idx].bucket) > 1)
-									second_best_idx = best_idx;
+								if (abs(mappings[best2_idx].bucket - mappings[best_idx].bucket) > 1)
+									best2_idx = best_idx;
 								best_idx = mappings_idx;
-								J_best = it->J;
-							} else if (second_best_idx == -1 || it->J > mappings[second_best_idx].J) {
-								if (abs(mappings[second_best_idx].bucket - it->bucket) > 1) {
-									second_best_idx = mappings_idx;
-									J_second = it->J;
-								}
-							}
+							} else if (best2_idx == -1 || it->J > mappings[best2_idx].J)
+								if (abs(mappings[best2_idx].bucket - it->bucket) > 1)
+									best2_idx = mappings_idx;
 						}
 					}
 				}
@@ -416,25 +413,25 @@ class JaccMapper : public Mapper {
 //						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
 //						//cerr << "         mapq: " << mappings.front().mapq << endl;
 //						cerr << "         best: " << best_idx <<  ", bucket=" << best_bucket << "[" << best_bucket*lmax << ", " << (best_bucket+2)*lmax << ")"; if (best_idx != -1) cerr << ", " << std::setprecision(5) << mappings[best_idx] << endl; else cerr << endl;
-//						cerr << "  second_best_idx: " << second_best_idx << ", bucket=" << second_best_bucket << "[" << second_best_bucket*lmax << ", " << (second_best_bucket+2)*lmax << ")"; if (second_best_idx != -1) cerr << ", " << std::setprecision(5) << mappings[second_best_idx] << endl; else cerr << endl;
+//						cerr << "  best2_idx: " << best2_idx << ", bucket=" << second_best_bucket << "[" << second_best_bucket*lmax << ", " << (second_best_bucket+2)*lmax << ")"; if (best2_idx != -1) cerr << ", " << std::setprecision(5) << mappings[best2_idx] << endl; else cerr << endl;
 //					}
 				
 				bool use_ed = false;
 
 				H->T.start("edit_distance");
-				int best_ed_idx = -1, second_best_ed_idx = -1; 
-				if (use_ed) {
-					for (int i=0; i < (int)mappings.size(); ++i) {
-						auto &mapping = mappings[i];
-						add_edit_distance(&mapping, P, P_sz, m, kmers);
-						if (mapping.ed != -1 && (best_ed_idx == -1 || mapping.ed < mappings[best_ed_idx].ed)) {
-							second_best_ed_idx = best_ed_idx;
-							best_ed_idx = i;
-						} else if (mapping.ed != -1 && (second_best_ed_idx == -1 || mapping.ed > mappings[second_best_ed_idx].ed)) {
-							second_best_ed_idx = i;
-						}
-					}
-				}
+				int best_ed_idx = -1, best2_ed_idx = -1; 
+				//if (use_ed) {
+				//	for (int i=0; i < (int)mappings.size(); ++i) {
+				//		auto &mapping = mappings[i];
+				//		add_edit_distance(&mapping, P, P_sz, m, kmers);
+				//		if (mapping.ed != -1 && (best_ed_idx == -1 || mapping.ed < mappings[best_ed_idx].ed)) {
+				//			best2_ed_idx = best_ed_idx;
+				//			best_ed_idx = i;
+				//		} else if (mapping.ed != -1 && (best2_ed_idx == -1 || mapping.ed > mappings[best2_ed_idx].ed)) {
+				//			best2_ed_idx = i;
+				//		}
+				//	}
+				//}
 				H->T.stop("edit_distance");
 				
 				vector<Mapping> final_mappings;
@@ -443,25 +440,24 @@ class JaccMapper : public Mapper {
 					if ((use_ed && best_ed_idx != -1) || (!use_ed && best_idx != -1))  {
 						Mapping final_mapping = use_ed ? mappings[best_ed_idx] : mappings[best_idx];
 
-						assert(fabs(J_second-mappings[second_best_idx].J) < 1e-7);
-						final_mapping.J2 = J_second;
-						final_mapping.bucket2 = mappings[second_best_idx].bucket;
-						final_mapping.second_best_intersection = mappings[second_best_idx].intersection;
+						final_mapping.J2 = mappings[best2_idx].J;
+						final_mapping.bucket2 = mappings[best2_idx].bucket;
+						final_mapping.second_best_intersection = mappings[best2_idx].intersection;
 						final_mapping.max_seed_matches = max_seed_matches;
 						final_mapping.seed_matches = seed_matches;
 						final_mapping.max_buckets = max_buckets;
 						final_mapping.final_buckets = final_buckets.size();
 
 						if (use_ed) {
-							//cerr << "best_ed_idx=" << best_ed_idx << " second_best_ed_idx=" << second_best_ed_idx << " final_mapping.ed=" << final_mapping.ed << endl;
+							//cerr << "best_ed_idx=" << best_ed_idx << " best2_ed_idx=" << best2_ed_idx << " final_mapping.ed=" << final_mapping.ed << endl;
 							assert(best_ed_idx != -1);
 							assert(final_mapping.ed != -1);
-							final_mapping.ed2 = second_best_ed_idx == -1 ? -1 : mappings[second_best_ed_idx].ed;
+							final_mapping.ed2 = best2_ed_idx == -1 ? -1 : mappings[best2_ed_idx].ed;
 							final_mapping.mapq = mapq_ed(final_mapping.ed, final_mapping.ed2);
 							//if (final_mapping.mapq > 0)
 								final_mappings.push_back(final_mapping);
 						} else {
-							final_mapping.mapq = mapq_J(J_best, J_second);
+							final_mapping.mapq = mapq_J(final_mapping.J, final_mapping.J2);
 							//if (final_mapping.mapq > 0)
 								final_mappings.push_back(final_mapping);
 						}
