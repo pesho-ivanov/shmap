@@ -30,12 +30,12 @@ INF = 999999
 
 REFNAME ?= t2tChrY
 ACCURACY ?= 0.99
-DEPTH ?= 0.01
+DEPTH ?= 0.1
 MEANLEN ?= 10000
 READSIM_REFNAME ?= $(REFNAME)
 
 K ?= 19
-R ?= 1.0
+R ?= 0.1
 S ?= 300
 M ?= 100
 T ?= 0.9

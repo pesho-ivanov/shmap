@@ -283,9 +283,10 @@ class JaccMapper : public Mapper {
 	
 	int mapq_J(double J_best, double J_second) {
 		// minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
-		double bound = J_best * 0.95;
-		double r = max((J_second - bound) / (J_best - bound), 0.0);
-		return int(60.0 * (1.0 - 1.0 * r));
+		double bound = J_best * 0.9;
+		double r = max(J_second - bound, 0.0) / (J_best - bound);  // low is good
+		double J_fl = 60.0 * (1.0 - 1.0 * r);  // high is good
+		return int(J_fl/10.0) * 10;
 		//return 60.0 * (1.0 - 1.0 * pow(J_second / J_best, 0.5) );
 		//return  60.0 * (1.0 - 1.0 * pow(r, 2.0));
 	}
@@ -374,7 +375,7 @@ class JaccMapper : public Mapper {
 				vector<pair<int,int>> M_vec(M.begin(), M.end());
 				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 
-				int gt_a, gt_b;
+//				int gt_a, gt_b;
 //				if (!is_safe(query_id, M_vec, lmax, &gt_a, &gt_b))
 //					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
 
