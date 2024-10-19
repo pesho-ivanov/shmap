@@ -406,14 +406,12 @@ class JaccMapper : public Mapper {
 						H->T.stop("sweep");
 						
 						for (; maps_idx < static_cast<int>(maps.size()); ++maps_idx) {
-							//cerr << "best_idx=" << best_idx << " best2_idx=" << best2_idx << " best4_idx=" << bests_idx[0] << "," << bests_idx[1] << "," << bests_idx[2] << "," << bests_idx[3] << endl;
 							for (int i = 0; i < 4; ++i) {
 								if (bests_idx[i] == -1 || maps[bests_idx[i]].J < maps[maps_idx].J) {
 									for (int j=3; j>=i+1; --j)
 										bests_idx[j] = bests_idx[j-1];
 									bests_idx[i] = maps_idx;
 
-									//cerr << "i=" << i << ", best_idx=" << best_idx << " best2_idx=" << best2_idx << " bests_idx=" << bests_idx[0] << "," << bests_idx[1] << "," << bests_idx[2] << "," << bests_idx[3] << endl;
 									best_idx = bests_idx[0];
 									int j;
 									for (j=1; j<4; ++j)
@@ -428,21 +426,6 @@ class JaccMapper : public Mapper {
 						}
 
 						assert(best2_idx == -1 || abs(maps[best_idx].bucket - maps[best2_idx].bucket) > 1);
-
-						//for (; maps_idx < static_cast<int>(maps.size()); ++maps_idx) {
-						//	if (best_idx == -1) {
-						//		best_idx = maps_idx;
-						//	} else if (maps[maps_idx].J > maps[best_idx].J) {
-						//		if (abs(maps[best_idx].bucket - maps[maps_idx].bucket) > 1)
-						//			best2_idx = best_idx;
-						//		best_idx = maps_idx;
-						//	} else if (abs(maps[best_idx].bucket - maps[maps_idx].bucket) > 1) {
-						//		if (best2_idx == -1 || maps[maps_idx].J > maps[best2_idx].J) {
-						//			best2_idx = maps_idx;
-						//		}
-						//	}
-						//}
-						//assert(best2_idx == -1 || abs(maps[best_idx].bucket - maps[best2_idx].bucket) > 1);
 					}
 				}
 				
