@@ -2150,7 +2150,7 @@ function paf_mapeval(args)
 					continue;
 				var mapq = parseInt(t[11]);
 				if (mapq > max_mapq) mapq = max_mapq;
-				a.push([t[5], parseInt(t[7]), parseInt(t[8]), t[4], mapq, parseInt(t[9]), line]);
+				a.push([t[5], parseInt(t[7]), parseInt(t[8]), t[4], mapq, parseInt(t[9])].concat(t.slice(1)));
 			} else { // SAM
 				var flag = parseInt(t[1]);
 				var read_no = flag>>6&0x3;
@@ -2182,7 +2182,7 @@ function paf_mapeval(args)
 					var NM = parseInt(m[1]);
 					if (NM >= n_gap) score = mlen - (NM - n_gap);
 				}
-				a.push([t[2], pos, pos_end, (flag&16)? '-' : '+', mapq, score, line]);
+				a.push([t[2], pos, pos_end, (flag&16)? '-' : '+', mapq, score].concat(t.slice(1)));
 			}
 		}
 	}
