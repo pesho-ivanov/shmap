@@ -152,7 +152,8 @@ class JaccMapper : public Mapper {
 		unordered_map<int, int> diff_hist;
 
 		for (auto &kmer: kmers)
-			diff_hist[kmer.kmer.h] += kmer.occs_in_p;
+			diff_hist[kmer.kmer.h] = 1;
+			//diff_hist[kmer.kmer.h] += kmer.occs_in_p;
 
 		int intersection = 0;
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
@@ -183,7 +184,12 @@ class JaccMapper : public Mapper {
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			auto mapping = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, same_strand_seeds, l, prev(r), bucket);
+			double J = 1.0*intersection / kmers.size();
+			//double J = 1.0*intersection / m;
+			//J = 1.0*intersection / p_sz;
+			//J = 1.0*intersection / std::min(p_sz, s_sz);
+			//J = 1.0*intersection / (p_sz + s_sz - intersection);
+			auto mapping = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r), bucket);
 			if (mapping.J > best.J)
 				best = mapping;
 
