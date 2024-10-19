@@ -62,6 +62,7 @@ ONE_READ = $(ALLREADS_DIR)/$(READS_PREFIX).oneread.fa
 ALLOUT_DIR = $(DIR)/out
 OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)/k$(K)-r$(R)-s$(S)-m$(M)-t$(T)
 
+PAFTOOLS = ./ext/paftools.js
 SWEEPMAP_PREF = $(OUTDIR)/sweepmap/sweepmap
 BUCKETMAP_PREF = $(OUTDIR)/bucketmap/bucketmap
 RMQMAP_PREF = $(OUTDIR)/rmqmap/rmqmap
@@ -111,7 +112,7 @@ ifeq ($(wildcard $(READS)),)
 		   --length-mean $(MEANLEN)
 
 	samtools faidx $(READSIM_REF)
-	-paftools.js pbsim2fq $(READSIM_REF).fai "$(READS_PREFIX)"_*.maf >$(READS)
+	-$(PAFTOOLS) pbsim2fq $(READSIM_REF).fai "$(READS_PREFIX)"_*.maf >$(READS)
 	rm -f "$(READS_PREFIX)"_*.maf "$(READS_PREFIX)"_*.ref "$(READS_PREFIX)"_*.fastq
 # take only positive strand reads
 #	mv $(READS)_ $(READS)
@@ -130,7 +131,7 @@ eval_sketching: sweepmap gen_reads
 			echo "Processing $${f}"; \
 			$(TIME_CMD) -o $${f}.index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $${k} -r $${r} -S $(S) -M $(M) 2>&1 >/dev/null; \
 			$(TIME_CMD) -o $${f}.time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $${f}.params -x -t $(T) -k $${k} -r $${r} -S $(S) -M $(M) 2> >(tee $${f}.log) >$${f}.paf; \
-			-paftools.js mapeval $${f}.paf | tee $${f}.eval; \
+			-$(PAFTOOLS) mapeval $${f}.paf | tee $${f}.eval; \
 		done \
     done
 
@@ -143,7 +144,7 @@ eval_thinning: sweepmap gen_reads
 			echo "Processing $${f}"; \
 			$(TIME_CMD) -o $${f}.index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $${s} -M $${m} 2>&1 >/dev/null; \
 			$(TIME_CMD) -o $${f}.time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $${f}.params -x -t $(T) -k $(K) -r $(R) -S $${s} -M $${m} 2> >(tee $${f}.log) >$${f}.paf; \
-			-paftools.js mapeval $${f}.paf | tee $${f}.eval; \
+			-$(PAFTOOLS) mapeval $${f}.paf | tee $${f}.eval; \
 		done \
     done
 
@@ -151,43 +152,43 @@ eval_sweepmap_sam: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_PREF))
 	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) -a 2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).sam
-	-paftools.js mapeval $(SWEEPMAP_PREF).sam | tee $(SWEEPMAP_PREF).eval
-	@-paftools.js mapeval -Q 60 $(SWEEPMAP_PREF).sam >$(SWEEPMAP_PREF).wrong
+	-$(PAFTOOLS) mapeval $(SWEEPMAP_PREF).sam | tee $(SWEEPMAP_PREF).eval
+	@-$(PAFTOOLS) mapeval -Q 60 $(SWEEPMAP_PREF).sam >$(SWEEPMAP_PREF).wrong
 
 eval_sweepmap: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_PREF))
 	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -S $(S) -M $(M) -t $(T) -x 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -k $(K) -r $(R) -S $(S) -M $(M) -t $(T) -x    2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).paf
-	-paftools.js mapeval -r 0.1 $(SWEEPMAP_PREF).paf | tee $(SWEEPMAP_PREF).eval
-	@-paftools.js mapeval -r 0.1 -Q 60 $(SWEEPMAP_PREF).paf >$(SWEEPMAP_PREF).wrong
+	-$(PAFTOOLS) mapeval -r 0.1 $(SWEEPMAP_PREF).paf | tee $(SWEEPMAP_PREF).eval
+	@-$(PAFTOOLS) mapeval -r 0.1 -Q 60 $(SWEEPMAP_PREF).paf >$(SWEEPMAP_PREF).wrong
 
 eval_sweepmap_slow: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SWEEPMAP_SLOW_PREF))
 	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -z $(SWEEPMAP_SLOW_PREF).params -k $(K_SLOW) -r $(R_SLOW) -t $(T_SLOW) -x >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(SWEEPMAP_SLOW_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_SLOW_PREF).params -k $(K_SLOW) -r $(R_SLOW) -t $(T_SLOW) -x 2> >(tee $(SWEEPMAP_SLOW_PREF).log) >$(SWEEPMAP_SLOW_PREF).paf 
-	-paftools.js mapeval $(SWEEPMAP_SLOW_PREF).paf | tee $(SWEEPMAP_SLOW_PREF).eval
-	@-paftools.js mapeval -Q 0 $(SWEEPMAP_SLOW_PREF).paf >$(SWEEPMAP_SLOW_PREF).wrong
+	-$(PAFTOOLS) mapeval $(SWEEPMAP_SLOW_PREF).paf | tee $(SWEEPMAP_SLOW_PREF).eval
+	@-$(PAFTOOLS) mapeval -Q 0 $(SWEEPMAP_SLOW_PREF).paf >$(SWEEPMAP_SLOW_PREF).wrong
 
 eval_bucketmap: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(BUCKETMAP_PREF))
 #	$(TIME_CMD) -o $(BUCKETMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -m bucket 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(BUCKETMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(BUCKETMAP_PREF).params -k $(K) -r $(R) -t $(T) -x -m bucket     2> >(tee $(BUCKETMAP_PREF).log) >$(BUCKETMAP_PREF).paf
-	-paftools.js mapeval -r 0.1 $(BUCKETMAP_PREF).paf | tee $(BUCKETMAP_PREF).eval
-	@-paftools.js mapeval -r 0.1 -Q 60 $(BUCKETMAP_PREF).paf >$(BUCKETMAP_PREF).wrong
+	-$(PAFTOOLS) mapeval -r 0.1 $(BUCKETMAP_PREF).paf | tee $(BUCKETMAP_PREF).eval
+	@-$(PAFTOOLS) mapeval -r 0.1 -Q 60 $(BUCKETMAP_PREF).paf >$(BUCKETMAP_PREF).wrong
 
 eval_rmqmap: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(RMQMAP_PREF))
 	$(TIME_CMD) -o $(RMQMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -x -m rmq 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(RMQMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(RMQMAP_PREF).params -k $(K) -r $(R) -t $(T) -x -m rmq     2> >(tee $(RMQMAP_PREF).log) >$(RMQMAP_PREF).paf
-	-paftools.js mapeval -r 0.1 $(RMQMAP_PREF).paf | tee $(RMQMAP_PREF).eval
-	@-paftools.js mapeval -r 0.1 -Q 60 $(RMQMAP_PREF).paf >$(RMQMAP_PREF).wrong
+	-$(PAFTOOLS) mapeval -r 0.1 $(RMQMAP_PREF).paf | tee $(RMQMAP_PREF).eval
+	@-$(PAFTOOLS) mapeval -r 0.1 -Q 60 $(RMQMAP_PREF).paf >$(RMQMAP_PREF).wrong
 
 eval_jaccmap: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(JACCMAP_PREF))
 #	$(TIME_CMD) -o $(JACCMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -x -m jacc 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(JACCMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(JACCMAP_PREF).params -k $(K) -r $(R) -t $(T) -x -m jacc     2> >(tee $(JACCMAP_PREF).log) > $(JACCMAP_PREF).paf
-	-paftools.js mapeval -r 0.1 $(JACCMAP_PREF).paf | tee $(JACCMAP_PREF).eval
-	-paftools.js mapeval -r 0.1 -Q 0 $(JACCMAP_PREF).paf >$(JACCMAP_PREF).wrong
+	-$(PAFTOOLS) mapeval -r 0.1 $(JACCMAP_PREF).paf | tee $(JACCMAP_PREF).eval
+	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(JACCMAP_PREF).paf >$(JACCMAP_PREF).wrong
 
 eval_winnowmap: gen_reads
 	@mkdir -p $(shell dirname $(WINNOWMAP_PREF))
@@ -197,26 +198,26 @@ eval_winnowmap: gen_reads
 	fi
 	$(TIME_CMD) -o $(WINNOWMAP_PREF).index.time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 --secondary=no $(REF) $(ONE_READ) >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(WINNOWMAP_PREF).time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(WINNOWMAP_PREF).log) >$(WINNOWMAP_PREF).paf 
-	-paftools.js mapeval $(WINNOWMAP_PREF).paf | tee $(WINNOWMAP_PREF).eval
+	-$(PAFTOOLS) mapeval $(WINNOWMAP_PREF).paf | tee $(WINNOWMAP_PREF).eval
 
 eval_minimap: gen_reads
 	@mkdir -p $(shell dirname $(MINIMAP_PREF))
 	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level -a $(REF) $(ONE_READ) >/dev/null 2>/dev/null
 #	$(TIME_CMD) -o $(MINIMAP_PREF).time       $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level -a $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).bam
 	$(TIME_CMD) -o $(MINIMAP_PREF).time       $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).paf
-	-paftools.js mapeval $(MINIMAP_PREF).paf | tee $(MINIMAP_PREF).eval
+	-$(PAFTOOLS) mapeval $(MINIMAP_PREF).paf | tee $(MINIMAP_PREF).eval
 
 eval_blend: gen_reads
 	@mkdir -p $(shell dirname $(BLEND_PREF))
 	$(TIME_CMD) -o $(BLEND_PREF).index.time $(BLEND_BIN) -x map-hifi -t 1 -N 0 $(REF) $(ONE_READ) >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(BLEND_PREF).time $(BLEND_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(BLEND_PREF).log) >$(BLEND_PREF).paf 
-	-paftools.js mapeval $(BLEND_PREF).paf | tee $(BLEND_PREF).eval
+	-$(PAFTOOLS) mapeval $(BLEND_PREF).paf | tee $(BLEND_PREF).eval
 
 eval_mapquik: gen_reads
 	@mkdir -p $(shell dirname $(MAPQUIK_PREF))
 	$(TIME_CMD) -o $(MAPQUIK_PREF).index.time $(MAPQUIK_BIN) $(ONE_READ) --reference $(REF) --threads 1  >/dev/null
 	$(TIME_CMD) -o $(MAPQUIK_PREF).time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(MAPQUIK_PREF) | tee $(MAPQUIK_PREF).log
-	-paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
+	-$(PAFTOOLS) mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
 eval_tools: eval_sweepmap eval_sweepmap_slow eval_mapquik eval_blend eval_minimap eval_winnowmap 
 
@@ -269,7 +270,7 @@ clean_evals:
 #eval_veritymap:
 #	mkdir -p $(OUTDIR)
 #	$(TIME_CMD) -o $(OUTDIR)/veritymap.time $(VERITYMAP_BIN) -d hifi -t 1 --reads $(READS) $(REF) -o $(OUTDIR)/veritymap 2> >(tee $(OUTDIR)/veritymap.log) >$(OUTDIR)/veritymap.paf 
-#	-paftools.js mapeval $(OUTDIR)/veritymap.paf | tee $(OUTDIR)/veritymap.eval
+#	-$(PAFTOOLS) mapeval $(OUTDIR)/veritymap.paf | tee $(OUTDIR)/veritymap.eval
 
 #eval_eskemap: gen_reads
 #	mkdir -p $(OUTDIR)
