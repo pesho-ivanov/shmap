@@ -147,7 +147,7 @@ class JaccMapper : public Mapper {
 	//	edlibFreeAlignResult(result);
 	//}
 
-	void sweep(vector<Match> &M, const pos_t P_sz, const int m, const Seeds &kmers, vector<Mapping> *maps, int bucket) {
+	void sweep(vector<Match> &M, const pos_t P_sz, int lmax, const int m, const Seeds &kmers, vector<Mapping> *maps, int bucket) {
 		H->T.start("sweep-prepare");
 		unordered_map<int, int> diff_hist;
 
@@ -171,18 +171,14 @@ class JaccMapper : public Mapper {
 		// Increase the left point end of the window [l,r) one by one. O(matches)
 		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l) {
 			// Increase the right end of the window [l,r) until it gets out.
-			//cerr << "l: " << l->hit.segm_id << " " << l->hit.r << " " << l->seed.kmer.h << " " << l->seed.kmer.r << endl;
 			for(;  r != M.end()
 				&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
-				&& r->hit.r + H->params.k <= l->hit.r + P_sz
+				//&& r->hit.r + H->params.k <= l->hit.r + P_sz
+				&& l->hit.tpos + lmax >= r->hit.tpos
 				; ++r) {
 				same_strand_seeds += r->seed.occs_in_p * (r->is_same_strand() ? +1 : -1);  // todo: kmer multiplicity
-				//for (int k = 0; k < r->seed.occs_in_p; ++k) {  // TODO: in O(1)
-				//	if (--diff_hist[r->seed.kmer.h] >= 0)
-				//		++intersection;
-				//}
-				intersection += min(r->seed.occs_in_p, max(0, diff_hist[r->seed.kmer.h]));
-				diff_hist[r->seed.kmer.h] -= r->seed.occs_in_p;
+				if (--diff_hist[r->seed.kmer.h] >= 0)
+					++intersection;
 				
 				assert (l->hit.r <= r->hit.r);
 			}
@@ -192,12 +188,8 @@ class JaccMapper : public Mapper {
 				best = mapping;
 
 			same_strand_seeds -= l->seed.occs_in_p * (l->is_same_strand() ? +1 : -1);
-			//for (int k = 0; k < l->seed.occs_in_p; ++k) {  // TODO: in O(1)
-			//	if (++diff_hist[l->seed.kmer.h] >= 1)
-			//		--intersection;
-			//}
-			intersection -= max(0, l->seed.occs_in_p + min(0, diff_hist[l->seed.kmer.h]));
-			diff_hist[l->seed.kmer.h] += l->seed.occs_in_p;
+			if (++diff_hist[l->seed.kmer.h] >= 1)
+				--intersection;
 
 			assert(intersection >= 0);
 		}
@@ -402,7 +394,7 @@ class JaccMapper : public Mapper {
 						final_buckets.push_back( make_pair(b, cnt) );
 
 						H->T.start("sweep");
-							sweep(matches, P_sz, m, kmers, &maps, b);
+							sweep(matches, P_sz, lmax, m, kmers, &maps, b);
 							//edit_distance(matches, P, P_sz, m, kmers, &maps);
 						H->T.stop("sweep");
 						
