@@ -250,6 +250,7 @@ struct Mapping {
 			<< "\t" << "I2:i:"			<< mapping.intersection2
 			<< "\t" << "J:f:"			<< mapping.J   // Jaccard similarity [0; 1]
 			<< "\t" << "J2:f:"			<< mapping.J2   // second best mapping Jaccard similarity [0; 1]
+			<< "\t" << "Jdiff:f:"		<< mapping.J - mapping.J2   // second best mapping Jaccard similarity [0; 1]
 			<< "\t" << "ed:i:"			<< mapping.ed
 			<< "\t" << "ed2:i:"			<< mapping.ed2
 			<< "\t" << "MSeedmax:i:"	<< mapping.max_seed_matches

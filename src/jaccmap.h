@@ -265,7 +265,7 @@ class JaccMapper : public Mapper {
 			int bucket_a = b*lmax;
 			int bucket_b = (b+2)*lmax;
 			//if (bucket_a <= *gt_a && *gt_b <= bucket_b)
-			cerr << "safety check: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
+			//cerr << "safety check: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
 			if (covered_frac(bucket_a, bucket_b, *gt_a, *gt_b) >= 0.9) {
 				cerr << "SAFE: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
 				return true;
