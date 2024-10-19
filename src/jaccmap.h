@@ -99,7 +99,7 @@ class JaccMapper : public Mapper {
 		return cigar;
 	}
 			
-	//void edit_distance(vector<Match> &M, const char *P, const pos_t P_sz, const int m, const Seeds &kmers, vector<Mapping> *mappings) {
+	//void edit_distance(vector<Match> &M, const char *P, const pos_t P_sz, const int m, const Seeds &kmers, vector<Mapping> *maps) {
 	//	int max_ed = 600; // -1 for none
 
 	//	if (M.size() == 0)
@@ -143,11 +143,11 @@ class JaccMapper : public Mapper {
 	//	int intersection = -1;
 	//	auto mapping = Mapping(H->params.k, P_sz, m, from, to, segm_id, intersection, same_strand_seeds, M.begin(), M.begin());
 	//	mapping.ed = result.editDistance;
-	//	mappings->push_back(mapping);
+	//	maps->push_back(mapping);
 	//	edlibFreeAlignResult(result);
 	//}
 
-	void sweep(vector<Match> &M, const pos_t P_sz, const int m, const Seeds &kmers, vector<Mapping> *mappings, int bucket) {
+	void sweep(vector<Match> &M, const pos_t P_sz, const int m, const Seeds &kmers, vector<Mapping> *maps, int bucket) {
 		H->T.start("sweep-prepare");
 		unordered_map<int, int> diff_hist;
 
@@ -205,7 +205,7 @@ class JaccMapper : public Mapper {
 		assert(same_strand_seeds == 0);
 		
 		if (best.J >= H->params.theta)
-			mappings->push_back(best);
+			maps->push_back(best);
 		H->T.stop("sweep-main");
 	}
 
@@ -223,7 +223,7 @@ class JaccMapper : public Mapper {
 		return 1.0 - double(S - matches) / p;
 	}
 
-	bool is_bucket_interesting(const vector<Mapping> &mappings, const Seeds &kmers, int lmax, int m, int b, int cnt, int i, int matched_seeds, int best_idx, double best2_idx) {
+	bool is_bucket_interesting(const vector<Mapping> &maps, const Seeds &kmers, int lmax, int m, int b, int cnt, int i, int matched_seeds, int best_idx, double best2_idx) {
 		H->T.start("match_frequent");
 		bool ret = true;
 		for (; i < (int)kmers.size(); i++) {
@@ -231,7 +231,7 @@ class JaccMapper : public Mapper {
 			if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
 				cnt += kmers[i].occs_in_p;
 			//if (hseed(m, matched_seeds, cnt) < min(J_second, J_best*0.95)) {  //if (cnt <= i-S+1)
-			double thr = best2_idx == -1 ? H->params.theta : mappings[best2_idx].J; 
+			double thr = best2_idx == -1 ? H->params.theta : maps[best2_idx].J; 
 			if (hseed(m, matched_seeds, cnt) < thr) {
 				ret = false;
 				break;
@@ -308,7 +308,7 @@ class JaccMapper : public Mapper {
 		H->C.inc("matches_freq", 0);
 		H->C.inc("spurious_matches", 0);
 		H->C.inc("J", 0);
-		H->C.inc("mappings", 0);
+		H->C.inc("maps", 0);
 		H->C.inc("sketched_kmers", 0);
 		H->C.inc("total_edit_distance", 0);
 		H->C.inc("intersection_diff", 0);
@@ -374,7 +374,7 @@ class JaccMapper : public Mapper {
 				max_buckets = M.size();
 				H->T.stop("match_infrequent");
 
-				vector<Mapping> mappings;
+				vector<Mapping> maps;
 				int total_matches = 0;
 				int best_idx(-1), best2_idx(-1);
 				//double J_best(0.0), J_second(H->params.theta);
@@ -387,10 +387,10 @@ class JaccMapper : public Mapper {
 //					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
 				H->C.inc("lost_on_seeding", lost_on_seeding);
 
-				int mappings_idx = 0;
+				int maps_idx = 0;
 				vector<pair<int, int>> final_buckets;
 				for (auto &[b, cnt]: M) {
-					if (is_bucket_interesting(mappings, kmers, lmax, m, b, cnt, i, matched_seeds, best_idx, best2_idx)) {
+					if (is_bucket_interesting(maps, kmers, lmax, m, b, cnt, i, matched_seeds, best_idx, best2_idx)) {
 						H->T.start("match_collect");
 						Matches matches;
 						for (const auto &kmer: kmers)
@@ -400,34 +400,39 @@ class JaccMapper : public Mapper {
 						final_buckets.push_back( make_pair(b, cnt) );
 
 						H->T.start("sweep");
-							sweep(matches, P_sz, m, kmers, &mappings, b);
-							//edit_distance(matches, P, P_sz, m, kmers, &mappings);
+							sweep(matches, P_sz, m, kmers, &maps, b);
+							//edit_distance(matches, P, P_sz, m, kmers, &maps);
 						H->T.stop("sweep");
 
-						for (; mappings_idx < (int)mappings.size(); ++mappings_idx) {
-							auto it = mappings.begin() + mappings_idx;
-							if (best_idx == -1 || it->J > mappings[best_idx].J) {
-								if (abs(mappings[best_idx].bucket - it->bucket) > 1)
+						for (; maps_idx < static_cast<int>(maps.size()); ++maps_idx) {
+							if (best_idx == -1) {
+								best_idx = maps_idx;
+							} else if (maps[maps_idx].J > maps[best_idx].J) {
+								if (abs(maps[best_idx].bucket - maps[maps_idx].bucket) > 1)
 									best2_idx = best_idx;
-								best_idx = mappings_idx;
-							} else if (best2_idx == -1 || (it->J > mappings[best2_idx].J && abs(mappings[best2_idx].bucket - it->bucket) > 1))
-								best2_idx = mappings_idx;
+								best_idx = maps_idx;
+							} else if (abs(maps[best_idx].bucket - maps[maps_idx].bucket) > 1) {
+								if (best2_idx == -1 || maps[maps_idx].J > maps[best2_idx].J) {
+									best2_idx = maps_idx;
+								}
+							}
 						}
+						assert(best2_idx == -1 || abs(maps[best_idx].bucket - maps[best2_idx].bucket) > 1);
 					}
 				}
 				
 				int lost_on_pruning = 1;
-				if (mappings.size() == 1) { // && mappings.front().mapq > 0) {
+				if (maps.size() == 1) { // && maps.front().mapq > 0) {
 					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
 //						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
-//						//cerr << "         mapq: " << mappings.front().mapq << endl;
+//						//cerr << "         mapq: " << maps.front().mapq << endl;
 //						if (best_idx != -1) {
-//							int bb = mappings[best_idx].bucket;
-//							cerr << "         best: " << best_idx <<  ", bucket=" << bb << "[" << bb*lmax << ", " << (bb+2)*lmax << ")"; if (best_idx != -1) cerr << ", " << std::setprecision(5) << mappings[best_idx] << endl; else cerr << endl;
+//							int bb = maps[best_idx].bucket;
+//							cerr << "         best: " << best_idx <<  ", bucket=" << bb << "[" << bb*lmax << ", " << (bb+2)*lmax << ")"; if (best_idx != -1) cerr << ", " << std::setprecision(5) << maps[best_idx] << endl; else cerr << endl;
 //						}
 //						if (best2_idx != -1) {
-//							int bb2 = mappings[best2_idx].bucket;
-//							cerr << "  best2_idx: " << best2_idx << ", bucket=" << bb2 << "[" << bb2*lmax << ", " << (bb2+2)*lmax << ")"; if (best2_idx != -1) cerr << ", " << std::setprecision(5) << mappings[best2_idx] << endl; else cerr << endl;
+//							int bb2 = maps[best2_idx].bucket;
+//							cerr << "  best2_idx: " << best2_idx << ", bucket=" << bb2 << "[" << bb2*lmax << ", " << (bb2+2)*lmax << ")"; if (best2_idx != -1) cerr << ", " << std::setprecision(5) << maps[best2_idx] << endl; else cerr << endl;
 //						}
 					} else
 						lost_on_pruning = 0;
@@ -439,13 +444,13 @@ class JaccMapper : public Mapper {
 				H->T.start("edit_distance");
 				//int best_ed_idx = -1, best2_ed_idx = -1; 
 				//if (use_ed) {
-				//	for (int i=0; i < (int)mappings.size(); ++i) {
-				//		auto &mapping = mappings[i];
+				//	for (int i=0; i < (int)maps.size(); ++i) {
+				//		auto &mapping = maps[i];
 				//		add_edit_distance(&mapping, P, P_sz, m, kmers);
-				//		if (mapping.ed != -1 && (best_ed_idx == -1 || mapping.ed < mappings[best_ed_idx].ed)) {
+				//		if (mapping.ed != -1 && (best_ed_idx == -1 || mapping.ed < maps[best_ed_idx].ed)) {
 				//			best2_ed_idx = best_ed_idx;
 				//			best_ed_idx = i;
-				//		} else if (mapping.ed != -1 && (best2_ed_idx == -1 || mapping.ed > mappings[best2_ed_idx].ed)) {
+				//		} else if (mapping.ed != -1 && (best2_ed_idx == -1 || mapping.ed > maps[best2_ed_idx].ed)) {
 				//			best2_ed_idx = i;
 				//		}
 				//	}
@@ -454,50 +459,51 @@ class JaccMapper : public Mapper {
 				
 				vector<Mapping> final_mappings;
 				H->C.inc("mapped_reads");
-				if (H->params.onlybest && mappings.size() >= 1) {
+				if (H->params.onlybest && maps.size() >= 1) {
 					if (best_idx != -1) {
-						assert(0 <= best_idx && best_idx < mappings.size());
-						Mapping &final_mapping = mappings[best_idx];
+						assert(0 <= best_idx && best_idx < (int)maps.size());
+						Mapping &final_map = maps[best_idx];
 
-						const auto &segm = tidx.T[final_mapping.segm_id];
-						final_mapping.total_matches = total_matches;
-						final_mapping.max_seed_matches = max_seed_matches;
-						final_mapping.seed_matches = seed_matches;
-						final_mapping.max_buckets = max_buckets;
-						final_mapping.final_buckets = final_buckets.size();
-						final_mapping.query_id = query_id;
-						final_mapping.segm_name = segm.name.c_str();
-						final_mapping.segm_sz = segm.sz;
+						const auto &segm = tidx.T[final_map.segm_id];
+						final_map.total_matches = total_matches;
+						final_map.max_seed_matches = max_seed_matches;
+						final_map.seed_matches = seed_matches;
+						final_map.max_buckets = max_buckets;
+						final_map.final_buckets = final_buckets.size();
+						final_map.query_id = query_id;
+						final_map.segm_name = segm.name.c_str();
+						final_map.segm_sz = segm.sz;
 
 						if (best2_idx != -1) {
-							final_mapping.J2 = mappings[best2_idx].J;
-							final_mapping.bucket2 = mappings[best2_idx].bucket;
-							final_mapping.intersection2 = mappings[best2_idx].intersection;
+							final_map.J2 = maps[best2_idx].J;
+							final_map.bucket2 = maps[best2_idx].bucket;
+							final_map.intersection2 = maps[best2_idx].intersection;
+							assert(abs(final_map.bucket - final_map.bucket2) > 1);
 						}
 
 						if (use_ed) {
 //							//cerr << "best_ed_idx=" << best_ed_idx << " best2_ed_idx=" << best2_ed_idx << " final_mapping.ed=" << final_mapping.ed << endl;
 //							assert(best_ed_idx != -1);
 //							assert(final_mapping.ed != -1);
-//							final_mapping.ed2 = best2_ed_idx == -1 ? -1 : mappings[best2_ed_idx].ed;
+//							final_mapping.ed2 = best2_ed_idx == -1 ? -1 : maps[best2_ed_idx].ed;
 //							final_mapping.mapq = mapq_ed(final_mapping.ed, final_mapping.ed2);
 //							//if (final_mapping.mapq > 0)
 //								final_mappings.push_back(final_mapping);
 						} else {
-							final_mapping.mapq = mapq_J(final_mapping.J, final_mapping.J2);
+							final_map.mapq = mapq_J(final_map.J, final_map.J2);
 							//if (final_mapping.mapq > 0)
-								final_mappings.push_back(final_mapping);
+								final_mappings.push_back(final_map);
 						}
 
 //						if (best2_idx != -1 && final_mapping.mapq == 0) {
 //							string cigar1, cigar2;
-//							cigar1 = add_edit_distance(&mappings[best_idx], P, P_sz, m, kmers);
-//							cigar2 = add_edit_distance(&mappings[best2_idx], P, P_sz, m, kmers);
-//							if (mappings[best_idx].ed != mappings[best2_idx].ed) {
+//							cigar1 = add_edit_distance(&maps[best_idx], P, P_sz, m, kmers);
+//							cigar2 = add_edit_distance(&maps[best2_idx], P, P_sz, m, kmers);
+//							if (maps[best_idx].ed != maps[best2_idx].ed) {
 //								cerr << endl;
 //								cerr << "mapq = 0 for read " << query_id << endl;
-//								cerr << mappings[best_idx] << " " << cigar1 << endl;
-//								cerr << mappings[best2_idx] << " " << cigar2 << endl;
+//								cerr << maps[best_idx] << " " << cigar1 << endl;
+//								cerr << maps[best2_idx] << " " << cigar2 << endl;
 //							}
 //						}
 					}
