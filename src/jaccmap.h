@@ -267,7 +267,7 @@ class JaccMapper : public Mapper {
 			//if (bucket_a <= *gt_a && *gt_b <= bucket_b)
 			//cerr << "safety check: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
 			if (covered_frac(bucket_a, bucket_b, *gt_a, *gt_b) >= 0.9) {
-				cerr << "SAFE: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
+				//cerr << "SAFE: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
 				return true;
 			}
 		}
@@ -380,8 +380,9 @@ class JaccMapper : public Mapper {
 				vector<pair<int,int>> M_vec(M.begin(), M.end());
 				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 
-				int gt_a, gt_b;
-				int lost_on_seeding = !is_safe(query_id, M_vec, lmax, &gt_a, &gt_b);
+				int lost_on_seeding = (0);
+//				int gt_a, gt_b;
+//				lost_on_seeding = !is_safe(query_id, M_vec, lmax, &gt_a, &gt_b);
 //				if (!is_safe(query_id, M_vec, lmax, &gt_a, &gt_b))
 //					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
 				H->C.inc("lost_on_seeding", lost_on_seeding);
@@ -430,8 +431,8 @@ class JaccMapper : public Mapper {
 				}
 				
 				int lost_on_pruning = 1;
-				if (maps.size() == 1) { // && maps.front().mapq > 0) {
-					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
+//				if (maps.size() == 1) { // && maps.front().mapq > 0) {
+//					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
 //						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
 //						//cerr << "         mapq: " << maps.front().mapq << endl;
 //						if (best_idx != -1) {
@@ -442,9 +443,9 @@ class JaccMapper : public Mapper {
 //							int bb2 = maps[best2_idx].bucket;
 //							cerr << "  best2_idx: " << best2_idx << ", bucket=" << bb2 << "[" << bb2*lmax << ", " << (bb2+2)*lmax << ")"; if (best2_idx != -1) cerr << ", " << std::setprecision(5) << maps[best2_idx] << endl; else cerr << endl;
 //						}
-					} else
-						lost_on_pruning = 0;
-				}
+//					} else
+//						lost_on_pruning = 0;
+//				}
 				H->C.inc("lost_on_pruning", lost_on_pruning);
 
 				bool use_ed = false;
