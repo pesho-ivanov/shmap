@@ -387,7 +387,7 @@ class JaccMapper : public Mapper {
 				H->C.inc("lost_on_seeding", lost_on_seeding);
 
 				int best_idx(-1), best2_idx(-1);
-				int best4_idx[4] = {-1, -1, -1, -1};  // best_idx[0] -- best bucket, best_idx[1] -- best bucket size, the rest are the 3 next best (at least one of them will not be adjacent to best_idx[0])
+				int bests_idx[4] = {-1, -1, -1, -1};  // best_idx[0] -- best bucket, best_idx[1] -- best bucket size, the rest are the 3 next best (at least one of them will not be adjacent to best_idx[0])
 				int maps_idx = 0;
 				vector<pair<int, int>> final_buckets;
 				for (auto &[b, cnt]: M) {
@@ -404,25 +404,30 @@ class JaccMapper : public Mapper {
 							sweep(matches, P_sz, m, kmers, &maps, b);
 							//edit_distance(matches, P, P_sz, m, kmers, &maps);
 						H->T.stop("sweep");
-
+						
 						for (; maps_idx < static_cast<int>(maps.size()); ++maps_idx) {
+							//cerr << "best_idx=" << best_idx << " best2_idx=" << best2_idx << " best4_idx=" << bests_idx[0] << "," << bests_idx[1] << "," << bests_idx[2] << "," << bests_idx[3] << endl;
 							for (int i = 0; i < 4; ++i) {
-								if (best4_idx[i] == -1 || maps[best4_idx[i]].J < maps[maps_idx].J) {
-									for (int j=i+1; j<4; ++j)
-										best4_idx[j] = best4_idx[j-1];
-									best4_idx[i] = maps_idx;
+								if (bests_idx[i] == -1 || maps[bests_idx[i]].J < maps[maps_idx].J) {
+									for (int j=3; j>=i+1; --j)
+										bests_idx[j] = bests_idx[j-1];
+									bests_idx[i] = maps_idx;
 
-									best_idx = best4_idx[0];
-									for (int j=i; j<4; ++j)
-										if (best4_idx[j] == -1 || abs(maps[best4_idx[j]].bucket - maps[best_idx].bucket) > 1) {
-											best2_idx = best4_idx[j];
+									//cerr << "i=" << i << ", best_idx=" << best_idx << " best2_idx=" << best2_idx << " bests_idx=" << bests_idx[0] << "," << bests_idx[1] << "," << bests_idx[2] << "," << bests_idx[3] << endl;
+									best_idx = bests_idx[0];
+									int j;
+									for (j=1; j<4; ++j)
+										if (bests_idx[j] == -1 || abs(maps[bests_idx[j]].bucket - maps[best_idx].bucket) > 1) {
+											best2_idx = bests_idx[j];
 											break;
 										}
+									assert(j < 4);
+									break;
 								}
 							}
 						}
 
-						assert(best2_idx == -1 || abs(maps[best_idx].bucket - maps[best_idx2].bucket) > 1);
+						assert(best2_idx == -1 || abs(maps[best_idx].bucket - maps[best2_idx].bucket) > 1);
 
 						//for (; maps_idx < static_cast<int>(maps.size()); ++maps_idx) {
 						//	if (best_idx == -1) {
