@@ -376,7 +376,6 @@ class JaccMapper : public Mapper {
 
 				vector<Mapping> maps;
 				int total_matches = 0;
-				int best_idx(-1), best2_idx(-1);
 				//double J_best(0.0), J_second(H->params.theta);
 				vector<pair<int,int>> M_vec(M.begin(), M.end());
 				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
@@ -387,6 +386,8 @@ class JaccMapper : public Mapper {
 //					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
 				H->C.inc("lost_on_seeding", lost_on_seeding);
 
+				int best_idx(-1), best2_idx(-1);
+				int best4_idx[4] = {-1, -1, -1, -1};  // best_idx[0] -- best bucket, best_idx[1] -- best bucket size, the rest are the 3 next best (at least one of them will not be adjacent to best_idx[0])
 				int maps_idx = 0;
 				vector<pair<int, int>> final_buckets;
 				for (auto &[b, cnt]: M) {
@@ -405,19 +406,38 @@ class JaccMapper : public Mapper {
 						H->T.stop("sweep");
 
 						for (; maps_idx < static_cast<int>(maps.size()); ++maps_idx) {
-							if (best_idx == -1) {
-								best_idx = maps_idx;
-							} else if (maps[maps_idx].J > maps[best_idx].J) {
-								if (abs(maps[best_idx].bucket - maps[maps_idx].bucket) > 1)
-									best2_idx = best_idx;
-								best_idx = maps_idx;
-							} else if (abs(maps[best_idx].bucket - maps[maps_idx].bucket) > 1) {
-								if (best2_idx == -1 || maps[maps_idx].J > maps[best2_idx].J) {
-									best2_idx = maps_idx;
+							for (int i = 0; i < 4; ++i) {
+								if (best4_idx[i] == -1 || maps[best4_idx[i]].J < maps[maps_idx].J) {
+									for (int j=i+1; j<4; ++j)
+										best4_idx[j] = best4_idx[j-1];
+									best4_idx[i] = maps_idx;
+
+									best_idx = best4_idx[0];
+									for (int j=i; j<4; ++j)
+										if (best4_idx[j] == -1 || abs(maps[best4_idx[j]].bucket - maps[best_idx].bucket) > 1) {
+											best2_idx = best4_idx[j];
+											break;
+										}
 								}
 							}
 						}
-						assert(best2_idx == -1 || abs(maps[best_idx].bucket - maps[best2_idx].bucket) > 1);
+
+						assert(best2_idx == -1 || abs(maps[best_idx].bucket - maps[best_idx2].bucket) > 1);
+
+						//for (; maps_idx < static_cast<int>(maps.size()); ++maps_idx) {
+						//	if (best_idx == -1) {
+						//		best_idx = maps_idx;
+						//	} else if (maps[maps_idx].J > maps[best_idx].J) {
+						//		if (abs(maps[best_idx].bucket - maps[maps_idx].bucket) > 1)
+						//			best2_idx = best_idx;
+						//		best_idx = maps_idx;
+						//	} else if (abs(maps[best_idx].bucket - maps[maps_idx].bucket) > 1) {
+						//		if (best2_idx == -1 || maps[maps_idx].J > maps[best2_idx].J) {
+						//			best2_idx = maps_idx;
+						//		}
+						//	}
+						//}
+						//assert(best2_idx == -1 || abs(maps[best_idx].bucket - maps[best2_idx].bucket) > 1);
 					}
 				}
 				
