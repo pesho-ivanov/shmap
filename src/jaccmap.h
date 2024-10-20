@@ -276,7 +276,6 @@ class JaccMapper : public Mapper {
 					read_mapping_time.start();
 				H->T.stop("prepare");
 
-				//int m = p.size();
 				Seeds kmers = select_seeds(p);
 				int m = 0;
 				for (const auto kmer: kmers)
@@ -288,7 +287,7 @@ class JaccMapper : public Mapper {
 				for (const auto kmer: kmers) {
 					p_ht.insert(make_pair(kmer.kmer.h, kmer));
 					diff_hist[kmer.kmer.h] = 1;
-					//diff_hist[kmer.kmer.h] += kmer.occs_in_p;
+					//diff_hist[kmer.kmer.h] = kmer.occs_in_p;
 				}
 
 				int lmax = int(m / H->params.theta);					// maximum length of a similar mapping
