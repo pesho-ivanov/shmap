@@ -145,7 +145,8 @@ class JaccMapper : public Mapper {
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			double J = 1.0*intersection / kmers.size();
+			double J = 1.0*intersection / kmers.size(); // m?
+			assert(J <= 1.0);
 
 			//double J = 1.0*intersection / m;
 			//J = 1.0*intersection / p_sz;
@@ -539,8 +540,8 @@ class JaccMapper : public Mapper {
 		cerr << " |  |  | intersect. diff:     " << H->C.frac("intersection_diff", "mapped_reads") << " p/ mapped read" << endl;
 		cerr << " | Kmers:                 " << H->C.count("kmers") << " (" << H->C.frac("kmers", "reads") << " p/ read)" << endl;
 		cerr << " |  | sketched:               " << H->C.count("kmers_sketched") << " (" << H->C.frac("kmers_sketched", "kmers") << "x)" << endl;
-		cerr << " |  | unique:                 " << H->C.count("kmers_unique") << " (" << H->C.frac("kmers_unique", "kmers") << ")" << endl;
-		cerr << " |  | seeds:                  " << H->C.count("kmers_seeds") << " (" << H->C.frac("kmers_seeds", "kmers") << ")" << endl;
+		cerr << " |  | unique:                 " << H->C.count("kmers_unique") << " (" << H->C.perc("kmers_unique", "kmers") << "%, " << H->C.frac("kmers_unique", "reads") << " p/ read)" << endl;
+		cerr << " |  | seeds:                  " << H->C.count("kmers_seeds") << " (" << H->C.perc("kmers_seeds", "kmers") << "%, " << H->C.frac("kmers_seeds", "reads") << " p/ read)" << endl;
 		cerr << " | Matches:               " << H->C.count("total_matches") << " (" << H->C.frac("total_matches", "reads") << " p/ read)" << endl;
 		cerr << " |  | seed matches:           " << H->C.count("seed_matches") << " (" << H->C.perc("seed_matches", "total_matches") << "%, " << H->C.frac("seed_matches", "reads") << " p/ read)" << endl;
 //		cerr << " |  | frequent:               " << H->C.count("matches_freq") << " (" << H->C.perc("matches_freq", "total_matches") << "%)" << endl;
