@@ -339,7 +339,6 @@ class JaccMapper : public Mapper {
 				}
 				max_buckets = M.size();
 				H->C.inc("seed_matches", seed_matches);
-				H->C.inc("SH_reduction", 1.0 * potential_matches / seed_matches);
 				H->T.stop("match_seeds");
 
 				vector<Mapping> maps;
@@ -537,7 +536,7 @@ class JaccMapper : public Mapper {
 		cerr << " |  | seed matches:           " << H->C.count("seed_matches") << " (" << H->C.perc("seed_matches", "total_matches") << "%)" << endl;
 //		cerr << " |  | frequent:               " << H->C.count("matches_freq") << " (" << H->C.perc("matches_freq", "total_matches") << "%)" << endl;
 		cerr << " |  | potential_matches:      " << H->C.count("potential_matches") << " (" << H->C.frac("potential_matches", "total_matches") << "x)" << endl;
-		cerr << " |  | Seed h. reduction:      " << H->C.count("SH_reduction") << "x" << endl;
+//		cerr << " |  | Seed h. reduction:      " << H->C.frac("potential_matches", "seed_matches") << "x" << endl;
 		//cerr << " | Seed limit reached:    " << H->C.count("seeds_limit_reached") << " (" << H->C.perc("seeds_limit_reached", "reads") << "%)" << endl;
 		//cerr << " | Matches limit reached: " << H->C.count("matches_limit_reached") << " (" << H->C.perc("matches_limit_reached", "reads") << "%)" << endl;
 		//cerr << " | Spurious matches:      " << H->C.count("spurious_matches") << " (" << H->C.perc("spurious_matches", "matches") << "%)" << endl;
