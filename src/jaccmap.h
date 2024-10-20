@@ -99,55 +99,7 @@ class JaccMapper : public Mapper {
 		return cigar;
 	}
 			
-	//void edit_distance(vector<Match> &M, const char *P, const pos_t P_sz, const int m, const Seeds &kmers, vector<Mapping> *maps) {
-	//	int max_ed = 600; // -1 for none
-
-	//	if (M.size() == 0)
-	//		return;
-
-	//	Match f = M.front();
-	//	auto segm_id = f.hit.segm_id;
-	//	int S_a = f.hit.r, S_b = f.hit.r;
-	//	int same_strand_seeds = 0;
-	//	for (auto &match: M) {
-	//		if (match.hit.r < S_a) S_a = match.hit.r;
-	//		else if (match.hit.r > S_b) S_b = match.hit.r;
-	//		same_strand_seeds += match.seed.occs_in_p * (match.is_same_strand() ? +1 : -1);  // todo: kmer multiplicity
-	//	}
-	//	
-	//	auto &ref = tidx.T[segm_id].seq;
-	//	S_a -= H->params.k + 1;
-	//	assert(S_a >= 0 && S_a < (int)ref.size());
-	//	assert(S_b >= 0 && S_b < (int)ref.size());
-	//	
-	//	int S_sz = S_b - S_a;
-	//	const char *s;
-	//	string s_rev;
-	//	if (same_strand_seeds > 0)
-	//		s = ref.c_str() + S_a;
-	//	else {
-	//		s_rev = Mapping::reverseComplement(ref.substr(S_a, S_sz));
-	//		s = s_rev.c_str();
-	//	}
-
-	//	// edlib query: s
-	//	// edlib target: p
-	//	auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
-	//	EdlibAlignResult result = edlibAlign(s, S_sz, P, P_sz, config);
-	//	assert(result.status == EDLIB_STATUS_OK);
-
-	//	cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << endl;
-	//	
-	//	int from = S_a; // todo: change to result.
-	//	int to = S_b;
-	//	int intersection = -1;
-	//	auto mapping = Mapping(H->params.k, P_sz, m, from, to, segm_id, intersection, same_strand_seeds, M.begin(), M.begin());
-	//	mapping.ed = result.editDistance;
-	//	maps->push_back(mapping);
-	//	edlibFreeAlignResult(result);
-	//}
-
-	void sweep(vector<Match> &M, const pos_t P_sz, int lmax, const int m, const Seeds &kmers, vector<Mapping> *maps, int bucket, unordered_map<hash_t, int> &diff_hist) {
+	void sweep(const vector<Match> &M, const pos_t P_sz, int lmax, const int m, const Seeds &kmers, vector<Mapping> *maps, int bucket, unordered_map<hash_t, int> &diff_hist) {
 		H->T.start("sweep");
 		int intersection = 0;
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
