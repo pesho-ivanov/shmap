@@ -54,8 +54,24 @@ class JaccMapper : public Mapper {
 		return kmers;
 	}
 
+//	int edit_distance(int b, const char *P, const pos_t P_sz, int lmax) {
+//		int max_ed = -1;
+//		char *s = tidx.T[0].seq.c_str() + (b*lmax);
+//		int S_sz = 2*lmax;
+//		auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0);
+//		EdlibAlignResult result = edlibAlign(P, P_sz, s, S_sz, config);
+//		assert(result.status == EDLIB_STATUS_OK);
+//		int ed = result.editDistance;
+//		
+//		//string cigar = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_STANDARD);
+//		//cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << ", mapping: " << *mapping << endl;
+//		//cerr << cigar << endl;
+//		edlibFreeAlignResult(result);
+//		return ed;
+//	}
+
 	// returns cigar
-	string add_edit_distance(Mapping *mapping, const char *P, const pos_t P_sz, const int m, const Seeds &kmers) {
+	string add_edit_distance(Mapping *mapping, const char *P, const pos_t P_sz) {
 		int max_ed = 1000; // -1 for none // TODO: make it a function of theta
 		int delta = 10000;  // TODO: remove delta
 
@@ -442,6 +458,7 @@ class JaccMapper : public Mapper {
 							final_map.bucket2 = maps[best2_idx].bucket;
 							final_map.intersection2 = maps[best2_idx].intersection;
 							assert(abs(final_map.bucket - final_map.bucket2) > 1);
+							//final_map.ed2 = edit_distance(final_map.bucket, P, P_sz, m, kmers);
 						}
 
 						if (use_ed) {
