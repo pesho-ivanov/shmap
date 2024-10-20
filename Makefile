@@ -35,11 +35,11 @@ MEANLEN ?= 10000
 READSIM_REFNAME ?= $(REFNAME)
 
 K ?= 22
-R ?= 0.05
-T ?= 0.90
+R ?= 0.1
+T ?= 0.85
+M ?= 5000
 
 S ?= 300
-M ?= 100
 
 K_SLOW ?= $(K)
 R_SLOW ?= $(R)
@@ -186,8 +186,8 @@ eval_rmqmap: $(SWEEPMAP_BIN) gen_reads
 
 eval_jaccmap: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(JACCMAP_PREF))
-	$(TIME_CMD) -o $(JACCMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -x -m jacc 2>/dev/null >/dev/null
-	$(TIME_CMD) -o $(JACCMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(JACCMAP_PREF).params -k $(K) -r $(R) -t $(T) -x -m jacc     2> >(tee $(JACCMAP_PREF).log) > $(JACCMAP_PREF).paf
+	@$(TIME_CMD) -o $(JACCMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -x -m jacc 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(JACCMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(JACCMAP_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -x -m jacc     2> >(tee $(JACCMAP_PREF).log) > $(JACCMAP_PREF).paf
 	-paftools.js mapeval -r 0.1 $(JACCMAP_PREF).paf | tee $(JACCMAP_PREF).eval
 	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(JACCMAP_PREF).paf >$(JACCMAP_PREF).wrong
 

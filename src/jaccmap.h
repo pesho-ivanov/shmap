@@ -507,7 +507,7 @@ class JaccMapper : public Mapper {
 		//				else
 							m.print_paf();
 						//  H->C.inc("spurious_matches", spurious_matches(m, matches));
-						H->C.inc("J", int(10000.0*m.J));
+						H->C.inc("J_best", int(10000.0*m.J));
 						H->C.inc("mappings");
 					}
 		//			H->C.inc("matches", matches.size());
@@ -527,23 +527,24 @@ class JaccMapper : public Mapper {
 	void print_stats() {
 		cerr << std::fixed << std::setprecision(1);
 		//cerr << "Mapping:" << endl;
-		cerr << " | Total reads:           " << H->C.count("reads") << " (~" << 1.0*H->C.count("read_len") / H->C.count("reads") << " nb per read)" << endl;
+		cerr << " | Total reads:           " << H->C.count("reads") << " (~" << 1.0*H->C.count("read_len") / H->C.count("reads") << " nb p/ read)" << endl;
 		cerr << " |  | lost on seeding:      " << H->C.count("lost_on_seeding") << " (" << H->C.perc("lost_on_seeding", "reads") << "%)" << endl;
 		cerr << " |  | lost on pruning:      " << H->C.count("lost_on_pruning") << " (" << H->C.perc("lost_on_pruning", "reads") << "%)" << endl;
 		cerr << " |  | mapped:               " << H->C.count("mapped_reads") << " (" << H->C.perc("mapped_reads", "reads") << "%)" << endl;
-		cerr << " |  |  | intersect. diff:     " << H->C.frac("intersection_diff", "mapped_reads") << " per mapped read" << endl;
-		cerr << " | Read kmers (total):    " << H->C.count("kmers") << " (" << H->C.frac("kmers", "reads") << " per read)" << endl;
+		cerr << " |  |  | intersect. diff:     " << H->C.frac("intersection_diff", "mapped_reads") << " p/ mapped read" << endl;
+		cerr << " | Read kmers (total):    " << H->C.count("kmers") << " (" << H->C.frac("kmers", "reads") << " p/ read)" << endl;
 		cerr << " |  | unique:                 " << H->C.count("seeds") << " (" << H->C.frac("seeds", "kmers") << ")" << endl;
-		cerr << " | Matches:               " << H->C.count("total_matches") << " (" << H->C.frac("total_matches", "reads") << " per read)" << endl;
-		cerr << " |  | seed matches:           " << H->C.count("seed_matches") << " (" << H->C.perc("seed_matches", "total_matches") << "%)" << endl;
+		cerr << " | Matches:               " << H->C.count("total_matches") << " (" << H->C.frac("total_matches", "reads") << " p/ read)" << endl;
+		cerr << " |  | seed matches:           " << H->C.count("seed_matches") << " (" << H->C.perc("seed_matches", "total_matches") << "%, " << H->C.frac("seed_matches", "reads") << " p/ read)" << endl;
 //		cerr << " |  | frequent:               " << H->C.count("matches_freq") << " (" << H->C.perc("matches_freq", "total_matches") << "%)" << endl;
-		cerr << " |  | potential_matches:      " << H->C.count("potential_matches") << " (" << H->C.frac("potential_matches", "total_matches") << "x)" << endl;
-//		cerr << " |  | Seed h. reduction:      " << H->C.frac("potential_matches", "seed_matches") << "x" << endl;
+		cerr << " |  | potential_matches:      " << H->C.count("potential_matches") << " (" << H->C.frac("potential_matches", "total_matches") << "x, " << H->C.frac("potential_matches", "reads") << " p/ read)" << endl;
+		cerr << " |  | Seed h. reduction:      " << H->C.frac("potential_matches", "seed_matches") << "x" << endl;
 		//cerr << " | Seed limit reached:    " << H->C.count("seeds_limit_reached") << " (" << H->C.perc("seeds_limit_reached", "reads") << "%)" << endl;
 		//cerr << " | Matches limit reached: " << H->C.count("matches_limit_reached") << " (" << H->C.perc("matches_limit_reached", "reads") << "%)" << endl;
 		//cerr << " | Spurious matches:      " << H->C.count("spurious_matches") << " (" << H->C.perc("spurious_matches", "matches") << "%)" << endl;
 		//cerr << " | Discarded seeds:       " << H->C.count("discarded_seeds") << " (" << H->C.perc("discarded_seeds", "collected_seeds") << "%)" << endl;
-		//cerr << " | Average Jaccard:       " << H->C.frac("J", "mappings") / 10000.0 << endl;
+		cerr << " | Mappings:              " << H->C.count("mappings") << " (" << H->C.perc("mappings", "reads") << "\% of reads)" << endl;
+		cerr << " | | Average best sim.:       " << std::fixed << std::setprecision(3) << H->C.frac("J_best", "mappings") / 10000.0 << endl;
 		//cerr << " | Average edit dist:     " << H->C.frac("total_edit_distance", "mappings") << endl;
 		//print_time_stats();
         //printMemoryUsage();
@@ -551,7 +552,7 @@ class JaccMapper : public Mapper {
 
     void print_time_stats() {
         cerr << std::fixed << std::setprecision(1);
-        cerr << " | Runtime:                "    << setw(5) << right << H->T.secs("mapping")       << " sec (" << setw(5) << right << H->T.range_ratio("query_mapping") << "x)" << endl; //setw(4) << right << H->C.count("reads") / H->T.secs("total") << " reads per sec)" << endl;
+        cerr << " | Runtime:                "    << setw(5) << right << H->T.secs("mapping")       << " sec (" << setw(5) << right << H->T.range_ratio("query_mapping") << "x)" << endl; //setw(4) << right << H->C.count("reads") / H->T.secs("total") << " reads p/ sec)" << endl;
         cerr << " |  | load reads:             " << setw(5) << right << H->T.secs("query_reading")     << " (" << setw(4) << right << H->T.perc("query_reading", "mapping")       << "\%, " << setw(6) << right << H->T.range_ratio("query_reading") << "x)" << endl;
 //        cerr << " |  | prepare:                "     << setw(5) << right << H->T.secs("prepare")           << " (" << setw(4) << right << H->T.perc("prepare", "mapping")             << "\%, " << setw(6) << right << H->T.range_ratio("prepare") << "x)" << endl;
         cerr << " |  | sketch reads:           " << setw(5) << right << H->T.secs("sketching")         << " (" << setw(4) << right << H->T.perc("sketching", "mapping")           << "\%, " << setw(6) << right << H->T.range_ratio("sketching") << "x)" << endl;
