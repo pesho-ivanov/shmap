@@ -300,11 +300,14 @@ class JaccMapper : public Mapper {
 
 				unordered_map<hash_t, Seed> p_ht;
 				unordered_map<hash_t, int> diff_hist;
+				int potential_matches(0);
 				for (const auto kmer: kmers) {
 					p_ht.insert(make_pair(kmer.kmer.h, kmer));
 					diff_hist[kmer.kmer.h] = 1;
 					//diff_hist[kmer.kmer.h] = kmer.occs_in_p;
+					potential_matches += kmer.hits_in_T;
 				}
+				H->C.inc("potential_matches", potential_matches);
 
 				int lmax = int(m / H->params.theta);					// maximum length of a similar mapping
 				int S = int((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
@@ -314,7 +317,6 @@ class JaccMapper : public Mapper {
 				// stats
 				int seed_matches(0), max_seed_matches(0);
 				int max_buckets(0);
-
 				H->T.start("match_infrequent");
 				int i = 0;
 				for (; i < (int)kmers.size() && matched_seeds < S; i++) {
@@ -336,10 +338,11 @@ class JaccMapper : public Mapper {
 					matched_seeds += seed.occs_in_p;
 				}
 				max_buckets = M.size();
+				H->C.inc("seed_heuristic_reduction", 1.0 * potential_matches / seed_matches);
 				H->T.stop("match_infrequent");
 
 				vector<Mapping> maps;
-				int total_matches = 0;
+				int total_matches = seed_matches;
 				//double J_best(0.0), J_second(H->params.theta);
 				vector<pair<int,int>> M_vec(M.begin(), M.end());
 				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
@@ -417,6 +420,7 @@ class JaccMapper : public Mapper {
 //						lost_on_pruning = 0;
 //				}
 				H->C.inc("lost_on_pruning", lost_on_pruning);
+				H->C.inc("total_matches", total_matches);
 
 				bool use_ed = false;
 
@@ -528,9 +532,12 @@ class JaccMapper : public Mapper {
 		cerr << " |  |  | intersect. diff:     " << H->C.frac("intersection_diff", "mapped_reads") << " per mapped read" << endl;
 		cerr << " | Read kmers (total):    " << H->C.count("kmers") << " (" << H->C.frac("kmers", "reads") << " per read)" << endl;
 		cerr << " |  | unique:                 " << H->C.count("seeds") << " (" << H->C.frac("seeds", "kmers") << ")" << endl;
-		cerr << " | Matches:               " << H->C.count("matches") << " (" << H->C.frac("matches", "reads") << " per read)" << endl;
-		cerr << " |  | infrequent:             " << H->C.count("matches_infreq") << " (" << H->C.perc("matches_infreq", "matches") << "%)" << endl;
-		cerr << " |  | frequent:               " << H->C.count("matches_freq") << " (" << H->C.perc("matches_freq", "matches") << "%)" << endl;
+		cerr << " | Matches:               " << H->C.count("total_matches") << " (" << H->C.frac("total_matches", "reads") << " per read)" << endl;
+		cerr << " |  | seed matches:           " << H->C.count("matches_infreq") << " (" << H->C.perc("matches_infreq", "total_matches") << "%)" << endl;
+//		cerr << " |  | frequent:               " << H->C.count("matches_freq") << " (" << H->C.perc("matches_freq", "total_matches") << "%)" << endl;
+		cerr << " | Seed heuristic:        " << endl;
+		cerr << " |  | potential_matches:      " << H->C.count("potential_matches") << " (" << H->C.frac("potential_matches", "total_matches") << "x)" << endl;
+		cerr << " |  | SH reduction:           " << H->C.count("seed_heuristic_reduction") << "x" << endl;
 		//cerr << " | Seed limit reached:    " << H->C.count("seeds_limit_reached") << " (" << H->C.perc("seeds_limit_reached", "reads") << "%)" << endl;
 		//cerr << " | Matches limit reached: " << H->C.count("matches_limit_reached") << " (" << H->C.perc("matches_limit_reached", "reads") << "%)" << endl;
 		//cerr << " | Spurious matches:      " << H->C.count("spurious_matches") << " (" << H->C.perc("spurious_matches", "matches") << "%)" << endl;
