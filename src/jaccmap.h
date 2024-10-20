@@ -24,7 +24,7 @@ class JaccMapper : public Mapper {
 	using Matches = vector<Match>;
 	using Intervals = vector<pair<int, int>>;
 
-	Seeds select_seeds(sketch_t& p) {
+	Seeds select_kmers(sketch_t& p) {
 		H->T.start("seeding");
 		H->T.start("collect_kmer_info");
 			Seeds kmers;
@@ -39,6 +39,8 @@ class JaccMapper : public Mapper {
 							Seed el(p[ppos], -1, -1, hits_in_t, kmers.size());
 							el.occs_in_p = strike;
 							kmers.push_back(el);
+							if (H->params.max_seeds != -1 && (int)kmers.size() >= H->params.max_seeds)  // TODO maybe account for occs_in_p
+								break;
 						}
 					}
 					strike = 0;
@@ -288,17 +290,15 @@ class JaccMapper : public Mapper {
 					char *query_id = seq->name.s;
 					pos_t P_sz = (pos_t)seq->seq.l;
 
-					H->C.inc("kmers", p.size());
 					H->C.inc("read_len", P_sz);
 					Timer read_mapping_time;  // TODO: change to H->T.start
 					read_mapping_time.start();
 				H->T.stop("prepare");
 
-				Seeds kmers = select_seeds(p);
+				Seeds kmers = select_kmers(p);
 				int m = 0;
 				for (const auto kmer: kmers)
 					m += kmer.occs_in_p;
-				H->C.inc("kmers", m);
 
 				unordered_map<hash_t, Seed> p_ht;
 				unordered_map<hash_t, int> diff_hist;
@@ -315,6 +315,11 @@ class JaccMapper : public Mapper {
 				int S = int((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
 				std::unordered_map<int, int> M;  			// M[b] -- #matched kmers[0...i] in [bl, (b+2)l)
 				int matched_seeds = 0;
+
+				H->C.inc("kmers_sketched", p.size());
+				H->C.inc("kmers", m);
+				H->C.inc("kmers_unique", kmers.size());
+				H->C.inc("kmers_seeds", S);
 
 				// stats
 				int seed_matches(0), max_seed_matches(0);
@@ -532,8 +537,10 @@ class JaccMapper : public Mapper {
 		cerr << " |  | lost on pruning:      " << H->C.count("lost_on_pruning") << " (" << H->C.perc("lost_on_pruning", "reads") << "%)" << endl;
 		cerr << " |  | mapped:               " << H->C.count("mapped_reads") << " (" << H->C.perc("mapped_reads", "reads") << "%)" << endl;
 		cerr << " |  |  | intersect. diff:     " << H->C.frac("intersection_diff", "mapped_reads") << " p/ mapped read" << endl;
-		cerr << " | Read kmers (total):    " << H->C.count("kmers") << " (" << H->C.frac("kmers", "reads") << " p/ read)" << endl;
-		cerr << " |  | unique:                 " << H->C.count("seeds") << " (" << H->C.frac("seeds", "kmers") << ")" << endl;
+		cerr << " | Kmers:                 " << H->C.count("kmers") << " (" << H->C.frac("kmers", "reads") << " p/ read)" << endl;
+		cerr << " |  | sketched:               " << H->C.count("kmers_sketched") << " (" << H->C.frac("kmers_sketched", "kmers") << "x)" << endl;
+		cerr << " |  | unique:                 " << H->C.count("kmers_unique") << " (" << H->C.frac("kmers_unique", "kmers") << ")" << endl;
+		cerr << " |  | seeds:                  " << H->C.count("kmers_seeds") << " (" << H->C.frac("kmers_seeds", "kmers") << ")" << endl;
 		cerr << " | Matches:               " << H->C.count("total_matches") << " (" << H->C.frac("total_matches", "reads") << " p/ read)" << endl;
 		cerr << " |  | seed matches:           " << H->C.count("seed_matches") << " (" << H->C.perc("seed_matches", "total_matches") << "%, " << H->C.frac("seed_matches", "reads") << " p/ read)" << endl;
 //		cerr << " |  | frequent:               " << H->C.count("matches_freq") << " (" << H->C.perc("matches_freq", "total_matches") << "%)" << endl;

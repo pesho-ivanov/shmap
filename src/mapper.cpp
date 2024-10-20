@@ -36,10 +36,10 @@ Mapper* MapperFactory::createMapper(const std::string& type, const SketchIndex& 
         //    cerr << "Bucket mapper does not need limiting the number of matches. Do not set max_matches or set to -1." << endl;
         //    return nullptr;
         //}
-        if (H->params.max_seeds != -1) {
-            cerr << "JaccMapper does not need limiting the number of seeds. Do not set max_seeds or set to -1." << endl;
-            return nullptr;
-        }
+        //if (H->params.max_seeds != -1) {
+        //    cerr << "JaccMapper does not need limiting the number of seeds. Do not set max_seeds or set to -1." << endl;
+        //    return nullptr;
+        //}
         return new JaccMapper(tidx, H);
     } else {
 		cerr << "Mapper '" << type << "' is not supported. Choose 'sweep' or 'bucket'." << endl;
