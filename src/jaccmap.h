@@ -171,9 +171,9 @@ class JaccMapper : public Mapper {
 			matched_seeds += kmers[i].occs_in_p;
 			if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
 				cnt += kmers[i].occs_in_p;
-			//if (hseed(m, matched_seeds, cnt) < min(J_second, J_best*0.95)) {  //if (cnt <= i-S+1)
-			double thr = best2_idx == -1 ? H->params.theta : maps[best2_idx].J; 
-			if (hseed(m, matched_seeds, cnt) < thr) {
+			double thr1 = best_idx == -1 ? H->params.theta : min(H->params.theta, maps[best_idx].J*0.95);
+			double thr2 = best2_idx == -1 ? thr1 : maps[best2_idx].J; 
+			if (hseed(m, matched_seeds, cnt) < thr2) {
 				ret = false;
 				break;
 			}
