@@ -34,12 +34,14 @@ class JaccMapper : public Mapper {
 				++strike;
 				if (ppos == (int)p.size()-1 || p[ppos].h != p[ppos+1].h) {
 					int hits_in_t = tidx.count(p[ppos].h);
-					if (hits_in_t > 0) { // && hits_in_t < 1000) {
-						Seed el(p[ppos], -1, -1, hits_in_t, kmers.size());
-						el.occs_in_p = strike;
-						kmers.push_back(el);
-						strike = 0;
+					if (hits_in_t > 0) {
+						if (H->params.max_matches == -1 || hits_in_t <= H->params.max_matches) {
+							Seed el(p[ppos], -1, -1, hits_in_t, kmers.size());
+							el.occs_in_p = strike;
+							kmers.push_back(el);
+						}
 					}
+					strike = 0;
 				}
 			}
 		H->T.stop("collect_kmer_info");
