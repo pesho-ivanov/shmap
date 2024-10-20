@@ -256,12 +256,12 @@ class JaccMapper : public Mapper {
 	}
 
 	void map(const string &pFile) {
-		cerr << "Mapping reads using JaccMap " << "..." << endl;
+		cerr << "Mapping reads using JaccMap..." << endl;
 
 		H->C.inc("kmers", 0);
 		H->C.inc("seeds", 0);
 		H->C.inc("matches", 0);
-		H->C.inc("matches_infreq", 0);
+		H->C.inc("seed_matches", 0);
 		H->C.inc("matches_freq", 0);
 		H->C.inc("spurious_matches", 0);
 		H->C.inc("J", 0);
@@ -324,10 +324,10 @@ class JaccMapper : public Mapper {
 					if (seed.hits_in_T > 0) {
 						seed_matches += seed.hits_in_T;
 						max_seed_matches = max(max_seed_matches, seed.hits_in_T);
-						Matches matches_infreq;
+						Matches seed_matches;
 						std::unordered_map<int, int> matched_buckets;
-						tidx.get_matches(&matches_infreq, seed);
-						for (auto &m: matches_infreq) {
+						tidx.get_matches(&seed_matches, seed);
+						for (auto &m: seed_matches) {
 							int b = int(m.hit.tpos / lmax);
 							matched_buckets[b] = seed.occs_in_p;
 							if (b>0) matched_buckets[b-1] = seed.occs_in_p;
@@ -338,7 +338,8 @@ class JaccMapper : public Mapper {
 					matched_seeds += seed.occs_in_p;
 				}
 				max_buckets = M.size();
-				H->C.inc("seed_heuristic_reduction", 1.0 * potential_matches / seed_matches);
+				H->C.inc("seed_matches", seed_matches);
+				H->C.inc("SH_reduction", 1.0 * potential_matches / seed_matches);
 				H->T.stop("match_infrequent");
 
 				vector<Mapping> maps;
@@ -524,7 +525,7 @@ class JaccMapper : public Mapper {
 	
 	void print_stats() {
 		cerr << std::fixed << std::setprecision(1);
-		cerr << "Mapping:" << endl;
+		//cerr << "Mapping:" << endl;
 		cerr << " | Total reads:           " << H->C.count("reads") << " (~" << 1.0*H->C.count("read_len") / H->C.count("reads") << " nb per read)" << endl;
 		cerr << " |  | lost on seeding:      " << H->C.count("lost_on_seeding") << " (" << H->C.perc("lost_on_seeding", "reads") << "%)" << endl;
 		cerr << " |  | lost on pruning:      " << H->C.count("lost_on_pruning") << " (" << H->C.perc("lost_on_pruning", "reads") << "%)" << endl;
@@ -533,11 +534,10 @@ class JaccMapper : public Mapper {
 		cerr << " | Read kmers (total):    " << H->C.count("kmers") << " (" << H->C.frac("kmers", "reads") << " per read)" << endl;
 		cerr << " |  | unique:                 " << H->C.count("seeds") << " (" << H->C.frac("seeds", "kmers") << ")" << endl;
 		cerr << " | Matches:               " << H->C.count("total_matches") << " (" << H->C.frac("total_matches", "reads") << " per read)" << endl;
-		cerr << " |  | seed matches:           " << H->C.count("matches_infreq") << " (" << H->C.perc("matches_infreq", "total_matches") << "%)" << endl;
+		cerr << " |  | seed matches:           " << H->C.count("seed_matches") << " (" << H->C.perc("seed_matches", "total_matches") << "%)" << endl;
 //		cerr << " |  | frequent:               " << H->C.count("matches_freq") << " (" << H->C.perc("matches_freq", "total_matches") << "%)" << endl;
-		cerr << " | Seed heuristic:        " << endl;
 		cerr << " |  | potential_matches:      " << H->C.count("potential_matches") << " (" << H->C.frac("potential_matches", "total_matches") << "x)" << endl;
-		cerr << " |  | SH reduction:           " << H->C.count("seed_heuristic_reduction") << "x" << endl;
+		cerr << " |  | Seed h. reduction:      " << H->C.count("SH_reduction") << "x" << endl;
 		//cerr << " | Seed limit reached:    " << H->C.count("seeds_limit_reached") << " (" << H->C.perc("seeds_limit_reached", "reads") << "%)" << endl;
 		//cerr << " | Matches limit reached: " << H->C.count("matches_limit_reached") << " (" << H->C.perc("matches_limit_reached", "reads") << "%)" << endl;
 		//cerr << " | Spurious matches:      " << H->C.count("spurious_matches") << " (" << H->C.perc("spurious_matches", "matches") << "%)" << endl;
