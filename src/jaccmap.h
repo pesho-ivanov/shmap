@@ -312,7 +312,7 @@ class JaccMapper : public Mapper {
 						for (auto &m: matches_infreq) {
 							int b = int(m.hit.tpos / lmax);
 							matched_buckets[b] = seed.occs_in_p;
-							matched_buckets[b+1] = seed.occs_in_p;
+							if (b>0) matched_buckets[b-1] = seed.occs_in_p;
 						}
 						for (const auto [b, occs_in_p]: matched_buckets)
 							M[b] += occs_in_p;
