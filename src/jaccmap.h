@@ -167,7 +167,7 @@ class JaccMapper : public Mapper {
 		assert(m.J >= 0.0);
 		if (m.J2 < 0.0)
 			return 60;
-		if (sigmas_diff(m.intersection, m.intersection2) < 1.0)
+		if (sigmas_diff(m.intersection, m.intersection2) < 0.4)
 			return 0;
 		if (m.J < H->params.theta)
 			return 5;
