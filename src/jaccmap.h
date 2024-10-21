@@ -385,23 +385,23 @@ class JaccMapper : public Mapper {
 					for (auto &[b, seed_matches]: M_vec) {
 						if (seed_heuristic_pass(maps, kmers, lmax, m, b, seed_matches, i, seeds, best_idx, best2_idx)) {
 							H->T.start("match_collect");
-								Matches matches;
+								Matches s;
 								for (int i = b*lmax; i < std::min((b+2)*lmax, (int)tidx.T[0].kmers.size()); i++) {
 									const auto &kmer = tidx.T[0].kmers[i];
 									const auto seed_it = p_ht.find(kmer.h);
 									if (seed_it != p_ht.end()) {
-										matches.push_back(Match(seed_it->second, Hit(kmer, i, 0)));
-										assert(matches[ matches.size()-1 ].hit.tpos == matches[ matches.size()-1 ].hit.tpos);
+										s.push_back(Match(seed_it->second, Hit(kmer, i, 0)));
+										assert(s[ s.size()-1 ].hit.tpos == s[ s.size()-1 ].hit.tpos);
 									}
 								}
 							H->T.stop("match_collect");
-							total_matches += matches.size();
+							total_matches += s.size();
 							final_buckets.push_back( make_pair(b, seed_matches) );
 
-							sweep(matches, P_sz, lmax, m, kmers, &maps, b, diff_hist);
+							sweep(s, P_sz, lmax, m, kmers, &maps, b, diff_hist);
 							//edit_distance(matches, P, P_sz, m, kmers, &maps);
 							
-							//cerr << "Bucket " << b << " (" << cnt << " matches) has " << maps.size() << " good mappings" << endl;
+							//cerr << "Bucket " << b << " (" << seed_matches << " matches) has " << maps.size() << " good mappings" << endl;
 							//if (best_idx != -1)     cerr << "Best mapping: " << maps[best_idx].J << " (" << maps[best_idx].bucket << ")" << endl;
 							//if (best2_idx != -1)    cerr << "Second best mapping: " << maps[best2_idx].J << " (" << maps[best2_idx].bucket << ")" << endl;
 							//if (bests_idx[0] != -1) cerr << 0 << " " << bests_idx[0] << ": " << maps[bests_idx[0]].J << " (" << maps[bests_idx[0]].bucket << ")" << endl;
@@ -607,7 +607,7 @@ class JaccMapper : public Mapper {
         cerr << " |  | match seeds:            " << setw(5) << right << H->T.secs("match_seeds")  << " (" << setw(4) << right << H->T.perc("match_seeds", "mapping")   << "\%, " << setw(6) << right << H->T.range_ratio("match_seeds") << "x)" << endl;
         cerr << " |  | match rest:             " << setw(5) << right << H->T.secs("match_rest")   << " (" << setw(4) << right << H->T.perc("match_rest", "mapping")     << "\%, " << setw(6) << right << H->T.range_ratio("match_rest") << "x)" << endl;
         cerr << " |  |  | seed heuristic:         " << setw(5) << right << H->T.secs("seed_heuristic")    << " (" << setw(4) << right << H->T.perc("seed_heuristic", "match_rest")     << "\%, " << setw(6) << right << H->T.range_ratio("seed_heuristic") << "x)" << endl;
-//        cerr << " |  |  | matches collect:        " << setw(5) << right << H->T.secs("match_collect")     << " (" << setw(4) << right << H->T.perc("match_collect", "match_rest")      << "\%, " << setw(6) << right << H->T.range_ratio("match_collect") << "x)" << endl;
+        cerr << " |  |  | matches collect:        " << setw(5) << right << H->T.secs("match_collect")     << " (" << setw(4) << right << H->T.perc("match_collect", "match_rest")      << "\%, " << setw(6) << right << H->T.range_ratio("match_collect") << "x)" << endl;
 //        cerr << " |  |  | sweep:                  " << setw(5) << right << H->T.secs("sweep")             << " (" << setw(4) << right << H->T.perc("sweep", "match_rest")              << "\%, " << setw(6) << right << H->T.range_ratio("sweep") << "x)" << endl;
 
 //        cerr << " |  |  | get intervals:           " << setw(5) << right << H->T.secs("get_intervals")     << " (" << setw(4) << right << H->T.perc("get_intervals", "mapping")      << "\%, " << setw(5) << right << H->T.range_ratio("get_intervals") << "x)" << endl;
