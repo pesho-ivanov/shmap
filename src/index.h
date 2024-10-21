@@ -132,7 +132,7 @@ public:
 		return false;
 	}
 
-	bool is_kmer_in_t_interval(const Seed &s, int from, int to) const {
+	bool matches_in_interval(const Seed &s, int from, int to) const {
 		if (s.hits_in_T == 0) {
 			return false;
 		} else if (s.hits_in_T == 1) {

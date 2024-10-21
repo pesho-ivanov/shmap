@@ -186,22 +186,22 @@ class JaccMapper : public Mapper {
         }
     }
 
-	double hseed(int p, int S, int matches) {
-		return 1.0 - double(S - matches) / p;
+	double hseed(int p, int seeds, int matches) {
+		return 1.0 - double(seeds - matches) / p;
 	}
 
-	bool seed_heuristic_pass(const vector<Mapping> &maps, const Seeds &kmers, int lmax, int m, int b, int cnt, int i, int matched_seeds, int best_idx, double best2_idx) {
-		return true; // comment out
+	bool seed_heuristic_pass(const vector<Mapping> &maps, const Seeds &kmers, int lmax, int m, int b, int matches, int i, int seeds, int best_idx, double best2_idx) {
+//		return true; // comment out
 
 		H->T.start("seed_heuristic");
 		bool ret = true;
 		for (; i < (int)kmers.size(); i++) {
-			matched_seeds += kmers[i].occs_in_p;
-			if (tidx.is_kmer_in_t_interval(kmers[i], b*lmax, (b+2)*lmax))
-				cnt += kmers[i].occs_in_p;
+			seeds += kmers[i].occs_in_p;
+			if (tidx.matches_in_interval(kmers[i], b*lmax, (b+2)*lmax))
+				matches += kmers[i].occs_in_p;
 			double thr1 = best_idx == -1 ? H->params.theta : min(H->params.theta, maps[best_idx].J*0.9);
 			double thr2 = best2_idx == -1 ? thr1 : maps[best2_idx].J; 
-			if (hseed(m, matched_seeds, cnt) < thr2) {
+			if (hseed(m, seeds, matches) < thr2) {
 				ret = false;
 				break;
 			}
@@ -215,57 +215,59 @@ class JaccMapper : public Mapper {
 	}
 	
 	// TODO: works only in original coordinates
-	bool is_safe(const string &query_id, const vector<pair<int,int>> &potential_buckets, int lmax, int *gt_a, int *gt_b) {
-		std::vector<std::string> tokens;
-		std::stringstream ss(query_id);
-		std::string token;
+//	bool is_safe(const string &query_id, const vector<pair<int,int>> &potential_buckets, int lmax, int *gt_a, int *gt_b) {
+//		std::vector<std::string> tokens;
+//		std::stringstream ss(query_id);
+//		std::string token;
+//
+//		while (std::getline(ss, token, '!'))
+//			tokens.push_back(token);
+//
+//		if (tokens.size() < 4)
+//			return true;
+//
+//		*gt_a = std::stoi(tokens[2]);
+//		*gt_b = std::stoi(tokens[3]) + 1;
+//
+//		//cerr << "safety check: " << query_id << " " << *gt_a << " " << *gt_b << " among " << potential_buckets.size() << " buckets." << endl;
+//		for (const auto &[b, matches]: potential_buckets) {
+//			int bucket_a = b*lmax;
+//			int bucket_b = (b+2)*lmax;
+//			//if (bucket_a <= *gt_a && *gt_b <= bucket_b)
+//			//cerr << "safety check: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
+//			if (covered_frac(bucket_a, bucket_b, *gt_a, *gt_b) >= 0.9) {
+//				//cerr << "SAFE: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
+//				return true;
+//			}
+//		}
+//		return false;
+//	}
 
-		while (std::getline(ss, token, '!'))
-			tokens.push_back(token);
-
-		if (tokens.size() < 4)
-			return true;
-
-		*gt_a = std::stoi(tokens[2]);
-		*gt_b = std::stoi(tokens[3]) + 1;
-
-		//cerr << "safety check: " << query_id << " " << *gt_a << " " << *gt_b << " among " << potential_buckets.size() << " buckets." << endl;
-		for (const auto &[b, cnt]: potential_buckets) {
-			int bucket_a = b*lmax;
-			int bucket_b = (b+2)*lmax;
-			//if (bucket_a <= *gt_a && *gt_b <= bucket_b)
-			//cerr << "safety check: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
-			if (covered_frac(bucket_a, bucket_b, *gt_a, *gt_b) >= 0.9) {
-				//cerr << "SAFE: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
-				return true;
-			}
-		}
-		return false;
-	}
-
-
+//	int mapq_ed(int ed_best, int ed_second) {
+//		if (ed_best == -1)
+//			return 0;
+//		if (ed_second == -1)
+//			return 60;
+//		assert(ed_best <= ed_second);
+//		double bound = ed_best * 1.25;
+//		double r = max((bound - ed_second) / (bound - ed_best), 0.0);  // small r is good
+//		assert(r <= 1.0);
+//		return int(60.0 * (1.0 - 1.0 * r));  // big score is good
+//	}
+	
 	double sigmas_diff(int X, int Y) {
 		return std::abs(X - Y) / std::sqrt(X + Y);
 	}
 
-	int mapq_ed(int ed_best, int ed_second) {
-		if (ed_best == -1)
-			return 0;
-		if (ed_second == -1)
-			return 60;
-		assert(ed_best <= ed_second);
-		double bound = ed_best * 1.25;
-		double r = max((bound - ed_second) / (bound - ed_best), 0.0);  // small r is good
-		assert(r <= 1.0);
-		return int(60.0 * (1.0 - 1.0 * r));  // big score is good
-	}
-	
 	int mapq_J(const Mapping &m) {
 		// minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
+		assert(m.J >= 0.0);
 		if (m.J2 < 0.0)
 			return 60;
 		if (sigmas_diff(m.intersection, m.intersection2) < 1.0)
 			return 0;
+		if (m.J < H->params.theta)
+			return 5;
 		double bound = m.J * 0.9;
 		double r = max(m.J2 - bound, 0.0) / (m.J - bound);  // low is good
 		double J_fl = 60.0 * (1.0 - 1.0 * r);  // high is good
@@ -327,20 +329,20 @@ class JaccMapper : public Mapper {
 
 					int lmax = m;
 					//int lmax = int(m / H->params.theta);					// maximum length of a similar mapping
-					int S = int((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
+					int unique_seeds = int((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
 					std::unordered_map<int, int> M;  			// M[b] -- #matched kmers[0...i] in [bl, (b+2)l)
-					int matched_seeds = 0;
+					int seeds = 0;
 
 					H->C.inc("kmers_sketched", p.size());
 					H->C.inc("kmers", m);
 					H->C.inc("kmers_unique", kmers.size());
-					H->C.inc("kmers_seeds", S);
+					H->C.inc("kmers_seeds", unique_seeds);
 				H->T.stop("prepare");
 
 				H->T.start("match_seeds");
 					int seed_matches(0), max_seed_matches(0), max_buckets(0);  // stats
 					int i = 0;
-					for (; i < (int)kmers.size() && matched_seeds < S; i++) {
+					for (; i < (int)kmers.size() && seeds < unique_seeds; i++) {
 						Seed seed = kmers[i];
 						if (seed.hits_in_T > 0) {
 							seed_matches += seed.hits_in_T;
@@ -356,7 +358,7 @@ class JaccMapper : public Mapper {
 							for (const auto [b, occs_in_p]: matched_buckets)
 								M[b] += occs_in_p;
 						}
-						matched_seeds += seed.occs_in_p;
+						seeds += seed.occs_in_p;
 					}
 					max_buckets = M.size();
 					H->C.inc("seed_matches", seed_matches);
@@ -380,8 +382,8 @@ class JaccMapper : public Mapper {
 					int maps_idx = 0;
 					vector<pair<int, int>> final_buckets;
 					H->T.start("seed_heuristic"); H->T.stop("seed_heuristic");  // init
-					for (auto &[b, cnt]: M) {
-						if (seed_heuristic_pass(maps, kmers, lmax, m, b, cnt, i, matched_seeds, best_idx, best2_idx)) {
+					for (auto &[b, seed_matches]: M_vec) {
+						if (seed_heuristic_pass(maps, kmers, lmax, m, b, seed_matches, i, seeds, best_idx, best2_idx)) {
 							H->T.start("match_collect");
 								Matches matches;
 								for (int i = b*lmax; i < std::min((b+2)*lmax, (int)tidx.T[0].kmers.size()); i++) {
@@ -394,7 +396,7 @@ class JaccMapper : public Mapper {
 								}
 							H->T.stop("match_collect");
 							total_matches += matches.size();
-							final_buckets.push_back( make_pair(b, cnt) );
+							final_buckets.push_back( make_pair(b, seed_matches) );
 
 							sweep(matches, P_sz, lmax, m, kmers, &maps, b, diff_hist);
 							//edit_distance(matches, P, P_sz, m, kmers, &maps);
