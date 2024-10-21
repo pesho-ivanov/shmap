@@ -264,7 +264,7 @@ class JaccMapper : public Mapper {
 		// minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
 		if (m.J2 < 0.0)
 			return 60;
-		if (sigmas_diff(m.intersection, m.intersection2) < 0.5)
+		if (sigmas_diff(m.intersection, m.intersection2) < 1.0)
 			return 0;
 		double bound = m.J * 0.9;
 		double r = max(m.J2 - bound, 0.0) / (m.J - bound);  // low is good
