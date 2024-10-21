@@ -167,7 +167,7 @@ class JaccMapper : public Mapper {
 		assert(intersection == 0);
 		assert(same_strand_seeds == 0);
 		
-		if (best.J >= H->params.theta)
+		//if (best.J >= H->params.theta)
 			maps->push_back(best);
 		H->T.stop("sweep");
 	}
@@ -386,6 +386,13 @@ class JaccMapper : public Mapper {
 							sweep(matches, P_sz, lmax, m, kmers, &maps, b, diff_hist);
 							//edit_distance(matches, P, P_sz, m, kmers, &maps);
 							
+							//cerr << "Bucket " << b << " (" << cnt << " matches) has a best mapping with J=" << std::setprecision(3) << J << ", and " << maps.size() << " good mappings" << endl;
+							//if (best_idx != -1)     cerr << "Best mapping: " << maps[best_idx].J << " (" << maps[best_idx].bucket << ")" << endl;
+							//if (best2_idx != -1)    cerr << "Second best mapping: " << maps[best2_idx].J << " (" << maps[best2_idx].bucket << ")" << endl;
+							//if (bests_idx[0] != -1) cerr << 0 << " " << bests_idx[0] << ": " << maps[bests_idx[0]].J << " (" << maps[bests_idx[0]].bucket << ")" << endl;
+							//if (bests_idx[1] != -1) cerr << 1 << " " << bests_idx[1] << ": " << maps[bests_idx[1]].J << " (" << maps[bests_idx[1]].bucket << ")" << endl;
+							//if (bests_idx[2] != -1) cerr << 2 << " " << bests_idx[2] << ": " << maps[bests_idx[2]].J << " (" << maps[bests_idx[2]].bucket << ")" << endl;
+							//if (bests_idx[3] != -1) cerr << 3 << " " << bests_idx[3] << ": " << maps[bests_idx[3]].J << " (" << maps[bests_idx[3]].bucket << ")" << endl;
 							for (; maps_idx < static_cast<int>(maps.size()); ++maps_idx) {
 								for (int i = 0; i < 4; ++i) {
 									if (bests_idx[i] == -1 || maps[bests_idx[i]].J < maps[maps_idx].J) {
