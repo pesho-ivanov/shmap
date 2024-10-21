@@ -145,13 +145,14 @@ class JaccMapper : public Mapper {
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			double J = 1.0*intersection / kmers.size(); // m?
-			assert(J <= 1.0);
-
+			double J = 1.0*intersection / kmers.size();
+			//assert(m > 0);
 			//double J = 1.0*intersection / m;
 			//J = 1.0*intersection / p_sz;
 			//J = 1.0*intersection / std::min(p_sz, s_sz);
 			//J = 1.0*intersection / (p_sz + s_sz - intersection);
+
+			assert(J <= 1.0);
 			auto mapping = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r), bucket);
 			if (mapping.J > best.J)
 				best = mapping;
@@ -185,8 +186,8 @@ class JaccMapper : public Mapper {
 		return 1.0 - double(S - matches) / p;
 	}
 
-	bool is_bucket_interesting(const vector<Mapping> &maps, const Seeds &kmers, int lmax, int m, int b, int cnt, int i, int matched_seeds, int best_idx, double best2_idx) {
-		H->T.start("match_rest");
+	bool seed_heuristic_pass(const vector<Mapping> &maps, const Seeds &kmers, int lmax, int m, int b, int cnt, int i, int matched_seeds, int best_idx, double best2_idx) {
+		H->T.start("seed_heuristic");
 		bool ret = true;
 		for (; i < (int)kmers.size(); i++) {
 			matched_seeds += kmers[i].occs_in_p;
@@ -199,7 +200,7 @@ class JaccMapper : public Mapper {
 				break;
 			}
 		}
-		H->T.stop("match_rest");
+		H->T.stop("seed_heuristic");
 		return ret;
 	}
 	
@@ -269,8 +270,8 @@ class JaccMapper : public Mapper {
 		H->C.inc("seed_matches", 0);
 		H->C.inc("matches_freq", 0);
 		H->C.inc("spurious_matches", 0);
-		H->C.inc("J", 0);
-		H->C.inc("maps", 0);
+		H->C.inc("mappings", 0);
+		H->C.inc("J_best", 0);
 		H->C.inc("sketched_kmers", 0);
 		H->C.inc("total_edit_distance", 0);
 		H->C.inc("intersection_diff", 0);
@@ -294,141 +295,139 @@ class JaccMapper : public Mapper {
 					H->C.inc("read_len", P_sz);
 					Timer read_mapping_time;  // TODO: change to H->T.start
 					read_mapping_time.start();
+
+					Seeds kmers = select_kmers(p);
+					int m = 0;
+					for (const auto kmer: kmers)
+						m += kmer.occs_in_p;
+
+					unordered_map<hash_t, Seed> p_ht;
+					unordered_map<hash_t, int> diff_hist;
+					int potential_matches(0);
+					for (const auto kmer: kmers) {
+						p_ht.insert(make_pair(kmer.kmer.h, kmer));
+						diff_hist[kmer.kmer.h] = 1;
+						//diff_hist[kmer.kmer.h] = kmer.occs_in_p;
+						potential_matches += kmer.hits_in_T;
+					}
+					H->C.inc("potential_matches", potential_matches);
+
+					int lmax = int(m / H->params.theta);					// maximum length of a similar mapping
+					int S = int((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
+					std::unordered_map<int, int> M;  			// M[b] -- #matched kmers[0...i] in [bl, (b+2)l)
+					int matched_seeds = 0;
+
+					H->C.inc("kmers_sketched", p.size());
+					H->C.inc("kmers", m);
+					H->C.inc("kmers_unique", kmers.size());
+					H->C.inc("kmers_seeds", S);
 				H->T.stop("prepare");
 
-				Seeds kmers = select_kmers(p);
-				int m = 0;
-				for (const auto kmer: kmers)
-					m += kmer.occs_in_p;
-
-				unordered_map<hash_t, Seed> p_ht;
-				unordered_map<hash_t, int> diff_hist;
-				int potential_matches(0);
-				for (const auto kmer: kmers) {
-					p_ht.insert(make_pair(kmer.kmer.h, kmer));
-					diff_hist[kmer.kmer.h] = 1;
-					//diff_hist[kmer.kmer.h] = kmer.occs_in_p;
-					potential_matches += kmer.hits_in_T;
-				}
-				H->C.inc("potential_matches", potential_matches);
-
-				int lmax = int(m / H->params.theta);					// maximum length of a similar mapping
-				int S = int((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
-				std::unordered_map<int, int> M;  			// M[b] -- #matched kmers[0...i] in [bl, (b+2)l)
-				int matched_seeds = 0;
-
-				H->C.inc("kmers_sketched", p.size());
-				H->C.inc("kmers", m);
-				H->C.inc("kmers_unique", kmers.size());
-				H->C.inc("kmers_seeds", S);
-
-				// stats
-				int seed_matches(0), max_seed_matches(0);
-				int max_buckets(0);
 				H->T.start("match_seeds");
-				int i = 0;
-				for (; i < (int)kmers.size() && matched_seeds < S; i++) {
-					Seed seed = kmers[i];
-					if (seed.hits_in_T > 0) {
-						seed_matches += seed.hits_in_T;
-						max_seed_matches = max(max_seed_matches, seed.hits_in_T);
-						Matches seed_matches;
-						std::unordered_map<int, int> matched_buckets;
-						tidx.get_matches(&seed_matches, seed);
-						for (auto &m: seed_matches) {
-							int b = int(m.hit.tpos / lmax);
-							matched_buckets[b] = seed.occs_in_p;
-							if (b>0) matched_buckets[b-1] = seed.occs_in_p;
+					int seed_matches(0), max_seed_matches(0), max_buckets(0);  // stats
+					int i = 0;
+					for (; i < (int)kmers.size() && matched_seeds < S; i++) {
+						Seed seed = kmers[i];
+						if (seed.hits_in_T > 0) {
+							seed_matches += seed.hits_in_T;
+							max_seed_matches = max(max_seed_matches, seed.hits_in_T);
+							Matches seed_matches;
+							std::unordered_map<int, int> matched_buckets;
+							tidx.get_matches(&seed_matches, seed);
+							for (auto &m: seed_matches) {
+								int b = int(m.hit.tpos / lmax);
+								matched_buckets[b] = seed.occs_in_p;
+								if (b>0) matched_buckets[b-1] = seed.occs_in_p;
+							}
+							for (const auto [b, occs_in_p]: matched_buckets)
+								M[b] += occs_in_p;
 						}
-						for (const auto [b, occs_in_p]: matched_buckets)
-							M[b] += occs_in_p;
+						matched_seeds += seed.occs_in_p;
 					}
-					matched_seeds += seed.occs_in_p;
-				}
-				max_buckets = M.size();
-				H->C.inc("seed_matches", seed_matches);
+					max_buckets = M.size();
+					H->C.inc("seed_matches", seed_matches);
 				H->T.stop("match_seeds");
 
-				vector<Mapping> maps;
-				int total_matches = seed_matches;
-				//double J_best(0.0), J_second(H->params.theta);
-				vector<pair<int,int>> M_vec(M.begin(), M.end());
-				sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
+				H->T.start("match_rest");
+					vector<Mapping> maps;
+					int total_matches = seed_matches;
+					vector<pair<int,int>> M_vec(M.begin(), M.end());
+					sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 
-				int lost_on_seeding = (0);
-//				int gt_a, gt_b;
-//				lost_on_seeding = !is_safe(query_id, M_vec, lmax, &gt_a, &gt_b);
-//				if (!is_safe(query_id, M_vec, lmax, &gt_a, &gt_b))
-//					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
-				H->C.inc("lost_on_seeding", lost_on_seeding);
+					int lost_on_seeding = (0);
+	//				int gt_a, gt_b;
+	//				lost_on_seeding = !is_safe(query_id, M_vec, lmax, &gt_a, &gt_b);
+	//				if (!is_safe(query_id, M_vec, lmax, &gt_a, &gt_b))
+	//					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
+					H->C.inc("lost_on_seeding", lost_on_seeding);
 
-				int best_idx(-1), best2_idx(-1);
-				int bests_idx[4] = {-1, -1, -1, -1};  // best_idx[0] -- best bucket, best_idx[1] -- best bucket size, the rest are the 3 next best (at least one of them will not be adjacent to best_idx[0])
-				int maps_idx = 0;
-				vector<pair<int, int>> final_buckets;
-				for (auto &[b, cnt]: M) {
-					if (is_bucket_interesting(maps, kmers, lmax, m, b, cnt, i, matched_seeds, best_idx, best2_idx)) {
-						H->T.start("match_collect");
+					int best_idx(-1), best2_idx(-1);
+					int bests_idx[4] = {-1, -1, -1, -1};  // best_idx[0] -- best bucket, best_idx[1] -- best bucket size, the rest are the 3 next best (at least one of them will not be adjacent to best_idx[0])
+					int maps_idx = 0;
+					vector<pair<int, int>> final_buckets;
+					H->T.start("seed_heuristic"); H->T.stop("seed_heuristic");  // init
+					for (auto &[b, cnt]: M) {
+						if (seed_heuristic_pass(maps, kmers, lmax, m, b, cnt, i, matched_seeds, best_idx, best2_idx)) {
+							H->T.start("match_collect");
+								Matches matches;
+								for (int i = b*lmax; i < std::min((b+2)*lmax, (int)tidx.T[0].kmers.size()); i++) {
+									const auto &kmer = tidx.T[0].kmers[i];
+									const auto seed_it = p_ht.find(kmer.h);
+									if (seed_it != p_ht.end()) {
+										matches.push_back(Match(seed_it->second, Hit(kmer, i, 0)));
+										assert(matches[ matches.size()-1 ].hit.tpos == matches[ matches.size()-1 ].hit.tpos);
+									}
+								}
+							H->T.stop("match_collect");
+							total_matches += matches.size();
+							final_buckets.push_back( make_pair(b, cnt) );
 
-						Matches matches;
-						for (int i = b*lmax; i < std::min((b+2)*lmax, (int)tidx.T[0].kmers.size()); i++) {
-							const auto &kmer = tidx.T[0].kmers[i];
-							const auto seed_it = p_ht.find(kmer.h);
-							if (seed_it != p_ht.end()) {
-								matches.push_back(Match(seed_it->second, Hit(kmer, i, 0)));
-								assert(matches[ matches.size()-1 ].hit.tpos == matches[ matches.size()-1 ].hit.tpos);
-							}
-						}
+							sweep(matches, P_sz, lmax, m, kmers, &maps, b, diff_hist);
+							//edit_distance(matches, P, P_sz, m, kmers, &maps);
+							
+							for (; maps_idx < static_cast<int>(maps.size()); ++maps_idx) {
+								for (int i = 0; i < 4; ++i) {
+									if (bests_idx[i] == -1 || maps[bests_idx[i]].J < maps[maps_idx].J) {
+										for (int j=3; j>=i+1; --j)
+											bests_idx[j] = bests_idx[j-1];
+										bests_idx[i] = maps_idx;
 
-						H->T.stop("match_collect");
-						total_matches += matches.size();
-						final_buckets.push_back( make_pair(b, cnt) );
-
-						sweep(matches, P_sz, lmax, m, kmers, &maps, b, diff_hist);
-						//edit_distance(matches, P, P_sz, m, kmers, &maps);
-						
-						for (; maps_idx < static_cast<int>(maps.size()); ++maps_idx) {
-							for (int i = 0; i < 4; ++i) {
-								if (bests_idx[i] == -1 || maps[bests_idx[i]].J < maps[maps_idx].J) {
-									for (int j=3; j>=i+1; --j)
-										bests_idx[j] = bests_idx[j-1];
-									bests_idx[i] = maps_idx;
-
-									best_idx = bests_idx[0];
-									int j;
-									for (j=1; j<4; ++j)
-										if (bests_idx[j] == -1 || abs(maps[bests_idx[j]].bucket - maps[best_idx].bucket) > 1) {
-											best2_idx = bests_idx[j];
-											break;
-										}
-									assert(j < 4);
-									break;
+										best_idx = bests_idx[0];
+										int j;
+										for (j=1; j<4; ++j)
+											if (bests_idx[j] == -1 || abs(maps[bests_idx[j]].bucket - maps[best_idx].bucket) > 1) {
+												best2_idx = bests_idx[j];
+												break;
+											}
+										assert(j < 4);
+										break;
+									}
 								}
 							}
-						}
 
-						assert(best2_idx == -1 || abs(maps[best_idx].bucket - maps[best2_idx].bucket) > 1);
+							assert(best2_idx == -1 || abs(maps[best_idx].bucket - maps[best2_idx].bucket) > 1);
+						}
 					}
-				}
-				
-				int lost_on_pruning = 1;
-//				if (maps.size() == 1) { // && maps.front().mapq > 0) {
-//					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
-//						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
-//						//cerr << "         mapq: " << maps.front().mapq << endl;
-//						if (best_idx != -1) {
-//							int bb = maps[best_idx].bucket;
-//							cerr << "         best: " << best_idx <<  ", bucket=" << bb << "[" << bb*lmax << ", " << (bb+2)*lmax << ")"; if (best_idx != -1) cerr << ", " << std::setprecision(5) << maps[best_idx] << endl; else cerr << endl;
-//						}
-//						if (best2_idx != -1) {
-//							int bb2 = maps[best2_idx].bucket;
-//							cerr << "  best2_idx: " << best2_idx << ", bucket=" << bb2 << "[" << bb2*lmax << ", " << (bb2+2)*lmax << ")"; if (best2_idx != -1) cerr << ", " << std::setprecision(5) << maps[best2_idx] << endl; else cerr << endl;
-//						}
-//					} else
-//						lost_on_pruning = 0;
-//				}
-				H->C.inc("lost_on_pruning", lost_on_pruning);
-				H->C.inc("total_matches", total_matches);
+					
+					int lost_on_pruning = 1;
+	//				if (maps.size() == 1) { // && maps.front().mapq > 0) {
+	//					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
+	//						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
+	//						//cerr << "         mapq: " << maps.front().mapq << endl;
+	//						if (best_idx != -1) {
+	//							int bb = maps[best_idx].bucket;
+	//							cerr << "         best: " << best_idx <<  ", bucket=" << bb << "[" << bb*lmax << ", " << (bb+2)*lmax << ")"; if (best_idx != -1) cerr << ", " << std::setprecision(5) << maps[best_idx] << endl; else cerr << endl;
+	//						}
+	//						if (best2_idx != -1) {
+	//							int bb2 = maps[best2_idx].bucket;
+	//							cerr << "  best2_idx: " << best2_idx << ", bucket=" << bb2 << "[" << bb2*lmax << ", " << (bb2+2)*lmax << ")"; if (best2_idx != -1) cerr << ", " << std::setprecision(5) << maps[best2_idx] << endl; else cerr << endl;
+	//						}
+	//					} else
+	//						lost_on_pruning = 0;
+	//				}
+					H->C.inc("lost_on_pruning", lost_on_pruning);
+					H->C.inc("total_matches", total_matches);
+				H->T.stop("match_rest");
 
 				bool use_ed = false;
 
@@ -448,60 +447,60 @@ class JaccMapper : public Mapper {
 				//}
 				H->T.stop("edit_distance");
 				
-				vector<Mapping> final_mappings;
-				H->C.inc("mapped_reads");
-				if (H->params.onlybest && maps.size() >= 1) {
-					if (best_idx != -1) {
-						assert(0 <= best_idx && best_idx < (int)maps.size());
-						Mapping &final_map = maps[best_idx];
-
-						const auto &segm = tidx.T[final_map.segm_id];
-						final_map.total_matches = total_matches;
-						final_map.max_seed_matches = max_seed_matches;
-						final_map.seed_matches = seed_matches;
-						final_map.max_buckets = max_buckets;
-						final_map.final_buckets = final_buckets.size();
-						final_map.query_id = query_id;
-						final_map.segm_name = segm.name.c_str();
-						final_map.segm_sz = segm.sz;
-
-						if (best2_idx != -1) {
-							final_map.J2 = maps[best2_idx].J;
-							final_map.bucket2 = maps[best2_idx].bucket;
-							final_map.intersection2 = maps[best2_idx].intersection;
-							assert(abs(final_map.bucket - final_map.bucket2) > 1);
-							//final_map.ed2 = edit_distance(final_map.bucket, P, P_sz, m, kmers);
-						}
-
-						if (use_ed) {
-//							//cerr << "best_ed_idx=" << best_ed_idx << " best2_ed_idx=" << best2_ed_idx << " final_mapping.ed=" << final_mapping.ed << endl;
-//							assert(best_ed_idx != -1);
-//							assert(final_mapping.ed != -1);
-//							final_mapping.ed2 = best2_ed_idx == -1 ? -1 : maps[best2_ed_idx].ed;
-//							final_mapping.mapq = mapq_ed(final_mapping.ed, final_mapping.ed2);
-//							//if (final_mapping.mapq > 0)
-//								final_mappings.push_back(final_mapping);
-						} else {
-							final_map.mapq = mapq_J(final_map.J, final_map.J2);
-							//if (final_mapping.mapq > 0)
-								final_mappings.push_back(final_map);
-						}
-
-//						if (best2_idx != -1 && final_mapping.mapq == 0) {
-//							string cigar1, cigar2;
-//							cigar1 = add_edit_distance(&maps[best_idx], P, P_sz, m, kmers);
-//							cigar2 = add_edit_distance(&maps[best2_idx], P, P_sz, m, kmers);
-//							if (maps[best_idx].ed != maps[best2_idx].ed) {
-//								cerr << endl;
-//								cerr << "mapq = 0 for read " << query_id << endl;
-//								cerr << maps[best_idx] << " " << cigar1 << endl;
-//								cerr << maps[best2_idx] << " " << cigar2 << endl;
-//							}
-//						}
-					}
-				}
-
 				H->T.start("output");
+					vector<Mapping> final_mappings;
+					H->C.inc("mapped_reads");
+					if (H->params.onlybest && maps.size() >= 1) {
+						if (best_idx != -1) {
+							assert(0 <= best_idx && best_idx < (int)maps.size());
+							Mapping &final_map = maps[best_idx];
+
+							const auto &segm = tidx.T[final_map.segm_id];
+							final_map.total_matches = total_matches;
+							final_map.max_seed_matches = max_seed_matches;
+							final_map.seed_matches = seed_matches;
+							final_map.max_buckets = max_buckets;
+							final_map.final_buckets = final_buckets.size();
+							final_map.query_id = query_id;
+							final_map.segm_name = segm.name.c_str();
+							final_map.segm_sz = segm.sz;
+
+							if (best2_idx != -1) {
+								final_map.J2 = maps[best2_idx].J;
+								final_map.bucket2 = maps[best2_idx].bucket;
+								final_map.intersection2 = maps[best2_idx].intersection;
+								assert(abs(final_map.bucket - final_map.bucket2) > 1);
+								//final_map.ed2 = edit_distance(final_map.bucket, P, P_sz, m, kmers);
+							}
+
+							if (use_ed) {
+	//							//cerr << "best_ed_idx=" << best_ed_idx << " best2_ed_idx=" << best2_ed_idx << " final_mapping.ed=" << final_mapping.ed << endl;
+	//							assert(best_ed_idx != -1);
+	//							assert(final_mapping.ed != -1);
+	//							final_mapping.ed2 = best2_ed_idx == -1 ? -1 : maps[best2_ed_idx].ed;
+	//							final_mapping.mapq = mapq_ed(final_mapping.ed, final_mapping.ed2);
+	//							//if (final_mapping.mapq > 0)
+	//								final_mappings.push_back(final_mapping);
+							} else {
+								final_map.mapq = mapq_J(final_map.J, final_map.J2);
+								//if (final_mapping.mapq > 0)
+									final_mappings.push_back(final_map);
+							}
+
+	//						if (best2_idx != -1 && final_mapping.mapq == 0) {
+	//							string cigar1, cigar2;
+	//							cigar1 = add_edit_distance(&maps[best_idx], P, P_sz, m, kmers);
+	//							cigar2 = add_edit_distance(&maps[best2_idx], P, P_sz, m, kmers);
+	//							if (maps[best_idx].ed != maps[best2_idx].ed) {
+	//								cerr << endl;
+	//								cerr << "mapq = 0 for read " << query_id << endl;
+	//								cerr << maps[best_idx] << " " << cigar1 << endl;
+	//								cerr << maps[best2_idx] << " " << cigar2 << endl;
+	//							}
+	//						}
+						}
+					}
+
 					read_mapping_time.stop();
 
 					for (auto &m: final_mappings) {
@@ -539,9 +538,9 @@ class JaccMapper : public Mapper {
 		cerr << " |  | mapped:               " << H->C.count("mapped_reads") << " (" << H->C.perc("mapped_reads", "reads") << "%)" << endl;
 		cerr << " |  |  | intersect. diff:     " << H->C.frac("intersection_diff", "mapped_reads") << " p/ mapped read" << endl;
 		cerr << " | Kmers:                 " << H->C.count("kmers") << " (" << H->C.frac("kmers", "reads") << " p/ read)" << endl;
-		cerr << " |  | sketched:               " << H->C.count("kmers_sketched") << " (" << H->C.frac("kmers_sketched", "kmers") << "x)" << endl;
-		cerr << " |  | unique:                 " << H->C.count("kmers_unique") << " (" << H->C.perc("kmers_unique", "kmers") << "%, " << H->C.frac("kmers_unique", "reads") << " p/ read)" << endl;
-		cerr << " |  | seeds:                  " << H->C.count("kmers_seeds") << " (" << H->C.perc("kmers_seeds", "kmers") << "%, " << H->C.frac("kmers_seeds", "reads") << " p/ read)" << endl;
+		cerr << " |  | sketched:               " << H->C.perc("kmers_sketched", "kmers") << "%, " << H->C.frac("kmers_sketched", "reads") << endl;
+		cerr << " |  | unique:                 " << H->C.perc("kmers_unique", "kmers") << "%, " << H->C.frac("kmers_unique", "reads") << endl;
+		cerr << " |  | seeds:                  " << H->C.perc("kmers_seeds", "kmers") << "%, " << H->C.frac("kmers_seeds", "reads") << endl;
 		cerr << " | Matches:               " << H->C.count("total_matches") << " (" << H->C.frac("total_matches", "reads") << " p/ read)" << endl;
 		cerr << " |  | seed matches:           " << H->C.count("seed_matches") << " (" << H->C.perc("seed_matches", "total_matches") << "%, " << H->C.frac("seed_matches", "reads") << " p/ read)" << endl;
 //		cerr << " |  | frequent:               " << H->C.count("matches_freq") << " (" << H->C.perc("matches_freq", "total_matches") << "%)" << endl;
@@ -570,11 +569,13 @@ class JaccMapper : public Mapper {
 //        cerr << " |  |  | thin sketch:             " << setw(5) << right << H->T.secs("thin_sketch")       << " (" << setw(4) << right << H->T.perc("thin_sketch", "seeding")         << "\%, " << setw(6) << right << H->T.range_ratio("thin_sketch") << "x)" << endl;
 //        cerr << " |  |  | unique seeds:            " << setw(5) << right << H->T.secs("unique_seeds")      << " (" << setw(4) << right << H->T.perc("unique_seeds", "seeding")        << "\%, " << setw(6) << right << H->T.range_ratio("unique_seeds") << "x)" << endl;
         cerr << " |  | match seeds:            " << setw(5) << right << H->T.secs("match_seeds")  << " (" << setw(4) << right << H->T.perc("match_seeds", "mapping")   << "\%, " << setw(6) << right << H->T.range_ratio("match_seeds") << "x)" << endl;
-        cerr << " |  | match rest:             " << setw(5) << right << H->T.secs("match_rest")    << " (" << setw(4) << right << H->T.perc("match_rest", "mapping")     << "\%, " << setw(6) << right << H->T.range_ratio("match_rest") << "x)" << endl;
-        cerr << " |  | matches collect:        " << setw(5) << right << H->T.secs("match_collect")     << " (" << setw(4) << right << H->T.perc("match_collect", "mapping")      << "\%, " << setw(6) << right << H->T.range_ratio("match_collect") << "x)" << endl;
+        cerr << " |  | match rest:             " << setw(5) << right << H->T.secs("match_rest")   << " (" << setw(4) << right << H->T.perc("match_rest", "mapping")     << "\%, " << setw(6) << right << H->T.range_ratio("match_rest") << "x)" << endl;
+        cerr << " |  |  | seed heuristic:         " << setw(5) << right << H->T.secs("seed_heuristic")    << " (" << setw(4) << right << H->T.perc("seed_heuristic", "match_rest")     << "\%, " << setw(6) << right << H->T.range_ratio("seed_heuristic") << "x)" << endl;
+        cerr << " |  |  | matches collect:        " << setw(5) << right << H->T.secs("match_collect")     << " (" << setw(4) << right << H->T.perc("match_collect", "match_rest")      << "\%, " << setw(6) << right << H->T.range_ratio("match_collect") << "x)" << endl;
+        cerr << " |  |  | sweep:                  " << setw(5) << right << H->T.secs("sweep")             << " (" << setw(4) << right << H->T.perc("sweep", "match_rest")              << "\%, " << setw(6) << right << H->T.range_ratio("sweep") << "x)" << endl;
+
 //        cerr << " |  |  | get intervals:           " << setw(5) << right << H->T.secs("get_intervals")     << " (" << setw(4) << right << H->T.perc("get_intervals", "mapping")      << "\%, " << setw(5) << right << H->T.range_ratio("get_intervals") << "x)" << endl;
 //        cerr << " |  |  | filter promising buckets:" << setw(5) << right << H->T.secs("filter_promising_buckets")    << " (" << setw(4) << right << H->T.perc("filter_promising_buckets", "mapping")     << "\%, " << setw(5) << right << H->T.range_ratio("filter_promising_buckets") << "x)" << endl;
-        cerr << " |  | sweep:                  " << setw(5) << right << H->T.secs("sweep")             << " (" << setw(4) << right << H->T.perc("sweep", "mapping")               << "\%, " << setw(6) << right << H->T.range_ratio("sweep") << "x)" << endl;
 //        cerr << " |  | edit distance:          "     << setw(5) << right << H->T.secs("edit_distance")     << " (" << setw(4) << right << H->T.perc("edit_distance", "mapping")       << "\%, " << setw(6) << right << H->T.range_ratio("edit_distance") << "x)" << endl;
         cerr << " |  | output:                 " << setw(5) << right << H->T.secs("output")            << " (" << setw(4) << right << H->T.perc("output", "mapping")              << "\%, " << setw(6) << right << H->T.range_ratio("output") << "x)" << endl;
 //        cerr << " |  | post proc:              "     << setw(5) << right << H->T.secs("postproc")          << " (" << setw(4) << right << H->T.perc("postproc", "mapping")            << "\%, " << setw(6) << right << H->T.range_ratio("postproc") << "x)" << endl;

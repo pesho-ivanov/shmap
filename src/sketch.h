@@ -83,7 +83,7 @@ struct RefSegment {
 
 struct Mapping {
 	int k; 	   // kmer size
-	const char *query_id;
+	string query_id;
 	int P_start;
 	int P_end;
 	pos_t P_sz;     // pattern size |P| bp 
@@ -91,7 +91,7 @@ struct Mapping {
 	pos_t T_l;      // the position of the leftmost nucleotide of the mapping
 	pos_t T_r;      // the position of the rightmost nucleotide of the mapping
 	segm_t segm_id;
-	const char *segm_name;
+	string segm_name;
 	segm_t segm_sz;
 	pos_t s_sz;      // the position of the rightmost nucleotide of the mapping
 	int intersection;     // the number of kmers in the intersection between the pattern and its mapping in `t'
@@ -225,7 +225,6 @@ struct Mapping {
 	}
 
 	friend std::ostream& operator<<(std::ostream& os, const Mapping& mapping) {
-		//os << "Mapping(k=" << mapping.k << ", P_sz=" << mapping.P_sz << ", p_sz=" << mapping.p_sz << ", T_l=" << mapping.T_l << ", T_r=" << mapping.T_r << ", segm_id=" << mapping.segm_id << ", s_sz=" << mapping.s_sz << ", intersection=" << mapping.intersection << ", J=" << mapping.J << ", J2=" << mapping.J2 << ", map_time=" << mapping.map_time << ", mapq=" << mapping.mapq << ", strand=" << mapping.strand << ", unreasonable=" << mapping.unreasonable << ")";
 		os 
 			<< mapping.query_id  	// Query sequence name
 			<< "\t" << mapping.P_sz     // query sequence length
