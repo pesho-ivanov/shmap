@@ -36,9 +36,10 @@ READSIM_REFNAME ?= $(REFNAME)
 
 K ?= 22
 R ?= 0.05
-T ?= 0.70
-M ?= 10000
 S ?= 3000
+
+T ?= 0.80
+M ?= 10000
 
 K_SLOW ?= $(K)
 R_SLOW ?= $(R)

@@ -115,7 +115,7 @@ struct Mapping {
 	int intersection2; // number of matches in the second best mapping
 	double sigmas_diff;  // how many sigmas is the diff between intersection1 and intersection2
 
-    Mapping() {}
+    Mapping() : J(-1.0) {}
 	Mapping(int k, pos_t P_sz, int p_sz, pos_t T_l, pos_t T_r, segm_t segm_id, int intersection, double J, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r, int bucket=-1)
 		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), intersection(intersection), J(J), unreasonable(false), l(l), r(r), bucket(bucket) {
 		//if (J > 1.0)

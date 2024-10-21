@@ -86,7 +86,12 @@ class JaccMapper : public Mapper {
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			double J = 1.0*intersection / kmers.size();
+
+			//double J = 1.0*intersection / kmers.size();
+			double J = 1.0*intersection / m;
+			//if (fabs(J-J_) > 0.1)
+			//	cerr << J << " " << J_ << endl;
+			//cerr << std::fixed << std::setprecision(3) << J << " " << 1.0*intersection / m << endl;
 			//double J = 1.0*intersection / m; //kmers.size();
 			//cerr << "l=" << l->hit.r << ", r=" << prev(r)->hit.r << ", intersection=" << intersection << ", P_sz=" << P_sz << ", J= " << J << endl;
 			//assert(m > 0);
@@ -96,7 +101,7 @@ class JaccMapper : public Mapper {
 			//J = 1.0*intersection / (p_sz + s_sz - intersection);
 
 			assert(J <= 1.0);
-			auto mapping = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r), bucket);
+			Mapping mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r), bucket);
 			if (mapping.J > best.J)
 				best = mapping;
 
@@ -110,7 +115,7 @@ class JaccMapper : public Mapper {
 		assert(intersection == 0);
 		assert(same_strand_seeds == 0);
 		
-		//if (best.J >= H->params.theta)
+		if (best.J >= H->params.theta)
 			maps->push_back(best);
 		H->T.stop("sweep");
 	}
@@ -219,14 +224,14 @@ class JaccMapper : public Mapper {
 					int potential_matches(0);
 					for (const auto kmer: kmers) {
 						p_ht.insert(make_pair(kmer.kmer.h, kmer));
-						diff_hist[kmer.kmer.h] = 1;
-						//diff_hist[kmer.kmer.h] = kmer.occs_in_p;
+						//diff_hist[kmer.kmer.h] = 1;
+						diff_hist[kmer.kmer.h] = kmer.occs_in_p;
 						potential_matches += kmer.hits_in_T;
 					}
 					H->C.inc("potential_matches", potential_matches);
 
-					int lmax = m;
-					//int lmax = int(m / H->params.theta);					// maximum length of a similar mapping
+					//int lmax = m;
+					int lmax = int(m / H->params.theta);					// maximum length of a similar mapping
 					int unique_seeds = int((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
 					std::unordered_map<int, int> M;  			// M[b] -- #matched kmers[0...i] in [bl, (b+2)l)
 					int seeds = 0;
@@ -336,7 +341,7 @@ class JaccMapper : public Mapper {
 						}
 					}
 					assert(best_idx != -1 || maps.empty());
-					cerr << "read " << query_id << ", buckets: " << M_vec.size() << " final: " << final_buckets.size() << endl;
+					//cerr << "read " << query_id << ", buckets: " << M_vec.size() << " final: " << final_buckets.size() << endl;
 					
 					int lost_on_pruning = (best_idx == -1);
 					H->C.inc("lost_on_pruning", lost_on_pruning);
@@ -365,6 +370,7 @@ class JaccMapper : public Mapper {
 							final_map.segm_sz = segm.sz;
 
 							if (best2_idx != -1) {
+								//cerr << "best_idx: " << best_idx << ", best2_idx: " << best2_idx << endl;
 								final_map.J2 = maps[best2_idx].J;
 								final_map.bucket2 = maps[best2_idx].bucket;
 								final_map.intersection2 = maps[best2_idx].intersection;
