@@ -58,67 +58,6 @@ class JaccMapper : public Mapper {
 
 		return kmers;
 	}
-
-//	int edit_distance(int b, const char *P, const pos_t P_sz, int lmax) {
-//		int max_ed = -1;
-//		char *s = tidx.T[0].seq.c_str() + (b*lmax);
-//		int S_sz = 2*lmax;
-//		auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0);
-//		EdlibAlignResult result = edlibAlign(P, P_sz, s, S_sz, config);
-//		assert(result.status == EDLIB_STATUS_OK);
-//		int ed = result.editDistance;
-//		
-//		//string cigar = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_STANDARD);
-//		//cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << ", mapping: " << *mapping << endl;
-//		//cerr << cigar << endl;
-//		edlibFreeAlignResult(result);
-//		return ed;
-//	}
-
-	// returns cigar
-	string add_edit_distance(Mapping *mapping, const char *P, const pos_t P_sz) {
-		int max_ed = 1000; // -1 for none // TODO: make it a function of theta
-		int delta = 10000;  // TODO: remove delta
-
-		auto segm_id = mapping->segm_id;
-		int S_a = mapping->T_l, S_b = mapping->T_r;
-		char strand = mapping->strand;
-		auto &ref = tidx.T[segm_id].seq;
-		
-		// TODO: remove
-		S_a = max(0, S_a - delta);
-		S_b = min((int)ref.size()-1, S_b + delta);
-		
-		S_a -= H->params.k + 1;
-		assert(S_a >= 0 && S_a < (int)ref.size());
-		assert(S_b >= 0 && S_b < (int)ref.size());
-		
-		int S_sz = S_b - S_a;
-		const char *s;
-		string s_rev;
-		if (strand == '+')
-			s = ref.c_str() + S_a;
-		else {
-			assert(strand == '-');
-			s_rev = Mapping::reverseComplement(ref.substr(S_a, S_sz));
-			s = s_rev.c_str();
-		}
-
-		// edlib query: s
-		// edlib target: p
-		//auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
-		auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0);
-		//EdlibAlignResult result = edlibAlign(s, S_sz, P, P_sz, config);
-		EdlibAlignResult result = edlibAlign(P, P_sz, s, S_sz, config);
-		assert(result.status == EDLIB_STATUS_OK);
-		mapping->ed = result.editDistance;
-		
-		string cigar = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_STANDARD);
-		//cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << ", mapping: " << *mapping << endl;
-		//cerr << cigar << endl;
-		edlibFreeAlignResult(result);
-		return cigar;
-	}
 			
 	void sweep(const vector<Match> &M, const pos_t P_sz, int lmax, const int m, const Seeds &kmers, vector<Mapping> *maps, int bucket, unordered_map<hash_t, int> &diff_hist) {
 		H->T.start("sweep");
@@ -191,7 +130,7 @@ class JaccMapper : public Mapper {
 	}
 
 	bool seed_heuristic_pass(const vector<Mapping> &maps, const Seeds &kmers, int lmax, int m, int b, int matches, int i, int seeds, int best_idx, double best2_idx) {
-//		return true; // comment out
+		//return true; // comment out
 
 		H->T.start("seed_heuristic");
 		bool ret = true;
@@ -213,47 +152,6 @@ class JaccMapper : public Mapper {
 	double covered_frac(int bucket_a, int bucket_b, int gt_a, int gt_b) {
 		return 1.0*max(0, min(bucket_b, gt_b) - max(bucket_a, gt_a)) / (gt_b - gt_a);
 	}
-	
-	// TODO: works only in original coordinates
-//	bool is_safe(const string &query_id, const vector<pair<int,int>> &potential_buckets, int lmax, int *gt_a, int *gt_b) {
-//		std::vector<std::string> tokens;
-//		std::stringstream ss(query_id);
-//		std::string token;
-//
-//		while (std::getline(ss, token, '!'))
-//			tokens.push_back(token);
-//
-//		if (tokens.size() < 4)
-//			return true;
-//
-//		*gt_a = std::stoi(tokens[2]);
-//		*gt_b = std::stoi(tokens[3]) + 1;
-//
-//		//cerr << "safety check: " << query_id << " " << *gt_a << " " << *gt_b << " among " << potential_buckets.size() << " buckets." << endl;
-//		for (const auto &[b, matches]: potential_buckets) {
-//			int bucket_a = b*lmax;
-//			int bucket_b = (b+2)*lmax;
-//			//if (bucket_a <= *gt_a && *gt_b <= bucket_b)
-//			//cerr << "safety check: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
-//			if (covered_frac(bucket_a, bucket_b, *gt_a, *gt_b) >= 0.9) {
-//				//cerr << "SAFE: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
-//				return true;
-//			}
-//		}
-//		return false;
-//	}
-
-//	int mapq_ed(int ed_best, int ed_second) {
-//		if (ed_best == -1)
-//			return 0;
-//		if (ed_second == -1)
-//			return 60;
-//		assert(ed_best <= ed_second);
-//		double bound = ed_best * 1.25;
-//		double r = max((bound - ed_second) / (bound - ed_best), 0.0);  // small r is good
-//		assert(r <= 1.0);
-//		return int(60.0 * (1.0 - 1.0 * r));  // big score is good
-//	}
 	
 	double sigmas_diff(int X, int Y) {
 		return std::abs(X - Y) / std::sqrt(X + Y);
@@ -371,10 +269,6 @@ class JaccMapper : public Mapper {
 					sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 
 					int lost_on_seeding = (0);
-	//				int gt_a, gt_b;
-	//				lost_on_seeding = !is_safe(query_id, M_vec, lmax, &gt_a, &gt_b);
-	//				if (!is_safe(query_id, M_vec, lmax, &gt_a, &gt_b))
-	//					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
 					H->C.inc("lost_on_seeding", lost_on_seeding);
 
 					int best_idx(-1), best2_idx(-1);
@@ -445,41 +339,11 @@ class JaccMapper : public Mapper {
 					cerr << "read " << query_id << ", buckets: " << M_vec.size() << " final: " << final_buckets.size() << endl;
 					
 					int lost_on_pruning = (best_idx == -1);
-	//				if (maps.size() == 1) { // && maps.front().mapq > 0) {
-	//					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
-	//						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
-	//						//cerr << "         mapq: " << maps.front().mapq << endl;
-	//						if (best_idx != -1) {
-	//							int bb = maps[best_idx].bucket;
-	//							cerr << "         best: " << best_idx <<  ", bucket=" << bb << "[" << bb*lmax << ", " << (bb+2)*lmax << ")"; if (best_idx != -1) cerr << ", " << std::setprecision(5) << maps[best_idx] << endl; else cerr << endl;
-	//						}
-	//						if (best2_idx != -1) {
-	//							int bb2 = maps[best2_idx].bucket;
-	//							cerr << "  best2_idx: " << best2_idx << ", bucket=" << bb2 << "[" << bb2*lmax << ", " << (bb2+2)*lmax << ")"; if (best2_idx != -1) cerr << ", " << std::setprecision(5) << maps[best2_idx] << endl; else cerr << endl;
-	//						}
-	//					} else
-	//						lost_on_pruning = 0;
-	//				}
 					H->C.inc("lost_on_pruning", lost_on_pruning);
 					H->C.inc("total_matches", total_matches);
 				H->T.stop("match_rest");
 
-				bool use_ed = false;
-
 				H->T.start("edit_distance");
-				//int best_ed_idx = -1, best2_ed_idx = -1; 
-				//if (use_ed) {
-				//	for (int i=0; i < (int)maps.size(); ++i) {
-				//		auto &mapping = maps[i];
-				//		add_edit_distance(&mapping, P, P_sz, m, kmers);
-				//		if (mapping.ed != -1 && (best_ed_idx == -1 || mapping.ed < maps[best_ed_idx].ed)) {
-				//			best2_ed_idx = best_ed_idx;
-				//			best_ed_idx = i;
-				//		} else if (mapping.ed != -1 && (best2_ed_idx == -1 || mapping.ed > maps[best2_ed_idx].ed)) {
-				//			best2_ed_idx = i;
-				//		}
-				//	}
-				//}
 				H->T.stop("edit_distance");
 				
 				H->T.start("output");
@@ -509,31 +373,9 @@ class JaccMapper : public Mapper {
 								//final_map.ed2 = edit_distance(final_map.bucket, P, P_sz, m, kmers);
 							}
 
-							if (use_ed) {
-	//							//cerr << "best_ed_idx=" << best_ed_idx << " best2_ed_idx=" << best2_ed_idx << " final_mapping.ed=" << final_mapping.ed << endl;
-	//							assert(best_ed_idx != -1);
-	//							assert(final_mapping.ed != -1);
-	//							final_mapping.ed2 = best2_ed_idx == -1 ? -1 : maps[best2_ed_idx].ed;
-	//							final_mapping.mapq = mapq_ed(final_mapping.ed, final_mapping.ed2);
-	//							//if (final_mapping.mapq > 0)
-	//								final_mappings.push_back(final_mapping);
-							} else {
-								final_map.mapq = mapq_J(final_map);
-								//if (final_mapping.mapq > 0)
-									final_mappings.push_back(final_map);
-							}
-
-	//						if (best2_idx != -1 && final_mapping.mapq == 0) {
-	//							string cigar1, cigar2;
-	//							cigar1 = add_edit_distance(&maps[best_idx], P, P_sz, m, kmers);
-	//							cigar2 = add_edit_distance(&maps[best2_idx], P, P_sz, m, kmers);
-	//							if (maps[best_idx].ed != maps[best2_idx].ed) {
-	//								cerr << endl;
-	//								cerr << "mapq = 0 for read " << query_id << endl;
-	//								cerr << maps[best_idx] << " " << cigar1 << endl;
-	//								cerr << maps[best2_idx] << " " << cigar2 << endl;
-	//							}
-	//						}
+							final_map.mapq = mapq_J(final_map);
+							//if (final_mapping.mapq > 0)
+								final_mappings.push_back(final_map);
 						}
 					}
 
@@ -619,3 +461,159 @@ class JaccMapper : public Mapper {
 };
 
 }  // namespace sweepmap
+
+	// TODO: works only in original coordinates
+//	bool is_safe(const string &query_id, const vector<pair<int,int>> &potential_buckets, int lmax, int *gt_a, int *gt_b) {
+//		std::vector<std::string> tokens;
+//		std::stringstream ss(query_id);
+//		std::string token;
+//
+//		while (std::getline(ss, token, '!'))
+//			tokens.push_back(token);
+//
+//		if (tokens.size() < 4)
+//			return true;
+//
+//		*gt_a = std::stoi(tokens[2]);
+//		*gt_b = std::stoi(tokens[3]) + 1;
+//
+//		//cerr << "safety check: " << query_id << " " << *gt_a << " " << *gt_b << " among " << potential_buckets.size() << " buckets." << endl;
+//		for (const auto &[b, matches]: potential_buckets) {
+//			int bucket_a = b*lmax;
+//			int bucket_b = (b+2)*lmax;
+//			//if (bucket_a <= *gt_a && *gt_b <= bucket_b)
+//			//cerr << "safety check: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
+//			if (covered_frac(bucket_a, bucket_b, *gt_a, *gt_b) >= 0.9) {
+//				//cerr << "SAFE: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
+//				return true;
+//			}
+//		}
+//		return false;
+//	}
+
+//	int mapq_ed(int ed_best, int ed_second) {
+//		if (ed_best == -1)
+//			return 0;
+//		if (ed_second == -1)
+//			return 60;
+//		assert(ed_best <= ed_second);
+//		double bound = ed_best * 1.25;
+//		double r = max((bound - ed_second) / (bound - ed_best), 0.0);  // small r is good
+//		assert(r <= 1.0);
+//		return int(60.0 * (1.0 - 1.0 * r));  // big score is good
+//	}
+	
+//	int edit_distance(int b, const char *P, const pos_t P_sz, int lmax) {
+//		int max_ed = -1;
+//		char *s = tidx.T[0].seq.c_str() + (b*lmax);
+//		int S_sz = 2*lmax;
+//		auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0);
+//		EdlibAlignResult result = edlibAlign(P, P_sz, s, S_sz, config);
+//		assert(result.status == EDLIB_STATUS_OK);
+//		int ed = result.editDistance;
+//		
+//		//string cigar = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_STANDARD);
+//		//cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << ", mapping: " << *mapping << endl;
+//		//cerr << cigar << endl;
+//		edlibFreeAlignResult(result);
+//		return ed;
+//	}
+
+	// returns cigar
+//	string add_edit_distance(Mapping *mapping, const char *P, const pos_t P_sz) {
+//		int max_ed = 1000; // -1 for none // TODO: make it a function of theta
+//		int delta = 10000;  // TODO: remove delta
+//
+//		auto segm_id = mapping->segm_id;
+//		int S_a = mapping->T_l, S_b = mapping->T_r;
+//		char strand = mapping->strand;
+//		auto &ref = tidx.T[segm_id].seq;
+//		
+//		// TODO: remove
+//		S_a = max(0, S_a - delta);
+//		S_b = min((int)ref.size()-1, S_b + delta);
+//		
+//		S_a -= H->params.k + 1;
+//		assert(S_a >= 0 && S_a < (int)ref.size());
+//		assert(S_b >= 0 && S_b < (int)ref.size());
+//		
+//		int S_sz = S_b - S_a;
+//		const char *s;
+//		string s_rev;
+//		if (strand == '+')
+//			s = ref.c_str() + S_a;
+//		else {
+//			assert(strand == '-');
+//			s_rev = Mapping::reverseComplement(ref.substr(S_a, S_sz));
+//			s = s_rev.c_str();
+//		}
+//
+//		// edlib query: s
+//		// edlib target: p
+//		//auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
+//		auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0);
+//		//EdlibAlignResult result = edlibAlign(s, S_sz, P, P_sz, config);
+//		EdlibAlignResult result = edlibAlign(P, P_sz, s, S_sz, config);
+//		assert(result.status == EDLIB_STATUS_OK);
+//		mapping->ed = result.editDistance;
+//		
+//		string cigar = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_STANDARD);
+//		//cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << ", mapping: " << *mapping << endl;
+//		//cerr << cigar << endl;
+//		edlibFreeAlignResult(result);
+//		return cigar;
+//	}
+				//int best_ed_idx = -1, best2_ed_idx = -1; 
+				//if (use_ed) {
+				//	for (int i=0; i < (int)maps.size(); ++i) {
+				//		auto &mapping = maps[i];
+				//		add_edit_distance(&mapping, P, P_sz, m, kmers);
+				//		if (mapping.ed != -1 && (best_ed_idx == -1 || mapping.ed < maps[best_ed_idx].ed)) {
+				//			best2_ed_idx = best_ed_idx;
+				//			best_ed_idx = i;
+				//		} else if (mapping.ed != -1 && (best2_ed_idx == -1 || mapping.ed > maps[best2_ed_idx].ed)) {
+				//			best2_ed_idx = i;
+				//		}
+				//	}
+				//}
+
+	//						if (best2_idx != -1 && final_mapping.mapq == 0) {
+	//							string cigar1, cigar2;
+	//							cigar1 = add_edit_distance(&maps[best_idx], P, P_sz, m, kmers);
+	//							cigar2 = add_edit_distance(&maps[best2_idx], P, P_sz, m, kmers);
+	//							if (maps[best_idx].ed != maps[best2_idx].ed) {
+	//								cerr << endl;
+	//								cerr << "mapq = 0 for read " << query_id << endl;
+	//								cerr << maps[best_idx] << " " << cigar1 << endl;
+	//								cerr << maps[best2_idx] << " " << cigar2 << endl;
+	//							}
+	//						}
+	//				int gt_a, gt_b;
+	//				lost_on_seeding = !is_safe(query_id, M_vec, lmax, &gt_a, &gt_b);
+	//				if (!is_safe(query_id, M_vec, lmax, &gt_a, &gt_b))
+	//					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
+
+//							if (use_ed) {
+	//							//cerr << "best_ed_idx=" << best_ed_idx << " best2_ed_idx=" << best2_ed_idx << " final_mapping.ed=" << final_mapping.ed << endl;
+	//							assert(best_ed_idx != -1);
+	//							assert(final_mapping.ed != -1);
+	//							final_mapping.ed2 = best2_ed_idx == -1 ? -1 : maps[best2_ed_idx].ed;
+	//							final_mapping.mapq = mapq_ed(final_mapping.ed, final_mapping.ed2);
+	//							//if (final_mapping.mapq > 0)
+	//								final_mappings.push_back(final_mapping);
+//							} else {
+	//				if (maps.size() == 1) { // && maps.front().mapq > 0) {
+	//					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
+	//						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
+	//						//cerr << "         mapq: " << maps.front().mapq << endl;
+	//						if (best_idx != -1) {
+	//							int bb = maps[best_idx].bucket;
+	//							cerr << "         best: " << best_idx <<  ", bucket=" << bb << "[" << bb*lmax << ", " << (bb+2)*lmax << ")"; if (best_idx != -1) cerr << ", " << std::setprecision(5) << maps[best_idx] << endl; else cerr << endl;
+	//						}
+	//						if (best2_idx != -1) {
+	//							int bb2 = maps[best2_idx].bucket;
+	//							cerr << "  best2_idx: " << best2_idx << ", bucket=" << bb2 << "[" << bb2*lmax << ", " << (bb2+2)*lmax << ")"; if (best2_idx != -1) cerr << ", " << std::setprecision(5) << maps[best2_idx] << endl; else cerr << endl;
+	//						}
+	//					} else
+	//						lost_on_pruning = 0;
+	//				}
