@@ -167,10 +167,10 @@ class JaccMapper : public Mapper {
 		assert(m.J >= 0.0);
 		if (m.J2 < 0.0)
 			return 60;
-		//if (abs(m.intersection - m.intersection2) < 5)
-		//	return 0;
-		if (sigmas_diff(m.intersection, m.intersection2) > 0.3)
-			return 50;
+		if (abs(m.intersection - m.intersection2) == 0)
+			return 0;
+		if (sigmas_diff(m.intersection, m.intersection2) > 0.05)
+			return 60;
 		if (m.J < H->params.theta)
 			return 5;
 		double bound = m.J * 0.9;
