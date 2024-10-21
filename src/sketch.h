@@ -113,6 +113,7 @@ struct Mapping {
 	int bucket;			 // the bucket where the mapping is found
 	int bucket2;  // the bucket of the second best mapping
 	int intersection2; // number of matches in the second best mapping
+	double sigmas_diff;  // how many sigmas is the diff between intersection1 and intersection2
 
     Mapping() {}
 	Mapping(int k, pos_t P_sz, int p_sz, pos_t T_l, pos_t T_r, segm_t segm_id, int intersection, double J, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r, int bucket=-1)
@@ -141,6 +142,7 @@ struct Mapping {
 		J2 = -1.0;
 		bucket2 = -1;
 		intersection2 = -1;
+		sigmas_diff = -1.0;
 	}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
@@ -245,6 +247,7 @@ struct Mapping {
 			<< "\t" << "I:i:" 			<< mapping.intersection  // intersection of `p` and `s` [kmers]
 			<< "\t" << "I2:i:"			<< mapping.intersection2
 			<< "\t" << "Idiff:i:"		<< mapping.intersection - mapping.intersection2
+			<< "\t" << "Isdiff:f:"		<< mapping.sigmas_diff
 			<< "\t" << "J:f:"			<< mapping.J   // Jaccard similarity [0; 1]
 			<< "\t" << "J2:f:"			<< mapping.J2   // second best mapping Jaccard similarity [0; 1]
 			<< "\t" << "Jdiff:f:"		<< mapping.J - mapping.J2   // second best mapping Jaccard similarity [0; 1]

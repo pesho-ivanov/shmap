@@ -37,6 +37,7 @@ class JaccMapper : public Mapper {
 					if (hits_in_t > 0) {
 						if (H->params.max_matches == -1 || hits_in_t <= H->params.max_matches) {
 							Seed el(p[ppos], -1, -1, hits_in_t, kmers.size());
+							//strike = 1; // comment out for Weighted Jaccard 
 							el.occs_in_p = strike;
 							kmers.push_back(el);
 							if (H->params.max_seeds != -1 && (int)kmers.size() >= H->params.max_seeds)  // TODO maybe account for occs_in_p
@@ -134,6 +135,7 @@ class JaccMapper : public Mapper {
 			// Increase the right end of the window [l,r) until it gets out.
 			for(;  r != M.end()
 				//&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
+				//&& r->hit.tpos + H->params.k <= l->hit.tpos + P_sz
 				//&& r->hit.r + H->params.k <= l->hit.r + P_sz
 				&& r->hit.tpos <= l->hit.tpos + lmax 
 				; ++r) {
@@ -146,6 +148,8 @@ class JaccMapper : public Mapper {
 			}
 
 			double J = 1.0*intersection / kmers.size();
+			//double J = 1.0*intersection / m; //kmers.size();
+			//cerr << "l=" << l->hit.r << ", r=" << prev(r)->hit.r << ", intersection=" << intersection << ", P_sz=" << P_sz << ", J= " << J << endl;
 			//assert(m > 0);
 			//double J = 1.0*intersection / m;
 			//J = 1.0*intersection / p_sz;
@@ -187,6 +191,8 @@ class JaccMapper : public Mapper {
 	}
 
 	bool seed_heuristic_pass(const vector<Mapping> &maps, const Seeds &kmers, int lmax, int m, int b, int cnt, int i, int matched_seeds, int best_idx, double best2_idx) {
+		return true; // comment out
+
 		H->T.start("seed_heuristic");
 		bool ret = true;
 		for (; i < (int)kmers.size(); i++) {
@@ -237,6 +243,11 @@ class JaccMapper : public Mapper {
 		return false;
 	}
 
+
+	double sigmas_diff(int X, int Y) {
+		return std::abs(X - Y) / std::sqrt(X + Y);
+	}
+
 	int mapq_ed(int ed_best, int ed_second) {
 		if (ed_best == -1)
 			return 0;
@@ -249,12 +260,14 @@ class JaccMapper : public Mapper {
 		return int(60.0 * (1.0 - 1.0 * r));  // big score is good
 	}
 	
-	int mapq_J(double J_best, double J_second) {
+	int mapq_J(const Mapping &m) {
 		// minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
-		if (J_second < 0.0)
+		if (m.J2 < 0.0)
 			return 60;
-		double bound = J_best * 0.9;
-		double r = max(J_second - bound, 0.0) / (J_best - bound);  // low is good
+		if (sigmas_diff(m.intersection, m.intersection2) < 0.5)
+			return 0;
+		double bound = m.J * 0.9;
+		double r = max(m.J2 - bound, 0.0) / (m.J - bound);  // low is good
 		double J_fl = 60.0 * (1.0 - 1.0 * r);  // high is good
 		return int(J_fl/10.0) * 10;
 		//return 60.0 * (1.0 - 1.0 * pow(J_second / J_best, 0.5) );
@@ -414,11 +427,20 @@ class JaccMapper : public Mapper {
 									}
 								}
 							}
+							//cerr << "after update:" << endl;
+							//if (best_idx != -1)     cerr << "Best mapping: " << maps[best_idx].J << " (" << maps[best_idx].bucket << ")" << endl;
+							//if (best2_idx != -1)    cerr << "Second best mapping: " << maps[best2_idx].J << " (" << maps[best2_idx].bucket << ")" << endl;
+							//if (bests_idx[0] != -1) cerr << 0 << " " << bests_idx[0] << ": " << maps[bests_idx[0]].J << " (" << maps[bests_idx[0]].bucket << ")" << endl;
+							//if (bests_idx[1] != -1) cerr << 1 << " " << bests_idx[1] << ": " << maps[bests_idx[1]].J << " (" << maps[bests_idx[1]].bucket << ")" << endl;
+							//if (bests_idx[2] != -1) cerr << 2 << " " << bests_idx[2] << ": " << maps[bests_idx[2]].J << " (" << maps[bests_idx[2]].bucket << ")" << endl;
+							//if (bests_idx[3] != -1) cerr << 3 << " " << bests_idx[3] << ": " << maps[bests_idx[3]].J << " (" << maps[bests_idx[3]].bucket << ")" << endl;
+							//cerr << endl;
 
 							assert(best2_idx == -1 || abs(maps[best_idx].bucket - maps[best2_idx].bucket) > 1);
 						}
 					}
 					assert(best_idx != -1 || maps.empty());
+					cerr << "read " << query_id << ", buckets: " << M_vec.size() << " final: " << final_buckets.size() << endl;
 					
 					int lost_on_pruning = (best_idx == -1);
 	//				if (maps.size() == 1) { // && maps.front().mapq > 0) {
@@ -480,6 +502,7 @@ class JaccMapper : public Mapper {
 								final_map.J2 = maps[best2_idx].J;
 								final_map.bucket2 = maps[best2_idx].bucket;
 								final_map.intersection2 = maps[best2_idx].intersection;
+								final_map.sigmas_diff = sigmas_diff(final_map.intersection2, final_map.intersection);
 								assert(abs(final_map.bucket - final_map.bucket2) > 1);
 								//final_map.ed2 = edit_distance(final_map.bucket, P, P_sz, m, kmers);
 							}
@@ -493,7 +516,7 @@ class JaccMapper : public Mapper {
 	//							//if (final_mapping.mapq > 0)
 	//								final_mappings.push_back(final_mapping);
 							} else {
-								final_map.mapq = mapq_J(final_map.J, final_map.J2);
+								final_map.mapq = mapq_J(final_map);
 								//if (final_mapping.mapq > 0)
 									final_mappings.push_back(final_map);
 							}
