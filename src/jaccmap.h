@@ -386,7 +386,7 @@ class JaccMapper : public Mapper {
 							sweep(matches, P_sz, lmax, m, kmers, &maps, b, diff_hist);
 							//edit_distance(matches, P, P_sz, m, kmers, &maps);
 							
-							//cerr << "Bucket " << b << " (" << cnt << " matches) has a best mapping with J=" << std::setprecision(3) << J << ", and " << maps.size() << " good mappings" << endl;
+							//cerr << "Bucket " << b << " (" << cnt << " matches) has " << maps.size() << " good mappings" << endl;
 							//if (best_idx != -1)     cerr << "Best mapping: " << maps[best_idx].J << " (" << maps[best_idx].bucket << ")" << endl;
 							//if (best2_idx != -1)    cerr << "Second best mapping: " << maps[best2_idx].J << " (" << maps[best2_idx].bucket << ")" << endl;
 							//if (bests_idx[0] != -1) cerr << 0 << " " << bests_idx[0] << ": " << maps[bests_idx[0]].J << " (" << maps[bests_idx[0]].bucket << ")" << endl;
@@ -402,11 +402,13 @@ class JaccMapper : public Mapper {
 
 										best_idx = bests_idx[0];
 										int j;
-										for (j=1; j<4; ++j)
+										for (j=1; j<4; ++j) {
+											assert(bests_idx[j] == -1 || maps[ bests_idx[j-1] ].J >= maps[ bests_idx[j] ].J);
 											if (bests_idx[j] == -1 || abs(maps[bests_idx[j]].bucket - maps[best_idx].bucket) > 1) {
 												best2_idx = bests_idx[j];
 												break;
 											}
+										}
 										assert(j < 4);
 										break;
 									}
@@ -416,8 +418,9 @@ class JaccMapper : public Mapper {
 							assert(best2_idx == -1 || abs(maps[best_idx].bucket - maps[best2_idx].bucket) > 1);
 						}
 					}
+					assert(best_idx != -1 || maps.empty());
 					
-					int lost_on_pruning = 1;
+					int lost_on_pruning = (best_idx == -1);
 	//				if (maps.size() == 1) { // && maps.front().mapq > 0) {
 	//					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
 	//						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
@@ -457,8 +460,8 @@ class JaccMapper : public Mapper {
 				
 				H->T.start("output");
 					vector<Mapping> final_mappings;
-					H->C.inc("mapped_reads");
 					if (H->params.onlybest && maps.size() >= 1) {
+						H->C.inc("mapped_reads");
 						if (best_idx != -1) {
 							assert(0 <= best_idx && best_idx < (int)maps.size());
 							Mapping &final_map = maps[best_idx];
@@ -544,7 +547,7 @@ class JaccMapper : public Mapper {
 		cerr << " |  | lost on seeding:      " << H->C.count("lost_on_seeding") << " (" << H->C.perc("lost_on_seeding", "reads") << "%)" << endl;
 		cerr << " |  | lost on pruning:      " << H->C.count("lost_on_pruning") << " (" << H->C.perc("lost_on_pruning", "reads") << "%)" << endl;
 		cerr << " |  | mapped:               " << H->C.count("mapped_reads") << " (" << H->C.perc("mapped_reads", "reads") << "%)" << endl;
-		cerr << " |  |  | intersect. diff:     " << H->C.frac("intersection_diff", "mapped_reads") << " p/ mapped read" << endl;
+//		cerr << " |  |  | intersect. diff:     " << H->C.frac("intersection_diff", "mapped_reads") << " p/ mapped read" << endl;
 		cerr << " | Kmers:                 " << H->C.frac("kmers", "reads") << " p/ read" << endl;
 		cerr << " |  | sketched:               " << H->C.frac("kmers_sketched", "reads") << " (" << H->C.perc("kmers_sketched", "kmers") << "%)" << endl;
 		cerr << " |  | unique:                 " << H->C.frac("kmers_unique", "reads") << " (" << H->C.perc("kmers_unique", "kmers") << "%)" << endl;
@@ -579,8 +582,8 @@ class JaccMapper : public Mapper {
         cerr << " |  | match seeds:            " << setw(5) << right << H->T.secs("match_seeds")  << " (" << setw(4) << right << H->T.perc("match_seeds", "mapping")   << "\%, " << setw(6) << right << H->T.range_ratio("match_seeds") << "x)" << endl;
         cerr << " |  | match rest:             " << setw(5) << right << H->T.secs("match_rest")   << " (" << setw(4) << right << H->T.perc("match_rest", "mapping")     << "\%, " << setw(6) << right << H->T.range_ratio("match_rest") << "x)" << endl;
         cerr << " |  |  | seed heuristic:         " << setw(5) << right << H->T.secs("seed_heuristic")    << " (" << setw(4) << right << H->T.perc("seed_heuristic", "match_rest")     << "\%, " << setw(6) << right << H->T.range_ratio("seed_heuristic") << "x)" << endl;
-        cerr << " |  |  | matches collect:        " << setw(5) << right << H->T.secs("match_collect")     << " (" << setw(4) << right << H->T.perc("match_collect", "match_rest")      << "\%, " << setw(6) << right << H->T.range_ratio("match_collect") << "x)" << endl;
-        cerr << " |  |  | sweep:                  " << setw(5) << right << H->T.secs("sweep")             << " (" << setw(4) << right << H->T.perc("sweep", "match_rest")              << "\%, " << setw(6) << right << H->T.range_ratio("sweep") << "x)" << endl;
+//        cerr << " |  |  | matches collect:        " << setw(5) << right << H->T.secs("match_collect")     << " (" << setw(4) << right << H->T.perc("match_collect", "match_rest")      << "\%, " << setw(6) << right << H->T.range_ratio("match_collect") << "x)" << endl;
+//        cerr << " |  |  | sweep:                  " << setw(5) << right << H->T.secs("sweep")             << " (" << setw(4) << right << H->T.perc("sweep", "match_rest")              << "\%, " << setw(6) << right << H->T.range_ratio("sweep") << "x)" << endl;
 
 //        cerr << " |  |  | get intervals:           " << setw(5) << right << H->T.secs("get_intervals")     << " (" << setw(4) << right << H->T.perc("get_intervals", "mapping")      << "\%, " << setw(5) << right << H->T.range_ratio("get_intervals") << "x)" << endl;
 //        cerr << " |  |  | filter promising buckets:" << setw(5) << right << H->T.secs("filter_promising_buckets")    << " (" << setw(4) << right << H->T.perc("filter_promising_buckets", "mapping")     << "\%, " << setw(5) << right << H->T.range_ratio("filter_promising_buckets") << "x)" << endl;

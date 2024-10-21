@@ -36,7 +36,7 @@ READSIM_REFNAME ?= $(REFNAME)
 
 K ?= 22
 R ?= 0.3
-T ?= 0.80
+T ?= 0.70
 M ?= 1000
 S ?= 3000
 
