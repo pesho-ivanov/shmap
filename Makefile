@@ -35,11 +35,11 @@ MEANLEN ?= 10000
 READSIM_REFNAME ?= $(REFNAME)
 
 K ?= 22
-R ?= 0.2
+R ?= 0.1
 S ?= 3000
 
 T ?= 0.80
-M ?= 100000
+M ?= 10000
 
 K_SLOW ?= $(K)
 R_SLOW ?= $(R)
