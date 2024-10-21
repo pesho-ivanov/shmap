@@ -312,7 +312,8 @@ class JaccMapper : public Mapper {
 					}
 					H->C.inc("potential_matches", potential_matches);
 
-					int lmax = int(m / H->params.theta);					// maximum length of a similar mapping
+					int lmax = m;
+					//int lmax = int(m / H->params.theta);					// maximum length of a similar mapping
 					int S = int((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
 					std::unordered_map<int, int> M;  			// M[b] -- #matched kmers[0...i] in [bl, (b+2)l)
 					int matched_seeds = 0;
