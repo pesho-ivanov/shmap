@@ -28,20 +28,20 @@ SURVIVOR_BIN = ~/libs/SURVIVOR/Debug/SURVIVOR
 
 INF = 999999
 
-#REFNAME ?= t2tChrY
+REFNAME ?= t2tChrY
 #REFNAME ?= chm13-1B
-REFNAME ?= chm13-orig
+#REFNAME ?= chm13-orig
 ACCURACY ?= 0.99
-DEPTH ?= 0.01
+DEPTH ?= 1
 MEANLEN ?= 10000
 READSIM_REFNAME ?= $(REFNAME)
 
 K ?= 22
 R ?= 0.05
-T ?= 0.90
+T ?= 0.80
 
 S ?= 30000
-M ?= 1000000
+M ?= 50000
 
 K_SLOW ?= $(K)
 R_SLOW ?= $(R)
@@ -63,7 +63,8 @@ READS = $(ALLREADS_DIR)/$(READS_PREFIX).fa
 #endif
 ONE_READ = $(ALLREADS_DIR)/$(READS_PREFIX).oneread.fa
 ALLOUT_DIR = $(DIR)/out
-OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)/k$(K)-r$(R)-s$(S)-m$(M)-t$(T)
+#OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)/k$(K)-r$(R)-s$(S)-m$(M)-t$(T)
+OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 
 PAFTOOLS = ./ext/paftools.js
 SWEEPMAP_PREF = $(OUTDIR)/sweepmap/sweepmap
@@ -222,7 +223,7 @@ eval_mapquik: gen_reads
 	$(TIME_CMD) -o $(MAPQUIK_PREF).time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(MAPQUIK_PREF) | tee $(MAPQUIK_PREF).log
 	-paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
-eval_tools: eval_mapquik eval_blend eval_minimap #eval_winnowmap #eval_jacc 
+eval_tools: eval_jaccmap eval_mapquik eval_blend eval_minimap eval_winnowmap
 
 eval_tools_on_datasets:
 	make eval_tools REFNAME=t2tChrY DEPTH=10
