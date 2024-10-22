@@ -28,18 +28,20 @@ SURVIVOR_BIN = ~/libs/SURVIVOR/Debug/SURVIVOR
 
 INF = 999999
 
-REFNAME ?= t2tChrY
+#REFNAME ?= t2tChrY
+#REFNAME ?= chm13-1B
+REFNAME ?= chm13-orig
 ACCURACY ?= 0.99
-DEPTH ?= 0.1
+DEPTH ?= 0.01
 MEANLEN ?= 10000
 READSIM_REFNAME ?= $(REFNAME)
 
 K ?= 22
-R ?= 0.1
-S ?= 3000
+R ?= 0.05
+T ?= 0.90
 
-T ?= 0.80
-M ?= 10000
+S ?= 30000
+M ?= 1000000
 
 K_SLOW ?= $(K)
 R_SLOW ?= $(R)
@@ -186,7 +188,7 @@ eval_rmqmap: $(SWEEPMAP_BIN) gen_reads
 
 eval_jaccmap: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(JACCMAP_PREF))
-	$(TIME_CMD) -o $(JACCMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -m jacc 2>/dev/null >/dev/null
+#	$(TIME_CMD) -o $(JACCMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -m jacc 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(JACCMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(JACCMAP_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -m jacc     2> >(tee $(JACCMAP_PREF).log) > $(JACCMAP_PREF).paf
 	-paftools.js mapeval -r 0.1 $(JACCMAP_PREF).paf | tee $(JACCMAP_PREF).eval
 	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(JACCMAP_PREF).paf >$(JACCMAP_PREF).wrong
