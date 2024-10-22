@@ -218,6 +218,7 @@ class JaccMapper : public Mapper {
 		H->C.inc("sketched_kmers", 0);
 		H->C.inc("total_edit_distance", 0);
 		H->C.inc("intersection_diff", 0);
+		H->C.inc("mapq60", 0);
 
 		H->T.start("mapping");
 		H->T.start("query_reading");
@@ -394,7 +395,10 @@ class JaccMapper : public Mapper {
 							}
 
 							final_map.mapq = mapq_J(final_map);
-							//if (final_mapping.mapq > 0)
+							if (final_map.mapq == 60)
+								H->C.inc("mapq60");
+
+							//if (final_map.mapq > 0)
 								final_mappings.push_back(final_map);
 						}
 					}
@@ -451,6 +455,7 @@ class JaccMapper : public Mapper {
 		//cerr << " | Discarded seeds:       " << H->C.count("discarded_seeds") << " (" << H->C.perc("discarded_seeds", "collected_seeds") << "%)" << endl;
 		cerr << " | Mappings:              " << H->C.count("mappings") << " (" << H->C.perc("mappings", "reads") << "\% of reads)" << endl;
 		cerr << " | | Average best sim.:       " << std::fixed << std::setprecision(3) << H->C.frac("J_best", "mappings") / 10000.0 << endl;
+		cerr << " | | mapq=60:                 " << H->C.count("mapq60") << " (" << H->C.perc("mapq60", "mappings") << "\% of mappings)" << endl;
 		//cerr << " | Average edit dist:     " << H->C.frac("total_edit_distance", "mappings") << endl;
 		//print_time_stats();
         //printMemoryUsage();
