@@ -189,7 +189,7 @@ eval_rmqmap: $(SWEEPMAP_BIN) gen_reads
 
 eval_jaccmap: $(SWEEPMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(JACCMAP_PREF))
-#	$(TIME_CMD) -o $(JACCMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -m jacc 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(JACCMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -m jacc 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(JACCMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(JACCMAP_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -m jacc     2> >(tee $(JACCMAP_PREF).log) > $(JACCMAP_PREF).paf
 	-paftools.js mapeval -r 0.1 $(JACCMAP_PREF).paf | tee $(JACCMAP_PREF).eval
 	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(JACCMAP_PREF).paf >$(JACCMAP_PREF).wrong
@@ -223,12 +223,12 @@ eval_mapquik: gen_reads
 	$(TIME_CMD) -o $(MAPQUIK_PREF).time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(MAPQUIK_PREF) | tee $(MAPQUIK_PREF).log
 	-paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
-eval_tools: eval_jaccmap eval_mapquik eval_blend eval_minimap eval_winnowmap
+eval_tools: eval_mapquik eval_blend eval_minimap # eval_jaccmap #eval_winnowmap
 
 eval_tools_on_datasets:
-	make eval_tools REFNAME=t2tChrY DEPTH=10
-	make eval_tools REFNAME=chm13   DEPTH=0.1
-	make eval_tools REFNAME=t2tChrY DEPTH=1  MEANLEN=24000
+#	make eval_tools REFNAME=t2tChrY DEPTH=10
+#	make eval_tools REFNAME=chm13   DEPTH=0.1
+#	make eval_tools REFNAME=t2tChrY DEPTH=1  MEANLEN=24000
 	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb
 
 eval_jaccmap_on_datasets:
@@ -237,8 +237,8 @@ eval_jaccmap_on_datasets:
 	make eval_jaccmap REFNAME=t2tChrY DEPTH=1 	MEANLEN=24000
 	make eval_jaccmap REFNAME=chm13   READS_PREFIX=HG002_24kb
 
-eval_tools_on_SV:
-	make eval_tools REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
+#eval_tools_on_SV:
+#	make eval_tools REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
 
 clean_evals:
 	rm -r $(ALLREADS_DIR)
