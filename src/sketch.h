@@ -265,8 +265,8 @@ struct Mapping {
 			<< "\t" << "M:i:"			<< mapping.total_matches
 			<< "\t" << "Bmax:i:"		<< mapping.seeded_buckets
 			<< "\t" << "Bfinal:i:"		<< mapping.final_buckets
-			<< "\t" << "b:i:"			<< mapping.bucket.segm_id << "," << mapping.bucket.b
-			<< "\t" << "b2:i:"			<< mapping.bucket2.segm_id << "," << mapping.bucket2.b
+			<< "\t" << "b:s:"			<< mapping.bucket.segm_id << "," << mapping.bucket.b
+			<< "\t" << "b2:s:"			<< mapping.bucket2.segm_id << "," << mapping.bucket2.b
 			<< "\t" << "t:f:"			<< mapping.map_time
 			<< endl;
 		return os;
