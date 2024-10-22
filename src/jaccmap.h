@@ -136,7 +136,7 @@ class JaccMapper : public Mapper {
 	}
 
 	bool seed_heuristic_pass(const vector<Mapping> &maps, const Seeds &kmers, qpos_t lmax, qpos_t m, bucket_t b, rpos_t *max_matches, qpos_t i, qpos_t seeds, int best_idx, int best2_idx) {
-		return true; // comment out
+		//return true; // comment out
 
 		H->T.start("seed_heuristic");
 		bool ret = true;
@@ -144,7 +144,7 @@ class JaccMapper : public Mapper {
 			seeds += kmers[i].occs_in_p;
 			if (tidx.matches_in_bucket(kmers[i], b, lmax))
 				*max_matches += kmers[i].occs_in_p;
-			double thr1 = best_idx == -1 ? H->params.theta : min(H->params.theta, maps[best_idx].J*0.9);
+			double thr1 = best_idx == -1 ? H->params.theta : max(H->params.theta, maps[best_idx].J*0.99);
 			double thr2 = best2_idx == -1 ? thr1 : maps[best2_idx].J; 
 			if (hseed(m, seeds, *max_matches) < thr2) {
 				ret = false;
@@ -448,7 +448,7 @@ class JaccMapper : public Mapper {
 
     void print_time_stats() {
         cerr << std::fixed << std::setprecision(1);
-        cerr << " | Runtime:                "    << setw(5) << right << H->T.secs("mapping")       << " sec (" << setw(5) << right << H->T.range_ratio("query_mapping") << "x)" << endl; //setw(4) << right << H->C.count("reads") / H->T.secs("total") << " reads p/ sec)" << endl;
+        cerr << " | Runtime:                "    << setw(5) << right << H->T.secs("mapping")       << " sec, " << 1.0 * H->C.count("reads") / H->T.secs("mapping")  << " reads/sec (" << setw(5) << right << H->T.range_ratio("query_mapping") << "x)" << endl; //setw(4) << right << H->C.count("reads") / H->T.secs("total") << " reads p/ sec)" << endl;
         cerr << " |  | load reads:             " << setw(5) << right << H->T.secs("query_reading")     << " (" << setw(4) << right << H->T.perc("query_reading", "mapping")       << "\%, " << setw(6) << right << H->T.range_ratio("query_reading") << "x)" << endl;
 //        cerr << " |  | prepare:                "     << setw(5) << right << H->T.secs("prepare")           << " (" << setw(4) << right << H->T.perc("prepare", "mapping")             << "\%, " << setw(6) << right << H->T.range_ratio("prepare") << "x)" << endl;
         cerr << " |  | sketch reads:           " << setw(5) << right << H->T.secs("sketching")         << " (" << setw(4) << right << H->T.perc("sketching", "mapping")           << "\%, " << setw(6) << right << H->T.range_ratio("sketching") << "x)" << endl;

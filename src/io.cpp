@@ -11,6 +11,10 @@ void read_fasta_klib(const std::string& filename, std::function<void(kseq_t*)> c
         callback(seq);
     }
 
+    //if (l != -1)  // -1  end of file; do nothing
+    if (l == -2) cerr << "ERROR: truncated quality string" << endl;  // -2   truncated quality string
+    else if (l == -3) cerr << "ERROR: error reading stream" << endl;  // -3   error reading stream
+
     kseq_destroy(seq);
     gzclose(fp);
 }
