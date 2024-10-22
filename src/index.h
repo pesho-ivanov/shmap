@@ -80,35 +80,9 @@ public:
 		return false;
 	}
 
-	bool get_matches_in_interval(std::vector<Match> *matches, const Seed &s, const rpos_t from, const rpos_t to) const {
-		// assume matches of each seed are sorted by position in T
-		// TODO: account for segments
-		if (s.hits_in_T == 1) {
-			auto &hit = h2single.at(s.kmer.h);
-			if (intersect(hit, from, to)) {
-				matches->push_back(Match(s, hit));
-				return true;
-			}
-		} else if (s.hits_in_T > 1) {
-			// TODO: account for segments
-			// TODO: careful with left and right ends
-			const vector<Hit> &hits = h2multi.at(s.kmer.h);
-				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, rpos_t pos) { return hit.r < pos; });
-				//auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, rpos_t pos) { return hit.r > pos; });
-
-				//matches->push_back(Match(s, *it));
-				//matches->push_back(Match(s, *it_r));
-
-				for (; it != hits.end() && it->r < to; ++it)
-					matches->push_back(Match(s, *it));
-
-				return true;
-			//}
-		}	
-		return false;
-	}
-
-	bool matches_in_interval(const Seed &s, rpos_t from, rpos_t to) const {
+	bool matches_in_bucket(const Seed &s, const bucket_t b, qpos_t lmax) const {
+		rpos_t from = b.b * lmax;
+		rpos_t to = (b.b + 2) * lmax;
 		if (s.hits_in_T == 0) {
 			return false;
 		} else if (s.hits_in_T == 1) {
@@ -117,7 +91,11 @@ public:
 		} else if (s.hits_in_T > 1) {
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
 			//for (int i=1; i<(int)hits.size(); i++) assert(hits[i-1].r <= hits[i].r);
-			auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, rpos_t pos) { return hit.tpos < pos; });
+			auto it = lower_bound(hits.begin(), hits.end(), from, [&b](const Hit &hit, rpos_t pos) {
+				if (hit.segm_id != b.segm_id)
+					return hit.segm_id < b.segm_id;
+				return hit.tpos < pos;
+			});
 			//auto it_prev = it; if (it_prev != hits.begin()) { --it_prev; assert(it_prev->r < from); }
 			//if (it != hits.end()) assert(from <= it->r);
 			//cout << (it != hits.end() && it->r < to) << ", [" << from << ", " << to << ")" << ", it: " << (it != hits.end() ? it->r : -1) << endl;
@@ -201,7 +179,7 @@ public:
 			sort(hits.begin(), hits.end(), [](const Hit &a, const Hit &b) {
 				if (a.segm_id != b.segm_id)
 					return a.segm_id < b.segm_id;
-				return a.r < b.r;
+				return a.r < b.r;  // equivalent to a.tpos < b.tpos
 			});
 		}
 		H->T.stop("index_reading");
@@ -330,3 +308,37 @@ public:
 //						return true;
 //					}
 //			} else {
+
+//	bool get_matches_in_interval(std::vector<Match> *matches, const Seed &s, const bucket_t b, qpos_t lmax) const {
+//		// assume matches of each seed are sorted by position in T
+//		// TODO: account for segments
+//		rpos_t from = b.b * lmax;
+//		rpos_t to = (b.b + 2) * lmax;
+//		if (s.hits_in_T == 1) {
+//			auto &hit = h2single.at(s.kmer.h);
+//			if (intersect(hit, from, to)) {
+//				matches->push_back(Match(s, hit));
+//				return true;
+//			}
+//		} else if (s.hits_in_T > 1) {
+//			// TODO: account for segments
+//			// TODO: careful with left and right ends
+//			const vector<Hit> &hits = h2multi.at(s.kmer.h);
+//				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, rpos_t pos) {
+////					if (b.segm_id != hit.segm_id)
+////						return b.segm_id < hit.segm_id;
+//					return hit.r < pos;  // hit.tpos!!
+//				});
+//				//auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, rpos_t pos) { return hit.r > pos; });
+//
+//				//matches->push_back(Match(s, *it));
+//				//matches->push_back(Match(s, *it_r));
+//
+//				for (; it != hits.end() && it->r < to; ++it)
+//					matches->push_back(Match(s, *it));
+//
+//				return true;
+//			//}
+//		}	
+//		return false;
+//	}

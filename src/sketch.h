@@ -81,6 +81,25 @@ struct RefSegment {
 		: kmers(sk), name(name), seq(seq), sz(sz) {}
 };
 
+struct bucket_t {
+	segm_t segm_id;		// segm_id refers to tidx.T[segm_id]
+	rpos_t b;   		// b refers to interval [lmax*b, lmax*(b+2)) in tidx.T[segm_id].kmers
+	bucket_t() : segm_id(-1), b(-1) {}
+	bucket_t(segm_t segm_id, rpos_t b) : segm_id(segm_id), b(b) {}
+	bool operator==(const bucket_t &) const = default;
+};
+
+} // namespace sweepmap
+
+template <>
+struct std::hash<sweepmap::bucket_t> {
+	std::size_t operator()(const sweepmap::bucket_t& b) const {
+		return std::hash<sweepmap::segm_t>()(b.segm_id) ^ (std::hash<sweepmap::rpos_t>()(b.b) << 1);
+	}
+};
+
+namespace sweepmap {
+
 struct Mapping {
 	int k; 	   // kmer size
 	string query_id;
@@ -110,13 +129,13 @@ struct Mapping {
 	rpos_t seed_matches;    // number of matches of seeds
 	rpos_t seeded_buckets;     // the initial number of buckets
 	rpos_t final_buckets;   // the number of buckets after pruning with all kmers
-	rpos_t bucket;			 // the bucket where the mapping is found
-	rpos_t bucket2;  // the bucket of the second best mapping
+	bucket_t bucket;			 // the bucket where the mapping is found
+	bucket_t bucket2;  // the bucket of the second best mapping
 	qpos_t intersection2; // number of matches in the second best mapping
 	double sigmas_diff;  // how many sigmas is the diff between intersection1 and intersection2
 
     Mapping() : J(-1.0) {}
-	Mapping(int k, qpos_t P_sz, qpos_t p_sz, rpos_t T_l, rpos_t T_r, segm_t segm_id, qpos_t intersection, double J, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r, rpos_t bucket=-1)
+	Mapping(int k, qpos_t P_sz, qpos_t p_sz, rpos_t T_l, rpos_t T_r, segm_t segm_id, qpos_t intersection, double J, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r, bucket_t bucket)
 		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), intersection(intersection), J(J), unreasonable(false), l(l), r(r), bucket(bucket) {
 		//if (J > 1.0)
 		//	cerr << "s_sz = " << s_sz << ", intersection = " << intersection << ", p_sz = " << p_sz << ", J = " << J << ", r-l=" << r-l << endl;
@@ -140,7 +159,6 @@ struct Mapping {
 		seeded_buckets = -1;
 		final_buckets = -1;
 		J2 = -1.0;
-		bucket2 = -1;
 		intersection2 = -1;
 		sigmas_diff = -1.0;
 	}
@@ -247,8 +265,8 @@ struct Mapping {
 			<< "\t" << "M:i:"			<< mapping.total_matches
 			<< "\t" << "Bmax:i:"		<< mapping.seeded_buckets
 			<< "\t" << "Bfinal:i:"		<< mapping.final_buckets
-			<< "\t" << "b:i:"			<< mapping.bucket
-			<< "\t" << "b2:i:"			<< mapping.bucket2
+			<< "\t" << "b:i:"			<< mapping.bucket.segm_id << "," << mapping.bucket.b
+			<< "\t" << "b2:i:"			<< mapping.bucket2.segm_id << "," << mapping.bucket2.b
 			<< "\t" << "t:f:"			<< mapping.map_time
 			<< endl;
 		return os;
