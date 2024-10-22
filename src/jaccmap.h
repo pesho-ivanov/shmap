@@ -438,9 +438,9 @@ class JaccMapper : public Mapper {
 		//cerr << " | Spurious matches:      " << H->C.count("spurious_matches") << " (" << H->C.perc("spurious_matches", "matches") << "%)" << endl;
 		//cerr << " | Discarded seeds:       " << H->C.count("discarded_seeds") << " (" << H->C.perc("discarded_seeds", "collected_seeds") << "%)" << endl;
 		cerr << " | Mappings:              " << H->C.count("mappings") << " (" << H->C.perc("mappings", "reads") << "\% of reads)" << endl;
-		cerr << " | | Seeded buckets:          " << H->C.frac("seeded_buckets", "mappings") << " p/ mapping" << endl;
-		cerr << " | | Final buckes:            " << H->C.frac("final_buckets", "mappings") << " p/ mapping" << endl;
-		cerr << " | | Final mappings:          " << H->C.perc("final_mappings", "mappings") << endl;
+		cerr << " | | Seeded buckets:          " << H->C.frac("seeded_buckets", "mappings") << " /mapping" << endl;
+		cerr << " | | Final buckes:            " << H->C.frac("final_buckets", "mappings") << " /mapping" << endl;
+		cerr << " | | Final mappings:          " << H->C.frac("final_mappings", "mappings") << " /mapping" << endl;
 		cerr << " | | Average best sim.:       " << std::fixed << std::setprecision(3) << H->C.frac("J_best", "mappings") / 10000.0 << endl;
 		cerr << " | | mapq=60:                 " << H->C.count("mapq60") << " (" << H->C.perc("mapq60", "mappings") << "\% of mappings)" << endl;
 		//cerr << " | Average edit dist:     " << H->C.frac("total_edit_distance", "mappings") << endl;
