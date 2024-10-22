@@ -59,19 +59,19 @@ class JaccMapper : public Mapper {
 		return kmers;
 	}
 
-	void sweep(const vector<Match> &M, const pos_t P_sz, int lmax, const int m, const Seeds &kmers, vector<Mapping> *maps, int bucket, unordered_map<hash_t, int> &diff_hist) {
+	void sweep(const vector<Match> &B, const pos_t P_sz, int lmax, const int m, const Seeds &kmers, vector<Mapping> *maps, int bucket, unordered_map<hash_t, int> &diff_hist) {
 		int intersection = 0;
 		int same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 		Mapping best;
 		
-		for (int i=1; i<(int)M.size(); i++)
-			assert(M[i-1].hit.tpos < M[i].hit.tpos);
-		assert(M.size() == 0 || (int)M.size() <= M.back().hit.tpos - M.front().hit.tpos + 1);
+		for (int i=1; i<(int)B.size(); i++)
+			assert(B[i-1].hit.tpos < B[i].hit.tpos);
+		assert(B.size() == 0 || (int)B.size() <= B.back().hit.tpos - B.front().hit.tpos + 1);
 		
 		// Increase the left point end of the window [l,r) one by one. O(matches)
-		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l) {
+		for(auto l = B.begin(), r = B.begin(); l != B.end(); ++l) {
 			// Increase the right end of the window [l,r) until it gets out.
-			for(;  r != M.end()
+			for(;  r != B.end()
 				//&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
 				//&& r->hit.tpos + H->params.k <= l->hit.tpos + P_sz
 				//&& r->hit.r + H->params.k <= l->hit.r + P_sz
@@ -115,7 +115,7 @@ class JaccMapper : public Mapper {
 		assert(same_strand_seeds == 0);
 		
 		//if (best.J >= H->params.theta)
-		//cerr << "M=" << M.size() << ", bucket= " << bucket << ", best=" << best;
+		//cerr << "B=" << B.size() << ", bucket= " << bucket << ", best=" << best;
 		if (best.J >= 0)
 			maps->push_back(best);
 	}
@@ -236,7 +236,7 @@ class JaccMapper : public Mapper {
 					//int lmax = m;
 					int lmax = int(m / H->params.theta);					// maximum length of a similar mapping
 					int unique_seeds = int((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
-					std::unordered_map<int, int> M;  			// M[b] -- #matched kmers[0...i] in [bl, (b+2)l)
+					std::unordered_map<int, int> B;  			// B[b] -- #matched kmers[0...i] in [bl, (b+2)l)
 					int seeds = 0;
 
 					H->C.inc("kmers_sketched", p.size());
@@ -262,11 +262,11 @@ class JaccMapper : public Mapper {
 								if (b>0) matched_buckets[b-1] = seed.occs_in_p;
 							}
 							for (const auto [b, occs_in_p]: matched_buckets)
-								M[b] += occs_in_p;
+								B[b] += occs_in_p;
 						}
 						seeds += seed.occs_in_p;
 					}
-					seeded_buckets = M.size();
+					seeded_buckets = B.size();
 					H->C.inc("seeded_buckets", seeded_buckets);
 					H->C.inc("seed_matches", seed_matches);
 				H->T.stop("match_seeds");
@@ -274,8 +274,8 @@ class JaccMapper : public Mapper {
 				H->T.start("match_rest");
 					vector<Mapping> maps;
 					int total_matches = seed_matches;
-					vector<pair<int,int>> M_vec(M.begin(), M.end());
-					sort(M_vec.begin(), M_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
+					vector<pair<int,int>> B_vec(B.begin(), B.end());
+					sort(B_vec.begin(), B_vec.end(), [](const pair<int, int> &a, const pair<int, int> &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 
 					int lost_on_seeding = (0);
 					H->C.inc("lost_on_seeding", lost_on_seeding);
@@ -285,29 +285,29 @@ class JaccMapper : public Mapper {
 					int maps_idx = 0;
 					vector<pair<int, int>> final_buckets;
 					H->T.start("seed_heuristic"); H->T.stop("seed_heuristic");  // init
-					for (auto &[b, seed_matches]: M_vec) {
+					for (auto &[b, seed_matches]: B_vec) {
 						int max_matches_in_bucket = seed_matches;
 						if (seed_heuristic_pass(maps, kmers, lmax, m, b, &max_matches_in_bucket, i, seeds, best_idx, best2_idx)) {
 							H->T.start("match_collect");
-								Matches M;
+								Matches B;
 								for (int i = b*lmax; i < std::min((b+2)*lmax, (int)tidx.T[0].kmers.size()); i++) {
 									const auto &kmer = tidx.T[0].kmers[i];
 									const auto seed_it = p_ht.find(kmer.h);
 									if (seed_it != p_ht.end()) {
-										M.push_back(Match(seed_it->second, Hit(kmer, i, 0)));
-										assert(M[ M.size()-1 ].hit.tpos == M[ M.size()-1 ].hit.tpos);
+										B.push_back(Match(seed_it->second, Hit(kmer, i, 0)));
+										assert(B[ B.size()-1 ].hit.tpos == B[ B.size()-1 ].hit.tpos);
 									}
 								}
 							H->T.stop("match_collect");
-							total_matches += M.size();
+							total_matches += B.size();
 							final_buckets.push_back( make_pair(b, seed_matches) );
 
-							//cerr << "seed matches=" << seed_matches << ", max_matches_in_bucket=" << max_matches_in_bucket << ", M.size()=" << M.size() << endl;
-							assert((int)M.size() >= seed_matches);
+							//cerr << "seed matches=" << seed_matches << ", max_matches_in_bucket=" << max_matches_in_bucket << ", B.size()=" << B.size() << endl;
+							assert((int)B.size() >= seed_matches);
 
 							H->T.start("sweep");
-								//no_sweep(M, P_sz, lmax, m, kmers, &maps, b, diff_hist);
-								sweep(M, P_sz, lmax, m, kmers, &maps, b, diff_hist);
+								//no_sweep(B, P_sz, lmax, m, kmers, &maps, b, diff_hist);
+								sweep(B, P_sz, lmax, m, kmers, &maps, b, diff_hist);
 								//edit_distance(matches, P, P_sz, m, kmers, &maps);
 							H->T.stop("sweep");
 							
@@ -338,7 +338,7 @@ class JaccMapper : public Mapper {
 						}
 					}
 					assert(best_idx != -1 || maps.empty());
-					cerr << "read " << query_id << ", buckets: " << M_vec.size() << ", final buckets: " << final_buckets.size() << ", maps.size(): " << maps.size() << ", best_idx: " << best_idx << ", best2_idx: " << best2_idx << endl;
+					cerr << "read " << query_id << ", seeded buckets: " << B.size() << ", final buckets: " << final_buckets.size() << ", maps.size(): " << maps.size() << ", best_idx: " << best_idx << ", best2_idx: " << best2_idx << endl;
 					
 					int lost_on_pruning = (best_idx == -1);
 					H->C.inc("final_buckets", final_buckets.size());
@@ -602,8 +602,8 @@ class JaccMapper : public Mapper {
 	//							}
 	//						}
 	//				int gt_a, gt_b;
-	//				lost_on_seeding = !is_safe(query_id, M_vec, lmax, &gt_a, &gt_b);
-	//				if (!is_safe(query_id, M_vec, lmax, &gt_a, &gt_b))
+	//				lost_on_seeding = !is_safe(query_id, B_vec, lmax, &gt_a, &gt_b);
+	//				if (!is_safe(query_id, B_vec, lmax, &gt_a, &gt_b))
 	//					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
 
 //							if (use_ed) {
@@ -631,13 +631,13 @@ class JaccMapper : public Mapper {
 	//						lost_on_pruning = 0;
 	//				}
 
-//	void no_sweep(const vector<Match> &M, const pos_t P_sz, int lmax, const int m, const Seeds &kmers, vector<Mapping> *maps, int bucket, unordered_map<hash_t, int> &diff_hist) {
+//	void no_sweep(const vector<Match> &B, const pos_t P_sz, int lmax, const int m, const Seeds &kmers, vector<Mapping> *maps, int bucket, unordered_map<hash_t, int> &diff_hist) {
 //		int intersection = 0;
 //		int same_strand_seeds = 0;
 //		//Mapping best;
-//		auto l = M.begin(), r = M.begin();
+//		auto l = B.begin(), r = B.begin();
 //		
-//		for(auto it = M.begin(); it != M.end(); ++it) {
+//		for(auto it = B.begin(); it != B.end(); ++it) {
 //			if (it->hit.tpos < l->hit.tpos) l = it;
 //			if (it->hit.tpos > r->hit.tpos) r = it;
 //
