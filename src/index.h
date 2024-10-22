@@ -220,6 +220,8 @@ public:
         //printMemoryUsage();
 		cerr << " | total nucleotides:     " << H->C.count("total_nucls") << endl;
 		cerr << " | index segments:        " << H->C.count("segments") << " (~" << 1.0*H->C.count("total_nucls") / H->C.count("segments") << " nb per segment)" << endl;
+		for (const auto &segm: T)
+			cerr << " | | " << segm.name << " (" << segm.sz << " nb)" << endl;
 		cerr << " | indexed kmers:         " << H->C.count("indexed_kmers") << endl;
 		cerr << " | indexed hits:          " << H->C.count("indexed_hits") << " ("
 												<< double(H->params.k)*H->C.perc("indexed_hits", "total_nucls") << "\% of the index, "
