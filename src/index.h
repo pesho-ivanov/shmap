@@ -309,7 +309,6 @@ public:
 
 	void print_stats() const {
 		cerr << std::fixed << std::setprecision(1);
-		//cerr << "Index stats:" << endl;
         //printMemoryUsage();
 		cerr << " | total nucleotides:     " << H->C.count("total_nucls") << endl;
 		cerr << " | index segments:        " << H->C.count("segments") << " (~" << 1.0*H->C.count("total_nucls") / H->C.count("segments") << " nb per segment)" << endl;
@@ -320,6 +319,10 @@ public:
 		cerr << " | | most frequent kmer:      " << H->C.count("indexed_highest_freq_kmer") << " times." << endl;
 		cerr << " | | blacklisted kmers:       " << H->C.count("blacklisted_kmers") << " (" << H->C.perc("blacklisted_kmers", "indexed_kmers") << "\%)" << endl;
 		cerr << " | | blacklisted hits:        " << H->C.count("blacklisted_hits") << " (" << H->C.perc("blacklisted_hits", "indexed_hits") << "\%)" << endl;
+		cerr << " | indexing time:        "    << H->T.secs("indexing") << "s" << endl;
+		cerr << " | | reading time:          " << H->T.secs("index_reading") << "s" << endl;
+		cerr << " | | sketching time:        " << H->T.secs("index_sketching") << "s" << endl;
+		cerr << " | | initializing time:     " << H->T.secs("index_initializing") << "s" << endl;
 	}
 };
 
