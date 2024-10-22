@@ -9,7 +9,7 @@
 #include "utils.h"
 #include "io.h"
 #include "handler.h"
-#include "rmq.h"
+//#include "rmq.h"
 
 namespace sweepmap {
 
@@ -23,15 +23,15 @@ public:
 	Handler *H;
 
 	void get_kmer_stats() const {
-		std::vector<int> hist(10, 0);
-		int max_occ = 0;
+		std::vector<rpos_t> hist(10, 0);
+		rpos_t max_occ = 0;
         H->C.inc("indexed_hits", h2single.size());
         H->C.inc("indexed_kmers", h2single.size());
 		for (const auto& h2p : h2multi) {
-			int occ = h2p.second.size();
+			rpos_t occ = h2p.second.size();
 			H->C.inc("indexed_hits", occ);
 			H->C.inc("indexed_kmers");
-			if (occ >= (int)hist.size()-1) {
+			if (occ >= rpos_t(hist.size())-1) {
 				hist.back() += occ;
 				if (occ > max_occ)
 					max_occ = occ;
@@ -41,18 +41,18 @@ public:
 		H->C.inc("indexed_highest_freq_kmer", max_occ);
 	}
 
-	int count(hash_t h) const {
+	rpos_t count(hash_t h) const {
 		if (h2single.contains(h)) return 1;
 		else if (h2multi.contains(h)) return h2multi.at(h).size();
 		else return 0;
 	}
 
-	bool intersect(const Hit &hit, const int from, const int to) const {
+	bool intersect(const Hit &hit, const rpos_t from, const rpos_t to) const {
 		// TODO: account for segments
 		return from <= hit.r && hit.r < to;
 	}
 
-	bool get_matches_in_t_interval(std::vector<Match> *matches, const Seed &s, const int from, const int to) const {
+	bool get_matches_in_t_interval(std::vector<Match> *matches, const Seed &s, const rpos_t from, const rpos_t to) const {
 		// assume matches of each seed are sorted by position in T
 		// TODO: account for segments
 		if (s.hits_in_T == 1) {
@@ -65,20 +65,8 @@ public:
 			// TODO: account for segments
 			// TODO: careful with left and right ends
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
-//			if (hits.size() < 10) {
-//				for (int i=0; i<(int)hits.size(); i++)
-//					if (hits[i].tpos >= from) {
-//						matches->push_back(Match(s, hits[i]));
-//						for (int j=(int)hits.size()-1; j>i; j--)
-//							if (hits[j].tpos < to) {
-//								matches->push_back(Match(s, hits[j]));
-//								break;
-//							}
-//						return true;
-//					}
-//			} else {
-				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.tpos < pos; });
-				//auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, int pos) { return hit.r > pos; });
+				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, rpos_t pos) { return hit.tpos < pos; });
+				//auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, rpos_t pos) { return hit.r > pos; });
 
 				//matches->push_back(Match(s, *it));
 				//matches->push_back(Match(s, *it_r));
@@ -92,7 +80,7 @@ public:
 		return false;
 	}
 
-	bool get_matches_in_interval(std::vector<Match> *matches, const Seed &s, const int from, const int to) const {
+	bool get_matches_in_interval(std::vector<Match> *matches, const Seed &s, const rpos_t from, const rpos_t to) const {
 		// assume matches of each seed are sorted by position in T
 		// TODO: account for segments
 		if (s.hits_in_T == 1) {
@@ -105,20 +93,8 @@ public:
 			// TODO: account for segments
 			// TODO: careful with left and right ends
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
-			//if (hits.size() < 10) {
-			//	for (int i=0; i<(int)hits.size(); i++)
-			//		if (hits[i].r >= from) {
-			//			matches->push_back(Match(s, hits[i]));
-			//			for (int j=(int)hits.size()-1; j>i; j--)
-			//				if (hits[j].r < to) {
-			//					matches->push_back(Match(s, hits[j]));
-			//					break;
-			//				}
-			//			return true;
-			//		}
-			//} else {
-				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.r < pos; });
-				//auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, int pos) { return hit.r > pos; });
+				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, rpos_t pos) { return hit.r < pos; });
+				//auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, rpos_t pos) { return hit.r > pos; });
 
 				//matches->push_back(Match(s, *it));
 				//matches->push_back(Match(s, *it_r));
@@ -132,7 +108,7 @@ public:
 		return false;
 	}
 
-	bool matches_in_interval(const Seed &s, int from, int to) const {
+	bool matches_in_interval(const Seed &s, rpos_t from, rpos_t to) const {
 		if (s.hits_in_T == 0) {
 			return false;
 		} else if (s.hits_in_T == 1) {
@@ -141,7 +117,7 @@ public:
 		} else if (s.hits_in_T > 1) {
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
 			//for (int i=1; i<(int)hits.size(); i++) assert(hits[i-1].r <= hits[i].r);
-			auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.tpos < pos; });
+			auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, rpos_t pos) { return hit.tpos < pos; });
 			//auto it_prev = it; if (it_prev != hits.begin()) { --it_prev; assert(it_prev->r < from); }
 			//if (it != hits.end()) assert(from <= it->r);
 			//cout << (it != hits.end() && it->r < to) << ", [" << from << ", " << to << ")" << ", it: " << (it != hits.end() ? it->r : -1) << endl;
@@ -149,74 +125,6 @@ public:
 		}
 		return false;
 	}
-
-	//bool is_kmer_in_interval(const Seed &s, int from, int to) const {
-	//	assert(s.hits_in_T > 0);
-	//	if (s.hits_in_T == 1) {
-	//		auto &hit = h2single.at(s.kmer.h);
-	//		return intersect(hit, from, to);
-	//	} else if (s.hits_in_T > 1) {
-	//		const vector<Hit> &hits = h2multi.at(s.kmer.h);
-	//		//for (int i=1; i<(int)hits.size(); i++) assert(hits[i-1].r <= hits[i].r);
-	//		auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.r < pos; });
-	//		//auto it_prev = it; if (it_prev != hits.begin()) { --it_prev; assert(it_prev->r < from); }
-	//		//if (it != hits.end()) assert(from <= it->r);
-	//		//cout << (it != hits.end() && it->r < to) << ", [" << from << ", " << to << ")" << ", it: " << (it != hits.end() ? it->r : -1) << endl;
-	//		return it != hits.end() && it->r < to;
-	//	}
-	//	return false;
-	//}
-
-	// returns the number of hits in the interval from, to
-//	void match_kmer_in_interval(SegmentTree *hist, const Seed &s, const int from, const int to, vector<Match> *matches_freq) const {
-//		// assume matches of each seed are sorted by position in T
-//		if (s.hits_in_T == 1) {
-//			auto &hit = h2single.at(s.kmer.h);
-//			int curr_l = hist->from(hit);
-//			int curr_r = hist->to(hit);
-//			if (from <= curr_r && curr_l <= to) {
-//				matches_freq->push_back(Match(s, hit));
-//				hist->incRange(max(curr_l, from), min(curr_r, to));
-//			}
-//		} else if (s.hits_in_T > 1) {
-//			const vector<Hit> &hits = h2multi.at(s.kmer.h);
-//			auto it = lower_bound(hits.begin(), hits.end(), from, [&hist](const Hit &hit, int pos) {
-//				return hist->to(hit) < pos;
-//			});
-//			assert(it==hits.begin() || hist->to(*(it-1)) < from);
-//			assert(it==hits.end() || from <= hist->to(*it));
-//
-//			int prev_l = -1;  //hist->from(*it);
-//			int prev_r = -1;  // hist->to(*it);
-//			for (; it != hits.end() && prev_l <= to; ++it) {
-//				int curr_l = hist->from(*it);
-//				int curr_r = hist->to(*it);
-//				assert(curr_l <= curr_r);
-//				if (from <= curr_r && curr_l <= to)  // intersect?
-//					matches_freq->push_back(Match(s, *it));
-//				if (prev_r < curr_l) {  // if there will be a gap, push the current range
-//					if (prev_l != -1) {
-//#ifdef DEBUG
-//						cerr << "  match_kmer_in_interval(" << s << ", " << from << ", " << to << ")" << endl;
-//#endif
-//						hist->incRange(max(prev_l, from), min(prev_r, to));
-//					}
-//					prev_l = curr_l;
-//					prev_r = curr_r;
-//				} else {
-//					assert(prev_l <= curr_l);
-//					prev_r = curr_r;
-//				}
-//			}
-//			if (prev_l != -1 && prev_l <= to) {
-//				assert (prev_l <= prev_r);
-//#ifdef DEBUG
-//				cerr << "  match_kmer_in_interval(" << s << ", " << from << ", " << to << ")" << endl;
-//#endif
-//				hist->incRange(max(prev_l, from), min(prev_r, to));
-//			}	
-//		}
-//	}
 
 	void get_matches(std::vector<Match> *matches, const Seed &s) const {
 		matches->reserve(matches->size() + s.hits_in_T);
@@ -232,7 +140,7 @@ public:
 		assert(H->params.max_matches != -1);
 		std::vector<hash_t> blacklisted_h;
 		for (const auto &[h, hits]: h2multi)
-			if ((int)hits.size() > H->params.max_matches) {
+			if (rpos_t(hits.size()) > H->params.max_matches) {
 				blacklisted_h.push_back(h);
 				H->C.inc("blacklisted_kmers");
 				H->C.inc("blacklisted_hits", hits.size());
@@ -242,14 +150,14 @@ public:
 			h2multi.erase(h);
 	}
 
-	void populate_h2pos(const sketch_t& sketch, int segm_id) {
+	void populate_h2pos(const sketch_t& sketch, segm_t segm_id) {
 		// TODO: skip creating the sketch structure
 		for (size_t tpos = 0; tpos < sketch.size(); ++tpos) {
 			const Kmer& kmer = sketch[tpos];
 			const auto hit = Hit(kmer, tpos, segm_id);
 			if (!h2single.contains(kmer.h))
 				h2single[kmer.h] = hit; 
-            else if (H->params.max_matches == -1 || (int)h2multi[kmer.h].size() < H->params.max_matches + 1)
+            else if (H->params.max_matches == -1 || (rpos_t)h2multi[kmer.h].size() < H->params.max_matches + 1)
                 h2multi[kmer.h].push_back(hit);
 		}
 	}
@@ -257,7 +165,7 @@ public:
 	void add_segment(const kseq_t *seq, const sketch_t& sketch) {
 		string segm_name = seq->name.s;
 		string segm_seq = seq->seq.s;
-		int segm_size = seq->seq.l;
+		rpos_t segm_size = seq->seq.l;
 		T.push_back(RefSegment(sketch, segm_name, segm_seq, segm_size));
 		H->C.inc("segments");
 		H->C.inc("total_nucls", segm_size);
@@ -327,3 +235,96 @@ public:
 };
 
 } // namespace sweepmap
+
+	//bool is_kmer_in_interval(const Seed &s, int from, int to) const {
+	//	assert(s.hits_in_T > 0);
+	//	if (s.hits_in_T == 1) {
+	//		auto &hit = h2single.at(s.kmer.h);
+	//		return intersect(hit, from, to);
+	//	} else if (s.hits_in_T > 1) {
+	//		const vector<Hit> &hits = h2multi.at(s.kmer.h);
+	//		//for (int i=1; i<(int)hits.size(); i++) assert(hits[i-1].r <= hits[i].r);
+	//		auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, int pos) { return hit.r < pos; });
+	//		//auto it_prev = it; if (it_prev != hits.begin()) { --it_prev; assert(it_prev->r < from); }
+	//		//if (it != hits.end()) assert(from <= it->r);
+	//		//cout << (it != hits.end() && it->r < to) << ", [" << from << ", " << to << ")" << ", it: " << (it != hits.end() ? it->r : -1) << endl;
+	//		return it != hits.end() && it->r < to;
+	//	}
+	//	return false;
+	//}
+
+	// returns the number of hits in the interval from, to
+//	void match_kmer_in_interval(SegmentTree *hist, const Seed &s, const int from, const int to, vector<Match> *matches_freq) const {
+//		// assume matches of each seed are sorted by position in T
+//		if (s.hits_in_T == 1) {
+//			auto &hit = h2single.at(s.kmer.h);
+//			int curr_l = hist->from(hit);
+//			int curr_r = hist->to(hit);
+//			if (from <= curr_r && curr_l <= to) {
+//				matches_freq->push_back(Match(s, hit));
+//				hist->incRange(max(curr_l, from), min(curr_r, to));
+//			}
+//		} else if (s.hits_in_T > 1) {
+//			const vector<Hit> &hits = h2multi.at(s.kmer.h);
+//			auto it = lower_bound(hits.begin(), hits.end(), from, [&hist](const Hit &hit, int pos) {
+//				return hist->to(hit) < pos;
+//			});
+//			assert(it==hits.begin() || hist->to(*(it-1)) < from);
+//			assert(it==hits.end() || from <= hist->to(*it));
+//
+//			int prev_l = -1;  //hist->from(*it);
+//			int prev_r = -1;  // hist->to(*it);
+//			for (; it != hits.end() && prev_l <= to; ++it) {
+//				int curr_l = hist->from(*it);
+//				int curr_r = hist->to(*it);
+//				assert(curr_l <= curr_r);
+//				if (from <= curr_r && curr_l <= to)  // intersect?
+//					matches_freq->push_back(Match(s, *it));
+//				if (prev_r < curr_l) {  // if there will be a gap, push the current range
+//					if (prev_l != -1) {
+//#ifdef DEBUG
+//						cerr << "  match_kmer_in_interval(" << s << ", " << from << ", " << to << ")" << endl;
+//#endif
+//						hist->incRange(max(prev_l, from), min(prev_r, to));
+//					}
+//					prev_l = curr_l;
+//					prev_r = curr_r;
+//				} else {
+//					assert(prev_l <= curr_l);
+//					prev_r = curr_r;
+//				}
+//			}
+//			if (prev_l != -1 && prev_l <= to) {
+//				assert (prev_l <= prev_r);
+//#ifdef DEBUG
+//				cerr << "  match_kmer_in_interval(" << s << ", " << from << ", " << to << ")" << endl;
+//#endif
+//				hist->incRange(max(prev_l, from), min(prev_r, to));
+//			}	
+//		}
+//	}
+
+			//if (hits.size() < 10) {
+			//	for (int i=0; i<(int)hits.size(); i++)
+			//		if (hits[i].r >= from) {
+			//			matches->push_back(Match(s, hits[i]));
+			//			for (int j=(int)hits.size()-1; j>i; j--)
+			//				if (hits[j].r < to) {
+			//					matches->push_back(Match(s, hits[j]));
+			//					break;
+			//				}
+			//			return true;
+			//		}
+			//} else {
+//			if (hits.size() < 10) {
+//				for (int i=0; i<(int)hits.size(); i++)
+//					if (hits[i].tpos >= from) {
+//						matches->push_back(Match(s, hits[i]));
+//						for (int j=(int)hits.size()-1; j>i; j--)
+//							if (hits[j].tpos < to) {
+//								matches->push_back(Match(s, hits[j]));
+//								break;
+//							}
+//						return true;
+//					}
+//			} else {

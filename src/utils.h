@@ -11,7 +11,8 @@
 namespace sweepmap {
 
 using hash_t     = uint64_t;
-using pos_t      = int32_t;
+using rpos_t     = int64_t;  // reference position
+using qpos_t     = int32_t;  // query position
 using segm_t     = int32_t;
 
 class Timer {
@@ -105,12 +106,12 @@ public:
 
 class Counter {
 private:
-    int count_;
+    int64_t count_;
 
 public:
     Counter() : count_(0) {}
-    void inc(int value = 1) { count_ += value; }
-    int count() const { return count_; }
+    void inc(int64_t value = 1) { count_ += value; }
+    int64_t count() const { return count_; }
 };
 
 class Counters {
@@ -118,7 +119,7 @@ private:
     std::unordered_map<std::string, Counter> counters_;
 
 public:
-    void inc(const std::string& name, int value = 1) {
+    void inc(const std::string& name, int64_t value = 1) {
 		auto it = counters_.find(name);
         if (it == counters_.end()) {
             counters_[name] = Counter();
@@ -127,7 +128,7 @@ public:
         counters_[name].inc(value);
     }
 
-    int count(const std::string& name) const {
+    int64_t count(const std::string& name) const {
         assert(counters_.find(name) != counters_.end());
         return counters_.at(name).count();
     }

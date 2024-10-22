@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "mapper.h"
-#include "sweepmap.h"
+//#include "sweepmap.h"
 //#include "bucketmap.h"
 //#include "rmqmap.h"
 #include "jaccmap.h"
@@ -9,8 +9,8 @@
 namespace sweepmap {
 
 Mapper* MapperFactory::createMapper(const std::string& type, const SketchIndex& tidx, Handler* H) {
-    if (type == "sweep") {
-        return new SweepMapper(tidx, H);
+//    if (type == "sweep") {
+//        return new SweepMapper(tidx, H);
 //    } else if (type == "bucket") {
 //        //if (H->params.max_matches != -1) {
 //        //    cerr << "Bucket mapper does not need limiting the number of matches. Do not set max_matches or set to -1." << endl;
@@ -31,7 +31,8 @@ Mapper* MapperFactory::createMapper(const std::string& type, const SketchIndex& 
 //            return nullptr;
 //        }
 //        return new RMQMapper(tidx, H);
-    } else if (type == "jacc") {
+//    } else
+    if (type == "jacc") {
         //if (H->params.max_matches != -1) {
         //    cerr << "Bucket mapper does not need limiting the number of matches. Do not set max_matches or set to -1." << endl;
         //    return nullptr;
