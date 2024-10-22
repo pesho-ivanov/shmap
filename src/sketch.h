@@ -108,7 +108,7 @@ struct Mapping {
 	int total_matches;   // number of matches of all kmers
 	int max_seed_matches;// number of matches of the most frequent seed
 	int seed_matches;    // number of matches of seeds
-	int max_buckets;     // the initial number of buckets
+	int seeded_buckets;     // the initial number of buckets
 	int final_buckets;   // the number of buckets after pruning with all kmers
 	int bucket;			 // the bucket where the mapping is found
 	int bucket2;  // the bucket of the second best mapping
@@ -137,7 +137,7 @@ struct Mapping {
 		total_matches = -1;
 		max_seed_matches = -1;
 		seed_matches = -1;
-		max_buckets = -1;
+		seeded_buckets = -1;
 		final_buckets = -1;
 		J2 = -1.0;
 		bucket2 = -1;
@@ -256,7 +256,7 @@ struct Mapping {
 			<< "\t" << "MSeedmax:i:"	<< mapping.max_seed_matches
 			<< "\t" << "MSeed:i:"		<< mapping.seed_matches
 			<< "\t" << "M:i:"			<< mapping.total_matches
-			<< "\t" << "Bmax:i:"		<< mapping.max_buckets
+			<< "\t" << "Bmax:i:"		<< mapping.seeded_buckets
 			<< "\t" << "Bfinal:i:"		<< mapping.final_buckets
 			<< "\t" << "b:i:"			<< mapping.bucket
 			<< "\t" << "b2:i:"			<< mapping.bucket2
