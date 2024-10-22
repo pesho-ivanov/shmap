@@ -287,7 +287,8 @@ class JaccMapper : public Mapper {
 						if (seed_heuristic_pass(maps, kmers, lmax, m, b, &max_matches_in_bucket, i, seeds, best_idx, best2_idx)) {
 							H->T.start("match_collect");
 								Matches M;
-								for (rpos_t i = b.b*lmax; i < std::min((b.b+2)*lmax, (rpos_t)tidx.T[0].kmers.size()); i++) {
+								for (rpos_t i = b.b*lmax; i < std::min((b.b+2)*lmax, (rpos_t)tidx.T[b.segm_id].kmers.size()); i++) {
+									assert(b.segm_id >= 0 && b.segm_id < (rpos_t)tidx.T.size());
 									const auto &kmer = tidx.T[b.segm_id].kmers[i];
 									const auto seed_it = p_ht.find(kmer.h);
 									if (seed_it != p_ht.end()) {
