@@ -31,3 +31,4 @@ simulations/
 map
 evals/refs/
 src/fenwick.h
+evals/evals-table.tex
