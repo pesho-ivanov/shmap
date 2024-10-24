@@ -142,6 +142,11 @@ class JaccMapper : public Mapper {
 		//return true; // comment out
 		*lowest_sh = 1.0; // should only get lower
 
+		double thr1 = best_idx == -1 ? H->params.theta : max(H->params.theta, maps[best_idx].J*0.99);
+		double thr2 = best2_idx == -1 ? thr1 : maps[best2_idx].J; 
+		if (hseed(m, seeds, max_matches) < thr2)
+			return false;
+
 		H->T.start("seed_heuristic");
 		bool ret = true;
 		for (; i < (qpos_t)kmers.size(); i++) {
