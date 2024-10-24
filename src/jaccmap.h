@@ -89,6 +89,12 @@ class JaccMapper : public Mapper {
 
 			//double J = 1.0*intersection / kmers.size();
 			double J = 1.0*intersection / m;
+			//int s_sz = prev(r)->hit.tpos - l->hit.tpos + 1;
+			//assert(s_sz >= 1);
+			//assert(intersection <= s_sz);
+			//assert(intersection <= m);
+			//double J = 1.0*intersection / (m + s_sz - intersection);
+
 			//if (fabs(J-J_) > 0.1)
 			//	cerr << J << " " << J_ << endl;
 			//cerr << std::fixed << std::setprecision(3) << J << " " << 1.0*intersection / m << endl;
@@ -98,8 +104,8 @@ class JaccMapper : public Mapper {
 			//double J = 1.0*intersection / m;
 			//J = 1.0*intersection / p_sz;
 			//J = 1.0*intersection / std::min(p_sz, s_sz);
-			//J = 1.0*intersection / (p_sz + s_sz - intersection);
 
+			assert(J >= -0.0);
 			assert(J <= 1.0);
 			Mapping mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r), bucket);
 			if (mapping.J > best.J)
@@ -233,7 +239,7 @@ class JaccMapper : public Mapper {
 					}
 					H->C.inc("potential_matches", potential_matches);
 
-					//qpos_t lmax = m;
+					//qpos_t lmax = m;  m/0.8
 					qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
 					qpos_t S = qpos_t((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
 					Buckets B;  			// B[segment][b] -- #matched kmers[0...i] in [bl, (b+2)l)
@@ -272,6 +278,7 @@ class JaccMapper : public Mapper {
 				H->T.stop("match_seeds");
 
 				H->T.start("match_rest");
+					double best_J = -1.0, best_J2 = -1.0;
 					vector<Mapping> maps;
 					qpos_t total_matches = seed_matches;
 					vector<Bucket> B_vec(B.begin(), B.end());
@@ -307,16 +314,16 @@ class JaccMapper : public Mapper {
 							//assert((rpos_t)M.size() >= seed_matches);
 
 							H->T.start("sweep");
-								auto best = sweep(M, P_sz, lmax, m, kmers, b, diff_hist);
+								auto bucket_best = sweep(M, P_sz, lmax, m, kmers, b, diff_hist);
 								//if (best.J >= H->params.theta)
 								//cerr << "B=" << B.size() << ", bucket= " << bucket << ", best=" << best;
 								//if (best.J > lowest_sh + 1e-7) {
 								//	cerr << std::fixed << std::setprecision(5);
 								//	cerr << "lowest_sh=" << lowest_sh << ", best=" << best << ", b=" << b << ", seed_matches=" << seed_matches << ", seeds=" << seeds << ", i=" << i << ", best_idx=" << best_idx << ", best2_idx=" << best2_idx << endl;
 								//}
-								assert(best.J <= lowest_sh);
-								if (best.J >= 0)
-									maps.push_back(best);
+								assert(bucket_best.J <= lowest_sh + 1e-7);
+								if (bucket_best.J >= 0)
+									maps.push_back(bucket_best);
 							H->T.stop("sweep");
 							
 							//cerr << "Bucket " << b << " (" << seed_matches << " matches) has " << maps.size() << " good mappings" << endl;
@@ -343,6 +350,28 @@ class JaccMapper : public Mapper {
 									}
 								}
 							}
+							for (int i=0; i<4; ++i) {
+								assert(bests_idx[i] == -1 || maps[bests_idx[i]].J >= 0);
+								assert(i==0 || bests_idx[i] == -1 || maps[bests_idx[i-1]].J >= maps[bests_idx[i]].J);
+							}
+							assert(maps[best_idx].J >= bucket_best.J);
+
+							best_J = max(best_J, bucket_best.J);
+							if (best2_idx != -1) best_J2 = max(best_J2, maps[best2_idx].J);
+							assert(best_idx == -1 || fabs(maps[best_idx].J - best_J) < 1e-7);
+
+							//if (best2_idx != -1 && fabs(maps[best2_idx].J - best_J2) >= 1e-7) {
+							//	cerr << std::fixed << std::setprecision(4);
+							//	cerr << "best_idx: " << best_idx << ", best2_idx: " << best2_idx << ", best_J: " << best_J << ", best_J2: " << best_J2 << endl;
+							//	for (int i=0; i<4; ++i) {
+							//		cerr << "bests_idx[" << i << "] = " << bests_idx[i];
+							//		if (bests_idx[i] != -1) cerr << ", J=" << maps[bests_idx[i]].J << ", mapping=" << maps[bests_idx[i]];
+							//		cerr << endl;
+							//	}
+							//	cerr << "bucket_best: " << bucket_best << endl;
+							//	cerr << "maps[best2_idx]: " << maps[best2_idx] << endl;
+							//}
+							//assert(best2_idx == -1 || fabs(maps[best2_idx].J - best_J2) < 1e-7);
 
 							//assert(best2_idx == -1 || abs(maps[best_idx].bucket - maps[best2_idx].bucket) > 1);
 						}
