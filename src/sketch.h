@@ -85,7 +85,9 @@ struct bucket_t {
 	rpos_t b;   		// b refers to interval [lmax*b, lmax*(b+2)) in tidx.T[segm_id].kmers
 	bucket_t() : segm_id(-1), b(-1) {}
 	bucket_t(segm_t segm_id, rpos_t b) : segm_id(segm_id), b(b) {}
-	bool operator==(const bucket_t &) const = default;
+    bool operator==(const bucket_t &other) const {
+        return segm_id == other.segm_id && b == other.b;
+    }
 	friend std::ostream& operator<<(std::ostream& os, const bucket_t& b) {
 		os << "(" << b.segm_id << "," << b.b << ")";
 		return os;

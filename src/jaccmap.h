@@ -268,31 +268,8 @@ class JaccMapper : public Mapper {
 							Matches seed_matches;
 							tidx.get_matches(&seed_matches, seed);
 
-//							bucket_t prev_b(-1, -1);
-//							int matches_in_prev_bucket = 0;
-//							for (int i=0; i < (int)seed_matches.size();) {
-//								bucket_t curr_b(seed_matches[i].hit.segm_id, seed_matches[i].hit.tpos / lmax);
-//								
-//								if (prev_b.segm_id != -1 && (curr_b.segm_id != prev_b.segm_id || curr_b.b != prev_b.b + 1)) {
-//									B[prev_b] += min(matches_in_prev_bucket, seed.occs_in_p);
-//									matches_in_prev_bucket = 0;
-//								}
-//
-//								int matches_in_curr_bucket = 1;
-//								while (++i < (int)seed_matches.size()) {
-//									if (seed_matches[i].hit.tpos / lmax != curr_b.b) break;
-//									if (seed_matches[i].hit.segm_id != curr_b.segm_id) break;
-//									++matches_in_curr_bucket;
-//								}
-//								prev_b = curr_b;
-//								if (--curr_b.b >= 0)
-//									B[curr_b] += min(matches_in_prev_bucket + matches_in_curr_bucket, seed.occs_in_p);
-//
-//								matches_in_prev_bucket = matches_in_curr_bucket;
-//							}
-//							if (prev_b.segm_id != -1)
-//								B[prev_b] += min(matches_in_prev_bucket, seed.occs_in_p);
-
+							//auto B2 = B;	
+							//////////////// correct B
 							Buckets b2m;
 							for (auto &m: seed_matches) {
 								rpos_t b(m.hit.tpos / lmax);
@@ -301,6 +278,32 @@ class JaccMapper : public Mapper {
 							}
 							for (const auto [b, matches]: b2m)
 								B[b] += min(seed.occs_in_p, matches);
+
+							//bucket_t prev_b(-1, -1);
+							//int matches_in_prev_bucket = 0;
+							//for (int i=0; i < (int)seed_matches.size();) {
+							//	bucket_t curr_b(seed_matches[i].hit.segm_id, seed_matches[i].hit.tpos / lmax);
+							//	
+							//	if (prev_b.segm_id != -1 && (curr_b.segm_id != prev_b.segm_id || curr_b.b != prev_b.b + 1)) {
+							//		B2[prev_b] += min(matches_in_prev_bucket, seed.occs_in_p);
+							//		matches_in_prev_bucket = 0;
+							//	}
+
+							//	int matches_in_curr_bucket = 1;
+							//	while (++i < (int)seed_matches.size()
+							//			&& seed_matches[i].hit.tpos / lmax == curr_b.b
+							//			&& seed_matches[i].hit.segm_id == curr_b.segm_id) {
+							//		++matches_in_curr_bucket;
+							//	}
+							//	prev_b = curr_b;
+							//	if (--curr_b.b >= 0) {
+							//		B2[curr_b] += min(matches_in_prev_bucket + matches_in_curr_bucket, seed.occs_in_p);
+							//	}
+
+							//	matches_in_prev_bucket = matches_in_curr_bucket;
+							//}
+							//if (prev_b.segm_id != -1)
+							//	B2[prev_b] += min(matches_in_prev_bucket, seed.occs_in_p);
 						}
 						seeds += seed.occs_in_p;
 					}
