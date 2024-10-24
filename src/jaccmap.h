@@ -273,11 +273,14 @@ class JaccMapper : public Mapper {
 							Buckets b2m;
 							for (auto &m: seed_matches) {
 								rpos_t b(m.hit.tpos / lmax);
-								if (b > 0) ++b2m[ bucket_t(m.hit.segm_id, b-1) ];
-								++b2m[ bucket_t(m.hit.segm_id, b) ];
+								//if (b > 0) ++b2m[ bucket_t(m.hit.segm_id, b-1) ];
+								//++b2m[ bucket_t(m.hit.segm_id, b) ];
+								b2m[ bucket_t(m.hit.segm_id, b) ] = seed.occs_in_p;
+								if (b > 0) b2m[ bucket_t(m.hit.segm_id, b-1) ] = seed.occs_in_p;
 							}
 							for (const auto [b, matches]: b2m)
-								B[b] += min(seed.occs_in_p, matches);
+								//B[b] += min(seed.occs_in_p, matches);
+								B[b] += matches;
 
 							//bucket_t prev_b(-1, -1);
 							//int matches_in_prev_bucket = 0;
@@ -431,7 +434,7 @@ class JaccMapper : public Mapper {
 
 					if (H->params.onlybest && maps.size() >= 1) {
 						H->C.inc("mapped_reads");
-						if (best_idx != -1) 
+						//if (best_idx != -1) 
 						if (maps[best_idx].J >= H->params.theta)
 						{
 							assert(0 <= best_idx && best_idx < (int)maps.size());
