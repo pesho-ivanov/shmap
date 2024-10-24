@@ -266,15 +266,50 @@ class JaccMapper : public Mapper {
 							seed_matches += seed.hits_in_T;
 							max_seed_matches = max(max_seed_matches, seed.hits_in_T);
 							Matches seed_matches;
-							Buckets matched_buckets;
 							tidx.get_matches(&seed_matches, seed);
-							for (auto &m: seed_matches) {
-								rpos_t b(m.hit.tpos / lmax);
-								if (b > 0) matched_buckets[ bucket_t(m.hit.segm_id, b-1) ] = min(seed.occs_in_p, matched_buckets[ bucket_t(m.hit.segm_id, b-1) ] + 1);
-								matched_buckets[ bucket_t(m.hit.segm_id, b) ] = min(seed.occs_in_p, matched_buckets[ bucket_t(m.hit.segm_id, b) ] + 1);
+
+//							bucket_t prev_b;
+//							int matches_in_prev_bucket = 0;
+//							for (int i=0; i < (int)seed_matches.size(); ++i) {
+//								auto &m = seed_matches[i];
+//								bucket_t curr_b(m.hit.segm_id, m.hit.tpos / lmax);
+//								
+//								if (curr_b.segm_id != prev_b.segm_id || curr_b.b != prev_b.b + 1) {
+//									B[prev_b] += min(matches_in_prev_bucket, seed.occs_in_p);
+//									matches_in_prev_bucket = 0;
+//								}
+//
+//								int matches_in_curr_bucket = 1;
+//								while (++i < (int)seed_matches.size()) {
+//									if (!(seed_matches[i].hit.tpos / lmax == curr_b.b)) break;
+//									if (!(seed_matches[i].hit.segm_id == curr_b.segm_id)) break;
+//									++matches_in_curr_bucket;
+//								}
+//								if (curr_b.b > 0)
+//									B[ bucket_t(curr_b.segm_id, curr_b.b-1) ] += min(matches_in_prev_bucket + matches_in_curr_bucket, seed.occs_in_p);
+//
+//								prev_b = curr_b;
+//								matches_in_prev_bucket = matches_in_curr_bucket;
+//							}
+							
+							Buckets matched_buckets;
+							for (int i=0; i<(int)seed_matches.size(); i++) {
+								auto &m = seed_matches[i];
+								bucket_t b(m.hit.segm_id, m.hit.tpos / lmax);
+								int matches_in_bucket = 1;
+								while (++i < (int)seed_matches.size() && seed_matches[i].hit.tpos / lmax == b.b && seed_matches[i].hit.segm_id == b.segm_id)
+									++matches_in_bucket;
+								++matched_buckets[b];
+								if (--b.b >= 0) ++matched_buckets[b];
 							}
-							for (const auto [b, occs_in_p]: matched_buckets)
-								B[b] += occs_in_p;
+
+							//for (auto &m: seed_matches) {
+							//	rpos_t b(m.hit.tpos / lmax);
+							//	if (b > 0) ++matched_buckets[ bucket_t(m.hit.segm_id, b-1) ];
+							//	++matched_buckets[ bucket_t(m.hit.segm_id, b) ];
+							//}
+							for (const auto [b, matches]: matched_buckets)
+								B[b] += min(seed.occs_in_p, matches);
 						}
 						seeds += seed.occs_in_p;
 					}
@@ -298,6 +333,8 @@ class JaccMapper : public Mapper {
 					int maps_idx = 0;
 					vector<Bucket> final_buckets;
 					H->T.start("seed_heuristic"); H->T.stop("seed_heuristic");  // init
+					H->T.start("match_collect"); H->T.stop("match_collect");
+					H->T.start("sweep"); H->T.stop("sweep");
 					for (auto &[b, seed_matches]: B_vec) {
 						double lowest_sh;
 						if (seed_heuristic_pass(maps, kmers, lmax, m, b, seed_matches, i, seeds, best_idx, best2_idx, &lowest_sh)) {
