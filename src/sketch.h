@@ -44,14 +44,13 @@ struct Hit {  // TODO: compress into a 32bit field
 // Seed -- a kmer with metadata (a position in the queyr P and number of hits in the reference T)
 struct Seed {
 	Kmer kmer;
-	rpos_t r_first, r_last;
 	rpos_t hits_in_T;
 	qpos_t occs_in_p;
 	qpos_t seed_num;
-	Seed(const Kmer &kmer, rpos_t r_first, rpos_t r_last, rpos_t hits_in_T, qpos_t seed_num) :
-		kmer(kmer), r_first(r_first), r_last(r_last), hits_in_T(hits_in_T), seed_num(seed_num) {}	
+	Seed(const Kmer &kmer, rpos_t hits_in_T, qpos_t seed_num) :
+		kmer(kmer), hits_in_T(hits_in_T), seed_num(seed_num) {}	
 	friend std::ostream& operator<<(std::ostream& os, const Seed& seed) {
-		os << "Seed(" << seed.kmer << ", r_first=" << seed.r_first << ", r_last=" << seed.r_last << ", hits_in_T=" << seed.hits_in_T << ", seed_num=" << seed.seed_num << ")";
+		os << "Seed(" << seed.kmer << ", hits_in_T=" << seed.hits_in_T << ", seed_num=" << seed.seed_num << ")";
 		return os;
 	}
 };

@@ -37,7 +37,7 @@ class JaccMapper : public Mapper {
 					rpos_t hits_in_t = tidx.count(p[ppos].h);
 					if (hits_in_t > 0) {
 						if (H->params.max_matches == -1 || hits_in_t <= H->params.max_matches) {
-							Seed el(p[ppos], -1, -1, hits_in_t, kmers.size());
+							Seed el(p[ppos], hits_in_t, kmers.size());
 							//strike = 1; // comment out for Weighted Jaccard 
 							el.occs_in_p = strike;
 							kmers.push_back(el);
