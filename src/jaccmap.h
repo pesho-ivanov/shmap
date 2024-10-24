@@ -179,7 +179,7 @@ class JaccMapper : public Mapper {
 			return 60;
 		if (abs(m.intersection - m.intersection2) == 0)
 			return 0;
-		if (sigmas_diff(m.intersection, m.intersection2) >= 0.15)
+		if (sigmas_diff(m.intersection, m.intersection2) >= 0.2)
 			return 60;
 		return 0;
 		//if (m.J < H->params.theta)
@@ -244,9 +244,9 @@ class JaccMapper : public Mapper {
 					}
 					H->C.inc("potential_matches", potential_matches);
 
-					//qpos_t lmax = m;  m/0.8
-					double delta = 1.0 - H->params.theta;
-					qpos_t lmax = qpos_t(m / (1.0 - 1.0*delta));					// maximum length of a similar mapping
+					qpos_t lmax = m/0.8;
+					//double delta = 1.0 - H->params.theta;
+					//qpos_t lmax = qpos_t(m / (1.0 - 1.0*delta));					// maximum length of a similar mapping
 					qpos_t S = qpos_t((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
 					Buckets B;  			// B[segment][b] -- #matched kmers[0...i] in [bl, (b+2)l)
 					qpos_t seeds = 0;
@@ -258,6 +258,7 @@ class JaccMapper : public Mapper {
 				H->T.stop("prepare");
 
 				H->T.start("match_seeds");
+					int matches_in_B = 0;
 					rpos_t seed_matches(0), max_seed_matches(0), seeded_buckets(0);  // stats
 					qpos_t i = 0;
 					for (; i < (qpos_t)kmers.size() && seeds < S; i++) {
@@ -278,9 +279,11 @@ class JaccMapper : public Mapper {
 								b2m[ bucket_t(m.hit.segm_id, b) ] = seed.occs_in_p;
 								if (b > 0) b2m[ bucket_t(m.hit.segm_id, b-1) ] = seed.occs_in_p;
 							}
-							for (const auto [b, matches]: b2m)
+							for (const auto [b, matches]: b2m) {
 								//B[b] += min(seed.occs_in_p, matches);
 								B[b] += matches;
+								matches_in_B += matches;
+							}
 
 							//bucket_t prev_b(-1, -1);
 							//int matches_in_prev_bucket = 0;
@@ -314,6 +317,8 @@ class JaccMapper : public Mapper {
 					H->C.inc("seeded_buckets", seeded_buckets);
 					H->C.inc("seed_matches", seed_matches);
 				H->T.stop("match_seeds");
+
+				//cerr << "seed matches=" << seed_matches << ", matches_in_B=" << matches_in_B << ", max_seed_matches=" << max_seed_matches << ", seeds=" << seeds << ", S=" << S << ", i=" << i << endl;
 
 				H->T.start("match_rest");
 					double best_J = -1.0, best_J2 = -1.0;
