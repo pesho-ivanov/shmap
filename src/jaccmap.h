@@ -12,6 +12,8 @@
 #include "cmath"
 
 #include "edlib.h"
+//#include "phmap.hpp"
+#include <ankerl/unordered_dense.h>
 
 namespace sweepmap {
 	
@@ -22,8 +24,12 @@ class JaccMapper : public Mapper {
 	using Seeds = vector<Seed>;
 	using Matches = vector<Match>;
 	using Bucket = pair<bucket_t, qpos_t>;
-	using Buckets = std::unordered_map<bucket_t, qpos_t>;
-	using Hist = unordered_map<hash_t, qpos_t>;
+	//using Buckets = std::unordered_map<bucket_t, qpos_t>;
+	//using Buckets = gtl::flat_hash_map<bucket_t, qpos_t>;
+	using Buckets = ankerl::unordered_dense::map<bucket_t, qpos_t>;
+	//using Hist = unordered_map<hash_t, qpos_t>;
+	//using Hist = gtl::flat_hash_map<hash_t, qpos_t>;
+	using Hist = ankerl::unordered_dense::map<hash_t, qpos_t>;
 
 	Seeds select_kmers(sketch_t& p) {
 		H->T.start("seeding");
@@ -279,7 +285,7 @@ class JaccMapper : public Mapper {
 								b2m[ bucket_t(m.hit.segm_id, b) ] = seed.occs_in_p;
 								if (b > 0) b2m[ bucket_t(m.hit.segm_id, b-1) ] = seed.occs_in_p;
 							}
-							for (const auto [b, matches]: b2m) {
+							for (const auto &[b, matches]: b2m) {
 								//B[b] += min(seed.occs_in_p, matches);
 								B[b] += matches;
 								matches_in_B += matches;

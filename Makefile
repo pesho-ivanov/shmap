@@ -2,8 +2,8 @@ SHELL := /bin/bash
 CC = g++
 CXX_STANDARD = -std=c++20
 DEBUG_FLAGS = -g -DDEBUG
-RELEASE_FLAGS = -O2 -DNDEBUG
-CFLAGS = -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive #-Wconversion 
+RELEASE_FLAGS = -O3 -DNDEBUG -flto
+CFLAGS = -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto #-Wconversion 
 ifeq ($(DEBUG), 1)
     CFLAGS += $(DEBUG_FLAGS)
 	SWEEPMAP_BIN = ./debug/map
