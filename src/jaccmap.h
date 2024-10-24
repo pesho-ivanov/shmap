@@ -291,24 +291,18 @@ class JaccMapper : public Mapper {
 //								prev_b = curr_b;
 //								matches_in_prev_bucket = matches_in_curr_bucket;
 //							}
-							
-							Buckets matched_buckets;
-							for (int i=0; i<(int)seed_matches.size(); i++) {
-								auto &m = seed_matches[i];
-								bucket_t b(m.hit.segm_id, m.hit.tpos / lmax);
-								int matches_in_bucket = 1;
-								while (++i < (int)seed_matches.size() && seed_matches[i].hit.tpos / lmax == b.b && seed_matches[i].hit.segm_id == b.segm_id)
-									++matches_in_bucket;
-								++matched_buckets[b];
-								if (--b.b >= 0) ++matched_buckets[b];
-							}
 
-							//for (auto &m: seed_matches) {
-							//	rpos_t b(m.hit.tpos / lmax);
-							//	if (b > 0) ++matched_buckets[ bucket_t(m.hit.segm_id, b-1) ];
-							//	++matched_buckets[ bucket_t(m.hit.segm_id, b) ];
-							//}
-							for (const auto [b, matches]: matched_buckets)
+//							vector< pair<bucket_t, qpos_t> > matched_buckets;
+//							assert (matched_buckets.empty() || matched_buckets.back().first != b);
+//							matched_buckets.push_back(make_pair(b, matches_in_bucket));
+							
+							Buckets b2m;
+							for (auto &m: seed_matches) {
+								rpos_t b(m.hit.tpos / lmax);
+								if (b > 0) ++b2m[ bucket_t(m.hit.segm_id, b-1) ];
+								++b2m[ bucket_t(m.hit.segm_id, b) ];
+							}
+							for (const auto [b, matches]: b2m)
 								B[b] += min(seed.occs_in_p, matches);
 						}
 						seeds += seed.occs_in_p;
