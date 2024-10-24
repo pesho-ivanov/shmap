@@ -144,6 +144,7 @@ class JaccMapper : public Mapper {
 				max_matches += kmers[i].occs_in_p;
 			double thr1 = best_idx == -1 ? H->params.theta : max(H->params.theta, maps[best_idx].J*0.99);
 			double thr2 = best2_idx == -1 ? thr1 : maps[best2_idx].J; 
+			//double thr2 = best2_idx == -1 ? H->params.theta : maps[best2_idx].J; 
 			double sh = hseed(m, seeds, max_matches);
 			assert(sh <= *lowest_sh);
 			*lowest_sh = min(*lowest_sh, sh);	
@@ -169,12 +170,13 @@ class JaccMapper : public Mapper {
 			return 0;
 		if (sigmas_diff(m.intersection, m.intersection2) >= 0.15)
 			return 60;
-		if (m.J < H->params.theta)
-			return 5;
-		double bound = m.J * 0.9;
-		double r = max(m.J2 - bound, 0.0) / (m.J - bound);  // low is good
-		double J_fl = 60.0 * (1.0 - 1.0 * r);  // high is good
-		return int(J_fl/10.0) * 10;
+		return 0;
+		//if (m.J < H->params.theta)
+		//	return 5;
+		//double bound = m.J * 0.9;
+		//double r = max(m.J2 - bound, 0.0) / (m.J - bound);  // low is good
+		//double J_fl = 60.0 * (1.0 - 1.0 * r);  // high is good
+		//return int(J_fl/10.0) * 10;
 		//return 60.0 * (1.0 - 1.0 * pow(J_second / J_best, 0.5) );
 		//return  60.0 * (1.0 - 1.0 * pow(r, 2.0));
 	}
@@ -367,34 +369,34 @@ class JaccMapper : public Mapper {
 						if (maps[best_idx].J >= H->params.theta)
 						{
 							assert(0 <= best_idx && best_idx < (int)maps.size());
-							Mapping &final_map = maps[best_idx];
+							Mapping &m = maps[best_idx];
 
-							const auto &segm = tidx.T[final_map.segm_id];
-							final_map.total_matches = total_matches;
-							final_map.max_seed_matches = max_seed_matches;
-							final_map.seed_matches = seed_matches;
-							final_map.seeded_buckets = seeded_buckets;
-							final_map.final_buckets = final_buckets.size();
-							final_map.query_id = query_id;
-							final_map.segm_name = segm.name.c_str();
-							final_map.segm_sz = segm.sz;
+							const auto &segm = tidx.T[m.segm_id];
+							m.total_matches = total_matches;
+							m.max_seed_matches = max_seed_matches;
+							m.seed_matches = seed_matches;
+							m.seeded_buckets = seeded_buckets;
+							m.final_buckets = final_buckets.size();
+							m.query_id = query_id;
+							m.segm_name = segm.name.c_str();
+							m.segm_sz = segm.sz;
 
 							if (best2_idx != -1) {
 								//cerr << "best_idx: " << best_idx << ", best2_idx: " << best2_idx << endl;
-								final_map.J2 = maps[best2_idx].J;
-								final_map.bucket2 = maps[best2_idx].bucket;
-								final_map.intersection2 = maps[best2_idx].intersection;
-								final_map.sigmas_diff = sigmas_diff(final_map.intersection2, final_map.intersection);
-								assert(final_map.bucket.segm_id != final_map.bucket2.segm_id || abs(final_map.bucket.b - final_map.bucket2.b) > 1);
-								//final_map.ed2 = edit_distance(final_map.bucket, P, P_sz, m, kmers);
+								m.J2 = maps[best2_idx].J;
+								m.bucket2 = maps[best2_idx].bucket;
+								m.intersection2 = maps[best2_idx].intersection;
+								m.sigmas_diff = sigmas_diff(m.intersection2, m.intersection);
+								assert(m.bucket.segm_id != m.bucket2.segm_id || abs(m.bucket.b - m.bucket2.b) > 1);
+								//m.ed2 = edit_distance(m.bucket, P, P_sz, m, kmers);
 							}
 
-							final_map.mapq = mapq_J(final_map);
-							if (final_map.mapq == 60)
+							m.mapq = mapq_J(m);
+							if (m.mapq == 60)
 								H->C.inc("mapq60");
 
-							//if (final_map.mapq > 0)
-								final_mappings.push_back(final_map);
+							//if (m.mapq > 0)
+								final_mappings.push_back(m);
 						}
 					}
 
