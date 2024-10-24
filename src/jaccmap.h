@@ -61,7 +61,7 @@ class JaccMapper : public Mapper {
 		return kmers;
 	}
 
-	void sweep(const vector<Match> &M, const qpos_t P_sz, qpos_t lmax, const qpos_t m, const Seeds &kmers, vector<Mapping> *maps, const bucket_t &bucket, Hist &diff_hist) {
+	Mapping sweep(const vector<Match> &M, const qpos_t P_sz, qpos_t lmax, const qpos_t m, const Seeds &kmers, const bucket_t &bucket, Hist &diff_hist) {
 		qpos_t intersection = 0;
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 		Mapping best;
@@ -115,10 +115,7 @@ class JaccMapper : public Mapper {
 		assert(intersection == 0);
 		assert(same_strand_seeds == 0);
 		
-		//if (best.J >= H->params.theta)
-		//cerr << "B=" << B.size() << ", bucket= " << bucket << ", best=" << best;
-		if (best.J >= 0)
-			maps->push_back(best);
+		return best;
 	}
 
   public:
@@ -135,8 +132,9 @@ class JaccMapper : public Mapper {
 		return 1.0 - double(seeds - matches) / p;
 	}
 
-	bool seed_heuristic_pass(const vector<Mapping> &maps, const Seeds &kmers, qpos_t lmax, qpos_t m, bucket_t b, rpos_t max_matches, qpos_t i, qpos_t seeds, int best_idx, int best2_idx) {
+	bool seed_heuristic_pass(const vector<Mapping> &maps, const Seeds &kmers, qpos_t lmax, qpos_t m, bucket_t b, rpos_t max_matches, qpos_t i, qpos_t seeds, int best_idx, int best2_idx, double *lowest_sh) {
 		//return true; // comment out
+		*lowest_sh = 1.0; // should only get lower
 
 		H->T.start("seed_heuristic");
 		bool ret = true;
@@ -146,7 +144,10 @@ class JaccMapper : public Mapper {
 				max_matches += kmers[i].occs_in_p;
 			double thr1 = best_idx == -1 ? H->params.theta : max(H->params.theta, maps[best_idx].J*0.99);
 			double thr2 = best2_idx == -1 ? thr1 : maps[best2_idx].J; 
-			if (hseed(m, seeds, max_matches) < thr2) {
+			double sh = hseed(m, seeds, max_matches);
+			assert(sh <= *lowest_sh);
+			*lowest_sh = min(*lowest_sh, sh);	
+			if (sh < thr2) {
 				ret = false;
 				break;
 			}
@@ -283,7 +284,8 @@ class JaccMapper : public Mapper {
 					vector<Bucket> final_buckets;
 					H->T.start("seed_heuristic"); H->T.stop("seed_heuristic");  // init
 					for (auto &[b, seed_matches]: B_vec) {
-						if (seed_heuristic_pass(maps, kmers, lmax, m, b, seed_matches, i, seeds, best_idx, best2_idx)) {
+						double lowest_sh;
+						if (seed_heuristic_pass(maps, kmers, lmax, m, b, seed_matches, i, seeds, best_idx, best2_idx, &lowest_sh)) {
 							H->T.start("match_collect");
 								Matches M;
 								for (rpos_t i = b.b*lmax; i < std::min((b.b+2)*lmax, (rpos_t)tidx.T[b.segm_id].kmers.size()); i++) {
@@ -303,8 +305,16 @@ class JaccMapper : public Mapper {
 							//assert((rpos_t)M.size() >= seed_matches);
 
 							H->T.start("sweep");
-								sweep(M, P_sz, lmax, m, kmers, &maps, b, diff_hist);
-								//edit_distance(matches, P, P_sz, m, kmers, &maps);
+								auto best = sweep(M, P_sz, lmax, m, kmers, b, diff_hist);
+								//if (best.J >= H->params.theta)
+								//cerr << "B=" << B.size() << ", bucket= " << bucket << ", best=" << best;
+								//if (best.J > lowest_sh + 1e-7) {
+								//	cerr << std::fixed << std::setprecision(5);
+								//	cerr << "lowest_sh=" << lowest_sh << ", best=" << best << ", b=" << b << ", seed_matches=" << seed_matches << ", seeds=" << seeds << ", i=" << i << ", best_idx=" << best_idx << ", best2_idx=" << best2_idx << endl;
+								//}
+								assert(best.J <= lowest_sh);
+								if (best.J >= 0)
+									maps.push_back(best);
 							H->T.stop("sweep");
 							
 							//cerr << "Bucket " << b << " (" << seed_matches << " matches) has " << maps.size() << " good mappings" << endl;
