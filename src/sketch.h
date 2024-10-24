@@ -107,7 +107,7 @@ namespace sweepmap {
 
 struct Mapping {
 	int k; 	   // kmer size
-	string query_id;
+	const char* query_id;
 	qpos_t P_start;
 	qpos_t P_end;
 	qpos_t P_sz;     // pattern size |P| bp 
@@ -115,7 +115,7 @@ struct Mapping {
 	rpos_t T_l;      // the position of the leftmost nucleotide of the mapping
 	rpos_t T_r;      // the position of the rightmost nucleotide of the mapping
 	segm_t segm_id;
-	string segm_name;
+	const char* segm_name;
 	segm_t segm_sz;
 	rpos_t s_sz;      // the position of the rightmost nucleotide of the mapping
 	qpos_t intersection;     // the number of kmers in the intersection between the pattern and its mapping in `t'

@@ -25,6 +25,7 @@ public:
     Timer() : accumulated_time_(0.0), min_(1e9), max_(-1.0), running_(false) {}
 
     void start() {
+//        return;
         if (!running_) {
             start_time_point_ = std::chrono::high_resolution_clock::now();
             running_ = true;
@@ -32,6 +33,7 @@ public:
     }
 
     void stop() {
+//        return;
 		assert(running_);
         if (running_) {
             end_time_point_ = std::chrono::high_resolution_clock::now();

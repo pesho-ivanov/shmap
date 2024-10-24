@@ -52,33 +52,33 @@ public:
 		return from <= hit.r && hit.r < to;
 	}
 
-	bool get_matches_in_t_interval(std::vector<Match> *matches, const Seed &s, const rpos_t from, const rpos_t to) const {
-		// assume matches of each seed are sorted by position in T
-		// TODO: account for segments
-		if (s.hits_in_T == 1) {
-			auto &hit = h2single.at(s.kmer.h);
-			if (from <= hit.tpos && hit.tpos < to) {
-				matches->push_back(Match(s, hit));
-				return true;
-			}
-		} else if (s.hits_in_T > 1) {
-			// TODO: account for segments
-			// TODO: careful with left and right ends
-			const vector<Hit> &hits = h2multi.at(s.kmer.h);
-				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, rpos_t pos) { return hit.tpos < pos; });
-				//auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, rpos_t pos) { return hit.r > pos; });
-
-				//matches->push_back(Match(s, *it));
-				//matches->push_back(Match(s, *it_r));
-
-				for (; it != hits.end() && it->tpos < to; ++it)
-					matches->push_back(Match(s, *it));
-
-				return true;
+//	bool get_matches_in_t_interval(std::vector<Match> *matches, const Seed &s, const rpos_t from, const rpos_t to) const {
+//		// assume matches of each seed are sorted by position in T
+//		// TODO: account for segments
+//		if (s.hits_in_T == 1) {
+//			auto &hit = h2single.at(s.kmer.h);
+//			if (from <= hit.tpos && hit.tpos < to) {
+//				matches->push_back(Match(s, hit));
+//				return true;
 //			}
-		}	
-		return false;
-	}
+//		} else if (s.hits_in_T > 1) {
+//			// TODO: account for segments
+//			// TODO: careful with left and right ends
+//			const vector<Hit> &hits = h2multi.at(s.kmer.h);
+//				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, rpos_t pos) { return hit.tpos < pos; });
+//				//auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, rpos_t pos) { return hit.r > pos; });
+//
+//				//matches->push_back(Match(s, *it));
+//				//matches->push_back(Match(s, *it_r));
+//
+//				for (; it != hits.end() && it->tpos < to; ++it)
+//					matches->push_back(Match(s, *it));
+//
+//				return true;
+////			}
+//		}	
+//		return false;
+//	}
 
 	bool matches_in_bucket(const Seed &s, const bucket_t b, qpos_t lmax) const {
 		rpos_t from = b.b * lmax;

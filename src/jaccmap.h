@@ -113,9 +113,8 @@ class JaccMapper : public Mapper {
 
 			assert(J >= -0.0);
 			assert(J <= 1.0);
-			Mapping mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r), bucket);
-			if (mapping.J > best.J)
-				best = mapping;
+			if (J > best.J)
+				best = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r), bucket);
 
 			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
 			assert(diff_hist.contains(l->seed.kmer.h));
@@ -251,8 +250,7 @@ class JaccMapper : public Mapper {
 					H->C.inc("potential_matches", potential_matches);
 
 					qpos_t lmax = m/0.8;
-					//double delta = 1.0 - H->params.theta;
-					//qpos_t lmax = qpos_t(m / (1.0 - 1.0*delta));					// maximum length of a similar mapping
+					//qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
 					qpos_t S = qpos_t((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
 					Buckets B;  			// B[segment][b] -- #matched kmers[0...i] in [bl, (b+2)l)
 					qpos_t seeds = 0;
@@ -445,8 +443,8 @@ class JaccMapper : public Mapper {
 
 					if (H->params.onlybest && maps.size() >= 1) {
 						H->C.inc("mapped_reads");
-						//if (best_idx != -1) 
-						if (maps[best_idx].J >= H->params.theta)
+						if (best_idx != -1) 
+						//if (maps[best_idx].J >= H->params.theta)
 						{
 							assert(0 <= best_idx && best_idx < (int)maps.size());
 							Mapping &m = maps[best_idx];

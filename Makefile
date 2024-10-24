@@ -36,12 +36,12 @@ DEPTH ?= 1
 MEANLEN ?= 10000
 READSIM_REFNAME ?= $(REFNAME)
 
-K ?= 22
+K ?= 25
 R ?= 0.05
-T ?= 0.95
+T ?= 0.9
+M ?= 50000
 
 S ?= 30000
-M ?= 50000
 
 K_SLOW ?= $(K)
 R_SLOW ?= $(R)
@@ -67,15 +67,15 @@ ALLOUT_DIR = $(DIR)/out
 OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 
 PAFTOOLS = ./ext/paftools.js
-SWEEPMAP_PREF = $(OUTDIR)/sweepmap/sweepmap
-BUCKETMAP_PREF = $(OUTDIR)/bucketmap/bucketmap
-RMQMAP_PREF = $(OUTDIR)/rmqmap/rmqmap
-JACCMAP_PREF = $(OUTDIR)/jaccmap/jaccmap
+SWEEPMAP_PREF      = $(OUTDIR)/sweepmap/sweepmap
+BUCKETMAP_PREF     = $(OUTDIR)/bucketmap/bucketmap
+RMQMAP_PREF        = $(OUTDIR)/rmqmap/rmqmap
+JACCMAP_PREF       = $(ALLOUT_DIR)/jaccmap/$(READS_PREFIX)/jaccmap
 SWEEPMAP_SLOW_PREF = $(OUTDIR)/sweepmap-slow/sweepmap-slow
-MINIMAP_PREF = $(OUTDIR)/minimap/minimap
-BLEND_PREF = $(OUTDIR)/blend/blend
-MAPQUIK_PREF = $(OUTDIR)/mapquik/mapquik
-WINNOWMAP_PREF = $(OUTDIR)/winnowmap/winnowmap
+MINIMAP_PREF       = $(OUTDIR)/minimap/minimap
+BLEND_PREF         = $(OUTDIR)/blend/blend
+MAPQUIK_PREF       = $(OUTDIR)/mapquik/mapquik
+WINNOWMAP_PREF     = $(OUTDIR)/winnowmap/winnowmap
 
 MAX_SEEDS = 10 30 100 300 1000 3000 10000
 MAX_MATCHES = 100 300 1000 3000 10000 30000 100000 300000
