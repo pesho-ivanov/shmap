@@ -270,8 +270,8 @@ class JaccMapper : public Mapper {
 							tidx.get_matches(&seed_matches, seed);
 							for (auto &m: seed_matches) {
 								rpos_t b(m.hit.tpos / lmax);
-								matched_buckets[ bucket_t(m.hit.segm_id, b) ] = seed.occs_in_p;
-								if (b > 0) matched_buckets[ bucket_t(m.hit.segm_id, b-1) ] = seed.occs_in_p;
+								if (b > 0) matched_buckets[ bucket_t(m.hit.segm_id, b-1) ] = min(seed.occs_in_p, matched_buckets[ bucket_t(m.hit.segm_id, b-1) ] + 1);
+								matched_buckets[ bucket_t(m.hit.segm_id, b) ] = min(seed.occs_in_p, matched_buckets[ bucket_t(m.hit.segm_id, b) ] + 1);
 							}
 							for (const auto [b, occs_in_p]: matched_buckets)
 								B[b] += occs_in_p;
