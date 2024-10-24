@@ -240,7 +240,8 @@ class JaccMapper : public Mapper {
 					H->C.inc("potential_matches", potential_matches);
 
 					//qpos_t lmax = m;  m/0.8
-					qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
+					double delta = 1.0 - H->params.theta;
+					qpos_t lmax = qpos_t(m / (1.0 - 1.0*delta));					// maximum length of a similar mapping
 					qpos_t S = qpos_t((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
 					Buckets B;  			// B[segment][b] -- #matched kmers[0...i] in [bl, (b+2)l)
 					qpos_t seeds = 0;
