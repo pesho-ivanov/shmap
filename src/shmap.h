@@ -415,10 +415,7 @@ class SHMapper : public Mapper {
 										int j;
 										for (j=1; j<4; ++j) {
 											assert(bests_idx[j] == -1 || maps[ bests_idx[j-1] ].J >= maps[ bests_idx[j] ].J);
-											if (bests_idx[j] == -1
-												|| overlap(maps[bests_idx[j]], maps[best_idx]) < 0.3) {
-//												|| (maps[bests_idx[j]].bucket.segm_id != maps[best_idx].bucket.segm_id)
-//												|| abs(maps[bests_idx[j]].bucket.b - maps[best_idx].bucket.b) > 1) {
+											if (bests_idx[j] == -1 || overlap(maps[bests_idx[j]], maps[best_idx]) < 0.3) {
 												best2_idx = bests_idx[j];
 												break;
 											}
