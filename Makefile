@@ -20,6 +20,7 @@ SRCS = src/map.cpp src/mapper.cpp src/io.cpp ext/edlib.cpp
 OBJS = $(SRCS:.cpp=.o)
 DEPS = $(OBJS:.o=.d)
 MINIMAP_BIN = minimap2
+MM2_BIN = ~/libs/mm2-fast/minimap2
 BLEND_BIN = ~/libs/blend/bin/blend
 MAPQUIK_BIN = mapquik
 MERYL_BIN = ~/libs/Winnowmap/bin/meryl
@@ -73,6 +74,7 @@ RMQMAP_PREF        = $(OUTDIR)/rmqmap/rmqmap
 JACCMAP_PREF       = $(ALLOUT_DIR)/jaccmap/$(READS_PREFIX)/jaccmap
 SWEEPMAP_SLOW_PREF = $(OUTDIR)/sweepmap-slow/sweepmap-slow
 MINIMAP_PREF       = $(OUTDIR)/minimap/minimap
+MM2_PREF           = $(ALLOUT_DIR)/mm2-fast/$(READS_PREFIX)/mm2-fast
 BLEND_PREF         = $(OUTDIR)/blend/blend
 MAPQUIK_PREF       = $(OUTDIR)/mapquik/mapquik
 WINNOWMAP_PREF     = $(OUTDIR)/winnowmap/winnowmap
@@ -211,6 +213,12 @@ eval_minimap: gen_reads
 	$(TIME_CMD) -o $(MINIMAP_PREF).time       $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).paf
 	-paftools.js mapeval $(MINIMAP_PREF).paf | tee $(MINIMAP_PREF).eval
 
+eval_mm2: gen_reads
+	@mkdir -p $(shell dirname $(MM2_PREF))
+	$(TIME_CMD) -o $(MM2_PREF).index.time $(MM2_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level -a $(REF) $(ONE_READ) >/dev/null 2>/dev/null
+	$(TIME_CMD) -o $(MM2_PREF).time       $(MM2_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(MM2_PREF).log) >$(MM2_PREF).paf
+	-paftools.js mapeval $(MM2_PREF).paf | tee $(MM2_PREF).eval
+
 eval_blend: gen_reads
 	@mkdir -p $(shell dirname $(BLEND_PREF))
 	$(TIME_CMD) -o $(BLEND_PREF).index.time $(BLEND_BIN) -x map-hifi -t 1 -N 0 $(REF) $(ONE_READ) >/dev/null 2>/dev/null
@@ -223,7 +231,7 @@ eval_mapquik: gen_reads
 	$(TIME_CMD) -o $(MAPQUIK_PREF).time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(MAPQUIK_PREF) | tee $(MAPQUIK_PREF).log
 	-paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
-eval_tools: eval_mapquik eval_blend eval_minimap # eval_jaccmap #eval_winnowmap
+eval_tools: eval_mm2 #eval_mapquik eval_blend eval_minimap # eval_jaccmap #eval_winnowmap
 
 eval_tools_on_datasets:
 #	make eval_tools REFNAME=t2tChrY DEPTH=10
