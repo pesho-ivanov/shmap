@@ -67,10 +67,19 @@ class SHMapper : public Mapper {
 		return kmers;
 	}
 
-	bool overlap(const Mapping &a, const Mapping &b) {
+	bool do_overlap(const Mapping &a, const Mapping &b) {
 		if (a.segm_id != b.segm_id)
 			return false;
 		return a.T_r >= b.T_l && a.T_l <= b.T_r;
+	}
+
+	double overlap(const Mapping &a, const Mapping &b) {
+		if (a.segm_id != b.segm_id)
+			return 0.0;
+		int cap = std::max(0, std::min(a.T_r, b.T_r) - std::max(a.T_l, b.T_l));
+		int cup = std::max(a.T_r, b.T_r) - std::min(a.T_l, b.T_l);
+		assert(cup >= 0 && cap >=0 && cup >= cap);
+		return 1.0 * cap / cup;
 	}
 
 	Mapping sweep(const vector<Match> &M, const qpos_t P_sz, qpos_t lmax, const qpos_t m, const Seeds &kmers, const bucket_t &bucket, Hist &diff_hist) {
@@ -91,10 +100,11 @@ class SHMapper : public Mapper {
 				//&& r->hit.r + H->params.k <= l->hit.r + P_sz
 				&& r->hit.tpos <= l->hit.tpos + lmax 
 				; ++r) {
-				same_strand_seeds += r->is_same_strand() ? +1 : -1;
 				assert(diff_hist.contains(r->seed.kmer.h));
-				if (--diff_hist[r->seed.kmer.h] >= 0)
+				if (--diff_hist[r->seed.kmer.h] >= 0) {
 					++intersection;
+					same_strand_seeds += r->is_same_strand() ? +1 : -1;
+				}
 				
 				assert (l->hit.r <= r->hit.r);
 			}
@@ -122,10 +132,11 @@ class SHMapper : public Mapper {
 			if (J > best.J)
 				best = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r), bucket);
 
-			same_strand_seeds -= l->is_same_strand() ? +1 : -1;
 			assert(diff_hist.contains(l->seed.kmer.h));
-			if (++diff_hist[l->seed.kmer.h] >= 1)
+			if (++diff_hist[l->seed.kmer.h] >= 1) {
 				--intersection;
+				same_strand_seeds -= l->is_same_strand() ? +1 : -1;
+			}
 
 			assert(intersection >= 0);
 		}
@@ -194,7 +205,7 @@ class SHMapper : public Mapper {
 		if (m.J2 < H->params.theta)
 			m.J2 = H->params.theta;
 		if (m.J - m.J2 > 0.015) {
-			if (abs(m.same_strand_seeds) < 100)
+			if (abs(m.same_strand_seeds) < 200)
 				return 5;
 			return 60;
 		} else {
@@ -405,7 +416,7 @@ class SHMapper : public Mapper {
 										for (j=1; j<4; ++j) {
 											assert(bests_idx[j] == -1 || maps[ bests_idx[j-1] ].J >= maps[ bests_idx[j] ].J);
 											if (bests_idx[j] == -1
-												|| !overlap(maps[bests_idx[j]], maps[best_idx])) {
+												|| overlap(maps[bests_idx[j]], maps[best_idx]) < 0.5) {
 //												|| (maps[bests_idx[j]].bucket.segm_id != maps[best_idx].bucket.segm_id)
 //												|| abs(maps[bests_idx[j]].bucket.b - maps[best_idx].bucket.b) > 1) {
 												best2_idx = bests_idx[j];
