@@ -67,6 +67,12 @@ class SHMapper : public Mapper {
 		return kmers;
 	}
 
+	bool overlap(const Mapping &a, const Mapping &b) {
+		if (a.segm_id != b.segm_id)
+			return false;
+		return a.T_r >= b.T_l && a.T_l <= b.T_r;
+	}
+
 	Mapping sweep(const vector<Match> &M, const qpos_t P_sz, qpos_t lmax, const qpos_t m, const Seeds &kmers, const bucket_t &bucket, Hist &diff_hist) {
 		qpos_t intersection = 0;
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
@@ -393,8 +399,9 @@ class SHMapper : public Mapper {
 										for (j=1; j<4; ++j) {
 											assert(bests_idx[j] == -1 || maps[ bests_idx[j-1] ].J >= maps[ bests_idx[j] ].J);
 											if (bests_idx[j] == -1
-												|| (maps[bests_idx[j]].bucket.segm_id != maps[best_idx].bucket.segm_id)
-												|| abs(maps[bests_idx[j]].bucket.b - maps[best_idx].bucket.b) > 1) {
+												|| !overlap(maps[bests_idx[j]], maps[best_idx])) {
+//												|| (maps[bests_idx[j]].bucket.segm_id != maps[best_idx].bucket.segm_id)
+//												|| abs(maps[bests_idx[j]].bucket.b - maps[best_idx].bucket.b) > 1) {
 												best2_idx = bests_idx[j];
 												break;
 											}
@@ -408,7 +415,7 @@ class SHMapper : public Mapper {
 								assert(bests_idx[i] == -1 || maps[bests_idx[i]].J >= 0);
 								assert(i==0 || bests_idx[i] == -1 || maps[bests_idx[i-1]].J >= maps[bests_idx[i]].J);
 							}
-							assert(maps[best_idx].J >= bucket_best.J);
+							assert(best_idx == -1 || maps[best_idx].J >= bucket_best.J);
 
 							best_J = max(best_J, bucket_best.J);
 							if (best2_idx != -1) best_J2 = max(best_J2, maps[best2_idx].J);
@@ -470,7 +477,7 @@ class SHMapper : public Mapper {
 								m.bucket2 = maps[best2_idx].bucket;
 								m.intersection2 = maps[best2_idx].intersection;
 								m.sigmas_diff = sigmas_diff(m.intersection2, m.intersection);
-								assert(m.bucket.segm_id != m.bucket2.segm_id || abs(m.bucket.b - m.bucket2.b) > 1);
+								//assert(m.bucket.segm_id != m.bucket2.segm_id || abs(m.bucket.b - m.bucket2.b) > 1);
 								//m.ed2 = edit_distance(m.bucket, P, P_sz, m, kmers);
 							}
 
