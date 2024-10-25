@@ -193,11 +193,17 @@ class SHMapper : public Mapper {
 		assert(m.J >= 0.0);
 		if (m.J2 < H->params.theta)
 			m.J2 = H->params.theta;
+		if (m.J - m.J2 > 0.015) {
+			if (abs(m.same_strand_seeds) < 100)
+				return 5;
+			return 60;
+		} else {
+			return 0;
+		}
+
 		//if (abs(m.intersection - m.intersection2) == 0)
 		//	return 0;
-		return m.J - m.J2 > 0.02 ? 60 : 0;
 		//return sigmas_diff(m.intersection, m.intersection2) >= 0.2 ? 60 : 0;
-
 		//if (m.J < H->params.theta)
 		//	return 5;
 		//double bound = m.J * 0.9;
