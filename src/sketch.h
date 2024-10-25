@@ -122,6 +122,7 @@ struct Mapping {
 	double J, J2;     // Similarity in [0;1] for the best and for the second best mapping
 	double map_time;
 	int mapq;
+	int same_strand_seeds;  // diff between positive or negative matches
 	char strand;    // '+' or '-'
 	bool unreasonable;  // reserved for filtering matches
 	std::vector<Match>::const_iterator l, r;
@@ -141,7 +142,7 @@ struct Mapping {
 
     Mapping() : J(-1.0) {}
 	Mapping(int k, qpos_t P_sz, qpos_t p_sz, rpos_t T_l, rpos_t T_r, segm_t segm_id, qpos_t intersection, double J, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r, bucket_t bucket)
-		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), intersection(intersection), J(J), unreasonable(false), l(l), r(r), bucket(bucket) {
+		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), intersection(intersection), J(J), same_strand_seeds(same_strand_seeds), unreasonable(false), l(l), r(r), bucket(bucket) {
 		//if (J > 1.0)
 		//	cerr << "s_sz = " << s_sz << ", intersection = " << intersection << ", p_sz = " << p_sz << ", J = " << J << ", r-l=" << r-l << endl;
 		assert(J >= -0.0);
@@ -272,6 +273,7 @@ struct Mapping {
 			<< "\t" << "Bfinal:i:"		<< mapping.final_buckets
 			<< "\t" << "b:s:"			<< mapping.bucket.segm_id << "," << mapping.bucket.b
 			<< "\t" << "b2:s:"			<< mapping.bucket2.segm_id << "," << mapping.bucket2.b
+			<< "\t" << "strand:i:"		<< mapping.same_strand_seeds
 			<< "\t" << "t:f:"			<< mapping.map_time
 			<< endl;
 		return os;

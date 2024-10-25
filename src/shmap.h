@@ -195,7 +195,7 @@ class SHMapper : public Mapper {
 			m.J2 = H->params.theta;
 		//if (abs(m.intersection - m.intersection2) == 0)
 		//	return 0;
-		return m.J - m.J2 >= 0.015 ? 60 : 0;
+		return m.J - m.J2 > 0.02 ? 60 : 0;
 		//return sigmas_diff(m.intersection, m.intersection2) >= 0.2 ? 60 : 0;
 
 		//if (m.J < H->params.theta)
