@@ -22,7 +22,7 @@ using std::pair;
 using std::ifstream;
 using std::endl;
 
-#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:z:aonxhb"
+#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:z:aonxhbB"
 
 struct params_t {
 	// required
@@ -42,11 +42,14 @@ struct params_t {
 	bool overlaps;			// Permit overlapping mappings 
 	bool normalize; 		// Flag to save that scores are to be normalized
 	bool onlybest;			// Output up to one (best) mapping (if above the threshold)
+
+	// for degradation evals
 	bool no_bucket_pruning;
+	bool one_sweep;
 
 	params_t() :
 		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), mapper("shmap"),
-		sam(false), overlaps(false), normalize(false), onlybest(false), no_bucket_pruning(false) {}
+		sam(false), overlaps(false), normalize(false), onlybest(false), no_bucket_pruning(false), one_sweep(false) {}
 
 	void print(std::ostream& out, bool human) const {
 		std::vector<pair<string, string>> m;
@@ -65,6 +68,7 @@ struct params_t {
 		m.push_back({"normalize", std::to_string(normalize)});
 		m.push_back({"onlybest", std::to_string(onlybest)});
 		m.push_back({"no-bucket-pruning", std::to_string(no_bucket_pruning)});
+		m.push_back({"one-sweep", std::to_string(one_sweep)});
 
 		if (human) {
 			out << "Parameters:" << endl;
@@ -92,6 +96,7 @@ struct params_t {
 		out << " | overlaps:              " << overlaps << endl;
 		out << " | onlybest:              " << onlybest << endl;
 		out << " | no-bucket-pruning:     " << no_bucket_pruning << endl;
+		out << " | one-sweep:             " << one_sweep << endl;
 		out << " | tThres:                " << theta << endl;
 	}
 
@@ -120,6 +125,7 @@ struct params_t {
 		cerr << "   -n   --normalize         Normalize scores by length" << endl;
 		cerr << "   -x   --onlybest          Output the best alignment if above threshold (otherwise none)" << endl;
 		cerr << "   -b   --no-bucket-pruning Disables bucket pruning" << endl;
+		cerr << "   -B   --one-sweep         Disregards the seed heuristic and runs one sweepmap on all matches" << endl;
 		cerr << "   -h   --help              Display this help message" << endl;
 	}
 

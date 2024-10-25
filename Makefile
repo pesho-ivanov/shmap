@@ -69,6 +69,7 @@ OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 PAFTOOLS = ./ext/paftools.js
 SHMAP_PREF         = $(ALLOUT_DIR)/shmap/$(READS_PREFIX)/shmap
 SHMAP_NOPRUNE_PREF = $(ALLOUT_DIR)/shmap-noprune/$(READS_PREFIX)/shmap-noprune
+SHMAP_ONESWEEP_PREF= $(ALLOUT_DIR)/shmap-onesweep/$(READS_PREFIX)/shmap-onesweep
 MINIMAP_PREF       = $(OUTDIR)/minimap/minimap
 MM2_PREF           = $(ALLOUT_DIR)/mm2-fast/$(READS_PREFIX)/mm2-fast
 BLEND_PREF         = $(OUTDIR)/blend/blend
@@ -164,6 +165,13 @@ eval_shmap_noprune: $(SHMAP_BIN) gen_reads
 	-paftools.js mapeval -r 0.1 $(SHMAP_NOPRUNE_PREF).paf | tee $(SHMAP_NOPRUNE_PREF).eval
 	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_NOPRUNE_PREF).paf >$(SHMAP_NOPRUNE_PREF).wrong
 
+eval_shmap_onesweep: $(SHMAP_BIN) gen_reads
+	@mkdir -p $(shell dirname $(SHMAP_ONESWEEP_PREF))
+	$(TIME_CMD) -o $(SHMAP_ONESWEEP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -B 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(SHMAP_ONESWEEP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_ONESWEEP_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -B    2> >(tee $(SHMAP_ONESWEEP_PREF).log) > $(SHMAP_ONESWEEP_PREF).paf
+	-paftools.js mapeval -r 0.1 $(SHMAP_ONESWEEP_PREF).paf | tee $(SHMAP_ONESWEEP_PREF).eval
+	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_ONESWEEP_PREF).paf >$(SHMAP_ONESWEEP_PREF).wrong
+
 eval_winnowmap: gen_reads
 	@mkdir -p $(shell dirname $(WINNOWMAP_PREF))
 	if [ ! -f $(REF_DIR)/winnowmap_$(REF)_repetitive_k15.txt ]; then \
@@ -199,13 +207,13 @@ eval_mapquik: gen_reads
 	$(TIME_CMD) -o $(MAPQUIK_PREF).time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(MAPQUIK_PREF) | tee $(MAPQUIK_PREF).log
 	-paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
-eval_tools: eval_minimap #eval_mm2 eval_mapquik eval_blend eval_shmap #eval_winnowmap
+eval_tools: eval_shmap_noprune eval_shmap #eval_shmap_onesweep eval_minimap #eval_mm2 eval_mapquik eval_blend eval_winnowmap
 
 eval_tools_on_datasets:
 	make eval_tools REFNAME=t2tChrY DEPTH=10
 	make eval_tools REFNAME=chm13   DEPTH=0.1
-	make eval_tools REFNAME=t2tChrY DEPTH=1  MEANLEN=24000
-	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb
+#	make eval_tools REFNAME=t2tChrY DEPTH=1  MEANLEN=24000
+#	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb
 
 eval_shmap_on_datasets:
 	make eval_shmap REFNAME=t2tChrY DEPTH=10
