@@ -39,8 +39,8 @@ READSIM_REFNAME ?= $(REFNAME)
 K ?= 25
 R ?= 0.05
 T ?= 0.92
-M ?= 50000
 
+M ?= 100000
 S ?= 30000
 
 K_SLOW ?= $(K)
@@ -153,8 +153,8 @@ eval_thinning: sweepmap gen_reads
 
 eval_shmap: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_PREF))
-	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -x 2>/dev/null >/dev/null
-	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -x     2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
+	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -x 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -x     2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
 	-paftools.js mapeval -r 0.1 $(SHMAP_PREF).paf | tee $(SHMAP_PREF).eval
 	-$(PAFTOOLS) mapeval -r 0.1 -Q 5 $(SHMAP_PREF).paf >$(SHMAP_PREF).wrong
 
