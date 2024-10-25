@@ -6,10 +6,10 @@ RELEASE_FLAGS = -O3 -DNDEBUG -flto
 CFLAGS = -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto #-Wconversion 
 ifeq ($(DEBUG), 1)
     CFLAGS += $(DEBUG_FLAGS)
-	SWEEPMAP_BIN = ./debug/map
+	SHMAP_BIN = ./debug/map
 else
     CFLAGS += $(RELEASE_FLAGS)
-	SWEEPMAP_BIN = ./release/map
+	SHMAP_BIN = ./release/map
 endif
 LIBS = -lz
 DEPFLAGS = -MMD -MP
@@ -67,7 +67,7 @@ ALLOUT_DIR = $(DIR)/out
 OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 
 PAFTOOLS = ./ext/paftools.js
-JACCMAP_PREF       = $(ALLOUT_DIR)/jaccmap/$(READS_PREFIX)/jaccmap
+SHMAP_PREF         = $(ALLOUT_DIR)/shmap/$(READS_PREFIX)/shmap
 SHMAP_NOPRUNE_PREF = $(ALLOUT_DIR)/shmap-noprune/$(READS_PREFIX)/shmap-noprune
 MINIMAP_PREF       = $(OUTDIR)/minimap/minimap
 MM2_PREF           = $(ALLOUT_DIR)/mm2-fast/$(READS_PREFIX)/mm2-fast
@@ -81,9 +81,9 @@ MAX_MATCHES = 100 300 1000 3000 10000 30000 100000 300000
 Ks = 14 16 18 20 22 24 26
 Rs = 0.01 0.05 0.1 0.15 0.2
 
-all: $(SWEEPMAP_BIN)
+all: $(SHMAP_BIN)
 
-$(SWEEPMAP_BIN): $(OBJS) 
+$(SHMAP_BIN): $(OBJS) 
 	mkdir -p $(shell dirname $@)
 	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $@ $^ $(LIBS)
 
@@ -93,7 +93,7 @@ $(SWEEPMAP_BIN): $(OBJS)
 -include $(DEPS)
 
 clean:
-	rm -f $(OBJS) $(SWEEPMAP_BIN) $(DEPS)
+	rm -f $(OBJS) $(SHMAP_BIN) $(DEPS)
 
 simulate_SVs:
 	cd $(REF_DIR);\
@@ -131,8 +131,8 @@ eval_sketching: sweepmap gen_reads
 		for r in $(Rs); do \
 			f=$${DIR}/"sweepmap-K$${k}-R$${r}"; \
 			echo "Processing $${f}"; \
-			$(TIME_CMD) -o $${f}.index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $${k} -r $${r} -S $(S) -M $(M) 2>&1 >/dev/null; \
-			$(TIME_CMD) -o $${f}.time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $${f}.params -x -t $(T) -k $${k} -r $${r} -S $(S) -M $(M) 2> >(tee $${f}.log) >$${f}.paf; \
+			$(TIME_CMD) -o $${f}.index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $${k} -r $${r} -S $(S) -M $(M) 2>&1 >/dev/null; \
+			$(TIME_CMD) -o $${f}.time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $${f}.params -x -t $(T) -k $${k} -r $${r} -S $(S) -M $(M) 2> >(tee $${f}.log) >$${f}.paf; \
 			-paftools.js mapeval $${f}.paf | tee $${f}.eval; \
 		done \
     done
@@ -144,23 +144,23 @@ eval_thinning: sweepmap gen_reads
 		for m in $(MAX_MATCHES); do \
 			f=$${DIR}/"sweepmap-S$${s}-M$${m}"; \
 			echo "Processing $${f}"; \
-			$(TIME_CMD) -o $${f}.index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $${s} -M $${m} 2>&1 >/dev/null; \
-			$(TIME_CMD) -o $${f}.time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $${f}.params -x -t $(T) -k $(K) -r $(R) -S $${s} -M $${m} 2> >(tee $${f}.log) >$${f}.paf; \
+			$(TIME_CMD) -o $${f}.index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $${s} -M $${m} 2>&1 >/dev/null; \
+			$(TIME_CMD) -o $${f}.time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $${f}.params -x -t $(T) -k $(K) -r $(R) -S $${s} -M $${m} 2> >(tee $${f}.log) >$${f}.paf; \
 			-paftools.js mapeval $${f}.paf | tee $${f}.eval; \
 		done \
     done
 
-eval_jaccmap: $(SWEEPMAP_BIN) gen_reads
-	@mkdir -p $(shell dirname $(JACCMAP_PREF))
-	$(TIME_CMD) -o $(JACCMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -m jacc 2>/dev/null >/dev/null
-	$(TIME_CMD) -o $(JACCMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(JACCMAP_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -m jacc     2> >(tee $(JACCMAP_PREF).log) > $(JACCMAP_PREF).paf
-	-paftools.js mapeval -r 0.1 $(JACCMAP_PREF).paf | tee $(JACCMAP_PREF).eval
-	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(JACCMAP_PREF).paf >$(JACCMAP_PREF).wrong
+eval_shmap: $(SHMAP_BIN) gen_reads
+	@mkdir -p $(shell dirname $(SHMAP_PREF))
+	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x     2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
+	-paftools.js mapeval -r 0.1 $(SHMAP_PREF).paf | tee $(SHMAP_PREF).eval
+	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_PREF).paf >$(SHMAP_PREF).wrong
 
-eval_shmap_noprune: $(SWEEPMAP_BIN) gen_reads
+eval_shmap_noprune: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_NOPRUNE_PREF))
-	$(TIME_CMD) -o $(SHMAP_NOPRUNE_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -m jacc -b 2>/dev/null >/dev/null
-	$(TIME_CMD) -o $(SHMAP_NOPRUNE_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_NOPRUNE_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -m jacc -b    2> >(tee $(SHMAP_NOPRUNE_PREF).log) > $(SHMAP_NOPRUNE_PREF).paf
+	$(TIME_CMD) -o $(SHMAP_NOPRUNE_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -b 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(SHMAP_NOPRUNE_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_NOPRUNE_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -b    2> >(tee $(SHMAP_NOPRUNE_PREF).log) > $(SHMAP_NOPRUNE_PREF).paf
 	-paftools.js mapeval -r 0.1 $(SHMAP_NOPRUNE_PREF).paf | tee $(SHMAP_NOPRUNE_PREF).eval
 	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_NOPRUNE_PREF).paf >$(SHMAP_NOPRUNE_PREF).wrong
 
@@ -199,7 +199,7 @@ eval_mapquik: gen_reads
 	$(TIME_CMD) -o $(MAPQUIK_PREF).time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(MAPQUIK_PREF) | tee $(MAPQUIK_PREF).log
 	-paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
-eval_tools: eval_minimap #eval_mm2 eval_mapquik eval_blend eval_jaccmap #eval_winnowmap
+eval_tools: eval_minimap #eval_mm2 eval_mapquik eval_blend eval_shmap #eval_winnowmap
 
 eval_tools_on_datasets:
 	make eval_tools REFNAME=t2tChrY DEPTH=10
@@ -207,11 +207,11 @@ eval_tools_on_datasets:
 	make eval_tools REFNAME=t2tChrY DEPTH=1  MEANLEN=24000
 	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb
 
-eval_jaccmap_on_datasets:
-	make eval_jaccmap REFNAME=t2tChrY DEPTH=10
-	make eval_jaccmap REFNAME=chm13   DEPTH=0.1
-	make eval_jaccmap REFNAME=t2tChrY DEPTH=1 	MEANLEN=24000
-	make eval_jaccmap REFNAME=chm13   READS_PREFIX=HG002_24kb
+eval_shmap_on_datasets:
+	make eval_shmap REFNAME=t2tChrY DEPTH=10
+	make eval_shmap REFNAME=chm13   DEPTH=0.1
+	make eval_shmap REFNAME=t2tChrY DEPTH=1 	MEANLEN=24000
+	make eval_shmap REFNAME=chm13   READS_PREFIX=HG002_24kb
 
 #eval_tools_on_SV:
 #	make eval_tools REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
@@ -239,33 +239,33 @@ clean_evals:
 
 #eval_abe: sweep gen_reads
 #	mkdir -p ../out
-##	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 >out/sweep.out
+##	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 >out/sweep.out
 #
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -z $(DIR)/out/sweep-b.params >out/sweep-b.out
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -z $(DIR)/out/sweep-b-e.params >out/sweep-b-e.out
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -a extend_equally -z $(DIR)/out/sweep-b-e-a.params >out/sweep-b-e-a.out
+#	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -z $(DIR)/out/sweep-b.params >out/sweep-b.out
+#	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out
+#	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -z $(DIR)/out/sweep-b-e.params >out/sweep-b-e.out
+#	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -a extend_equally -z $(DIR)/out/sweep-b-e-a.params >out/sweep-b-e-a.out
 #
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -z $(DIR)/out/sweep.params >out/sweep.out
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -a extend_equally -z $(DIR)/out/sweep-a.params >out/sweep-a.out
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -z $(DIR)/out/sweep-e.params >out/sweep-e.out
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -a extend_equally -z $(DIR)/out/sweep-e-a.params >out/sweep-e-a.out
+#	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -z $(DIR)/out/sweep.params >out/sweep.out
+#	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -a extend_equally -z $(DIR)/out/sweep-a.params >out/sweep-a.out
+#	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -z $(DIR)/out/sweep-e.params >out/sweep-e.out
+#	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -a extend_equally -z $(DIR)/out/sweep-e-a.params >out/sweep-e-a.out
 
 #eval_multiple_alignments: sweep gen_reads
-#	time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -a fine 		     -z $(DIR)/out/sweep.params >out/sweep.out
-#	time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -a fine -x		     -z $(DIR)/out/sweep-x.params >out/sweep-x.out
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -x -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a-x.out
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out 2>out/sweep-b-a.cerr
-#	$(SWEEPMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -o -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a-o.out 2>out/sweep-b-a-o.cerr
+#	time $(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -a fine 		     -z $(DIR)/out/sweep.params >out/sweep.out
+#	time $(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -a fine -x		     -z $(DIR)/out/sweep-x.params >out/sweep-x.out
+#	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -x -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a-x.out
+#	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out 2>out/sweep-b-a.cerr
+#	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -o -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a-o.out 2>out/sweep-b-a-o.cerr
 
 #debug: sweep gen_reads
-#	$(SWEEPMAP_BIN) -s $(REF) -p simulations/reads/1.fasta $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-1.params >out/sweep-1.out 2>out/sweep-1.cerr
+#	$(SHMAP_BIN) -s $(REF) -p simulations/reads/1.fasta $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-1.params >out/sweep-1.out 2>out/sweep-1.cerr
 
 
-#eval_sweepmap_sam: $(SWEEPMAP_BIN) gen_reads
+#eval_sweepmap_sam: $(SHMAP_BIN) gen_reads
 #	@mkdir -p $(shell dirname $(SWEEPMAP_PREF))
-#	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SWEEPMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>/dev/null >/dev/null
-#	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SWEEPMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) -a 2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).sam
+#	$(TIME_CMD) -o $(SWEEPMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) 2>/dev/null >/dev/null
+#	$(TIME_CMD) -o $(SWEEPMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SWEEPMAP_PREF).params -x -t $(T) -k $(K) -r $(R) -S $(S) -M $(M) -a 2> >(tee $(SWEEPMAP_PREF).log) >$(SWEEPMAP_PREF).sam
 #	-paftools.js mapeval $(SWEEPMAP_PREF).sam | tee $(SWEEPMAP_PREF).eval
 #	@-paftools.js mapeval -Q 60 $(SWEEPMAP_PREF).sam >$(SWEEPMAP_PREF).wrong
 #

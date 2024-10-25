@@ -17,7 +17,7 @@
 
 namespace sweepmap {
 	
-class JaccMapper : public Mapper {
+class SHMapper : public Mapper {
 	const SketchIndex &tidx;
 	Handler *H;
 
@@ -44,7 +44,7 @@ class JaccMapper : public Mapper {
 					if (hits_in_t > 0) {
 						if (H->params.max_matches == -1 || hits_in_t <= H->params.max_matches) {
 							Seed el(p[ppos], hits_in_t, kmers.size());
-							//strike = 1; // comment out for Weighted Jaccard 
+							//strike = 1; // comment out for Weighted metric
 							el.occs_in_p = strike;
 							kmers.push_back(el);
 							if (H->params.max_seeds != -1 && (rpos_t)kmers.size() >= H->params.max_seeds)  // TODO maybe account for occs_in_p
@@ -130,7 +130,7 @@ class JaccMapper : public Mapper {
 	}
 
   public:
-	JaccMapper(const SketchIndex &tidx, Handler *H) : tidx(tidx), H(H) {
+	SHMapper(const SketchIndex &tidx, Handler *H) : tidx(tidx), H(H) {
         H->C.inc("seeds_limit_reached", 0);
         H->C.inc("mapped_reads", 0);
         if (H->params.theta < 0.0 || H->params.theta > 1.0) {
@@ -144,7 +144,9 @@ class JaccMapper : public Mapper {
 	}
 
 	bool seed_heuristic_pass(const vector<Mapping> &maps, const Seeds &kmers, qpos_t lmax, qpos_t m, bucket_t b, rpos_t max_matches, qpos_t i, qpos_t seeds, int best_idx, int best2_idx, double *lowest_sh) {
-		//return true; // comment out
+		if (H->params.no_bucket_pruning)
+			return true;
+
 		*lowest_sh = 1.0; // should only get lower
 
 		double thr1 = best_idx == -1 ? H->params.theta : max(H->params.theta, maps[best_idx].J*0.99);
@@ -198,7 +200,7 @@ class JaccMapper : public Mapper {
 	}
 
 	void map(const string &pFile) {
-		cerr << "Mapping reads using JaccMap..." << endl;
+		cerr << "Mapping reads using SHmap..." << endl;
 
 		H->C.inc("kmers", 0);
 		H->C.inc("seeds", 0);

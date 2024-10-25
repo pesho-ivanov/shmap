@@ -119,7 +119,7 @@ struct Mapping {
 	segm_t segm_sz;
 	rpos_t s_sz;      // the position of the rightmost nucleotide of the mapping
 	qpos_t intersection;     // the number of kmers in the intersection between the pattern and its mapping in `t'
-	double J, J2;     // Jaccard similarity in [0;1] for the best and for the second best mapping
+	double J, J2;     // Similarity in [0;1] for the best and for the second best mapping
 	double map_time;
 	int mapq;
 	char strand;    // '+' or '-'
@@ -260,9 +260,9 @@ struct Mapping {
 			<< "\t" << "I2:i:"			<< mapping.intersection2
 			<< "\t" << "Idiff:i:"		<< mapping.intersection - mapping.intersection2
 			<< "\t" << "Isdiff:f:"		<< mapping.sigmas_diff
-			<< "\t" << "J:f:"			<< mapping.J   // Jaccard similarity [0; 1]
-			<< "\t" << "J2:f:"			<< mapping.J2   // second best mapping Jaccard similarity [0; 1]
-			<< "\t" << "Jdiff:f:"		<< mapping.J - mapping.J2   // second best mapping Jaccard similarity [0; 1]
+			<< "\t" << "J:f:"			<< mapping.J   // Similarity [0; 1]
+			<< "\t" << "J2:f:"			<< mapping.J2   // second best mapping similarity [0; 1]
+			<< "\t" << "Jdiff:f:"		<< mapping.J - mapping.J2   // second best mapping similarity [0; 1]
 			<< "\t" << "ed:i:"			<< mapping.ed
 			<< "\t" << "ed2:i:"			<< mapping.ed2
 			<< "\t" << "MSeedmax:i:"	<< mapping.max_seed_matches

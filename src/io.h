@@ -22,7 +22,7 @@ using std::pair;
 using std::ifstream;
 using std::endl;
 
-#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:z:aonxh"
+#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:z:aonxhb"
 
 struct params_t {
 	// required
@@ -42,10 +42,11 @@ struct params_t {
 	bool overlaps;			// Permit overlapping mappings 
 	bool normalize; 		// Flag to save that scores are to be normalized
 	bool onlybest;			// Output up to one (best) mapping (if above the threshold)
+	bool no_bucket_pruning;
 
 	params_t() :
-		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), mapper("sweep"),
-		sam(false), overlaps(false), normalize(false), onlybest(false) {}
+		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), mapper("shmap"),
+		sam(false), overlaps(false), normalize(false), onlybest(false), no_bucket_pruning(false) {}
 
 	void print(std::ostream& out, bool human) const {
 		std::vector<pair<string, string>> m;
@@ -63,6 +64,7 @@ struct params_t {
 		m.push_back({"overlaps", std::to_string(overlaps)});
 		m.push_back({"normalize", std::to_string(normalize)});
 		m.push_back({"onlybest", std::to_string(onlybest)});
+		m.push_back({"no-bucket-pruning", std::to_string(no_bucket_pruning)});
 
 		if (human) {
 			out << "Parameters:" << endl;
@@ -84,17 +86,18 @@ struct params_t {
 		out << " | algorithm:             " << mapper << endl;
 		out << " | k:                     " << k << endl;
 		out << " | hFrac:                 " << hFrac << endl;
-		out << " | max_seeds (S):         " << max_seeds << endl;
-		out << " | max_matches (M):       " << max_matches << endl;
+		out << " | max_seeds              " << max_seeds << endl;
+		out << " | max_matches:           " << max_matches << endl;
 		out << " | sam:                   " << sam << endl;
 		out << " | overlaps:              " << overlaps << endl;
 		out << " | onlybest:              " << onlybest << endl;
+		out << " | no-bucket-pruning:     " << no_bucket_pruning << endl;
 		out << " | tThres:                " << theta << endl;
 	}
 
 	void dsHlp() {
 		cerr << "sweep [-hn] [-p PATTERN_FILE] [-s TEXT_FILE] [-k KMER_LEN] [-r HASH_RATIO] [-b BLACKLIST] [-c COM_HASH_WGHT] [-u UNI\
-		_HASH_WGHT] [-t HOMOLOGY_THRESHOLD] [-d DECENT] [-i INTERCEPT]" << endl;
+		_HASH_WGHT] [-t HOMOLOGY_THRESHOLD]" << endl;
 		cerr << endl;
 		cerr << "Find sketch-based pattern similarity in text." << endl;
 		cerr << endl;
@@ -116,6 +119,7 @@ struct params_t {
 		cerr << "   -o   --overlaps          Permit overlapping mappings" << endl;
 		cerr << "   -n   --normalize         Normalize scores by length" << endl;
 		cerr << "   -x   --onlybest          Output the best alignment if above threshold (otherwise none)" << endl;
+		cerr << "   -b   --no-bucket-pruning Disables bucket pruning" << endl;
 		cerr << "   -h   --help              Display this help message" << endl;
 	}
 
@@ -135,6 +139,7 @@ struct params_t {
 			{"overlaps",           no_argument,        0, 'o'},
 			{"normalize",          no_argument,        0, 'n'},
 			{"onlybest",           no_argument,        0, 'x'},
+			{"no-bucket-pruning",  no_argument,        0, 'b'},
 			{"help",               no_argument,        0, 'h'},
 			{0,                    0,                  0,  0 }
 		};
@@ -200,6 +205,9 @@ struct params_t {
 					break;
 				case 'x':
 					onlybest = true;
+					break;
+				case 'b':
+					no_bucket_pruning = true;
 					break;
 				case 'h':
 					return false;
