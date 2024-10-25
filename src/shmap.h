@@ -415,7 +415,7 @@ class SHMapper : public Mapper {
 										int j;
 										for (j=1; j<4; ++j) {
 											assert(bests_idx[j] == -1 || maps[ bests_idx[j-1] ].J >= maps[ bests_idx[j] ].J);
-											if (bests_idx[j] == -1 || overlap(maps[bests_idx[j]], maps[best_idx]) < 0.3) {
+											if (bests_idx[j] == -1 || overlap(maps[bests_idx[j]], maps[best_idx]) < 0.5) {
 												best2_idx = bests_idx[j];
 												break;
 											}
