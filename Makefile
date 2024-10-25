@@ -153,22 +153,22 @@ eval_thinning: sweepmap gen_reads
 
 eval_shmap: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_PREF))
-	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x 2>/dev/null >/dev/null
-	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x     2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
+	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -x 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -x     2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
 	-paftools.js mapeval -r 0.1 $(SHMAP_PREF).paf | tee $(SHMAP_PREF).eval
-	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_PREF).paf >$(SHMAP_PREF).wrong
+	-$(PAFTOOLS) mapeval -r 0.1 -Q 5 $(SHMAP_PREF).paf >$(SHMAP_PREF).wrong
 
 eval_shmap_noprune: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_NOPRUNE_PREF))
-	$(TIME_CMD) -o $(SHMAP_NOPRUNE_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -b 2>/dev/null >/dev/null
-	$(TIME_CMD) -o $(SHMAP_NOPRUNE_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_NOPRUNE_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -b    2> >(tee $(SHMAP_NOPRUNE_PREF).log) > $(SHMAP_NOPRUNE_PREF).paf
+	$(TIME_CMD) -o $(SHMAP_NOPRUNE_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -x -b 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(SHMAP_NOPRUNE_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_NOPRUNE_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -x -b    2> >(tee $(SHMAP_NOPRUNE_PREF).log) > $(SHMAP_NOPRUNE_PREF).paf
 	-paftools.js mapeval -r 0.1 $(SHMAP_NOPRUNE_PREF).paf | tee $(SHMAP_NOPRUNE_PREF).eval
 	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_NOPRUNE_PREF).paf >$(SHMAP_NOPRUNE_PREF).wrong
 
 eval_shmap_onesweep: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_ONESWEEP_PREF))
-	$(TIME_CMD) -o $(SHMAP_ONESWEEP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -B 2>/dev/null >/dev/null
-	$(TIME_CMD) -o $(SHMAP_ONESWEEP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_ONESWEEP_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -S $(S) -x -B    2> >(tee $(SHMAP_ONESWEEP_PREF).log) > $(SHMAP_ONESWEEP_PREF).paf
+	$(TIME_CMD) -o $(SHMAP_ONESWEEP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -x -B 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(SHMAP_ONESWEEP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_ONESWEEP_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -x -B    2> >(tee $(SHMAP_ONESWEEP_PREF).log) > $(SHMAP_ONESWEEP_PREF).paf
 	-paftools.js mapeval -r 0.1 $(SHMAP_ONESWEEP_PREF).paf | tee $(SHMAP_ONESWEEP_PREF).eval
 	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_ONESWEEP_PREF).paf >$(SHMAP_ONESWEEP_PREF).wrong
 
