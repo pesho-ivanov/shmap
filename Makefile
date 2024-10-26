@@ -69,12 +69,12 @@ OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 PAFTOOLS = ./ext/paftools.js
 SHMAP_PREF         = $(ALLOUT_DIR)/shmap/$(READS_PREFIX)/shmap
 SHMAP_NOPRUNE_PREF = $(ALLOUT_DIR)/shmap-noprune/$(READS_PREFIX)/shmap-noprune
-SHMAP_ONESWEEP_PREF= $(ALLOUT_DIR)/shmap-onesweep/$(READS_PREFIX)/shmap-onesweep
-MINIMAP_PREF       = $(OUTDIR)/minimap/minimap
-MM2_PREF           = $(ALLOUT_DIR)/mm2-fast/$(READS_PREFIX)/mm2-fast
-BLEND_PREF         = $(OUTDIR)/blend/blend
-MAPQUIK_PREF       = $(OUTDIR)/mapquik/mapquik
-WINNOWMAP_PREF     = $(OUTDIR)/winnowmap/winnowmap
+SHMAP_ONESWEEP_PREF= $(ALLOUT_DIR)/shmap-onesweep/$(READS_PREFIX)/shmap-onesweep # NOT USED
+MINIMAP_PREF       = $(ALLOUT_DIR)/minimap/$(READS_PREFIX)/minimap
+MM2_PREF           = $(ALLOUT_DIR)/mm2-fast/$(READS_PREFIX)/mm2-fast   # NOT USED
+BLEND_PREF         = $(ALLOUT_DIR)/blend/$(READS_PREFIX)/blend
+MAPQUIK_PREF       = $(ALLOUT_DIR)/mapquik/$(READS_PREFIX)/mapquik
+WINNOWMAP_PREF     = $(ALLOUT_DIR)/winnowmap/$(READS_PREFIX)/winnowmap
 
 MAX_SEEDS = 10 30 100 300 1000 3000 10000
 MAX_MATCHES = 100 300 1000 3000 10000 30000 100000 300000
@@ -207,19 +207,20 @@ eval_mapquik: gen_reads
 	$(TIME_CMD) -o $(MAPQUIK_PREF).time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(MAPQUIK_PREF) | tee $(MAPQUIK_PREF).log
 	-paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
-eval_tools: eval_shmap_noprune #eval_shmap #eval_shmap_onesweep eval_minimap #eval_mm2 eval_mapquik eval_blend eval_winnowmap
+eval_tools: eval_shmap eval_shmap_noprune eval_minimap eval_mapquik eval_blend #eval_winnowmap #eval_shmap_onesweep #eval_mm2 
+#eval_tools: eval_minimap eval_mapquik eval_blend
 
 eval_tools_on_datasets:
-	make eval_tools REFNAME=t2tChrY DEPTH=10
-	make eval_tools REFNAME=chm13   DEPTH=0.1
-	make eval_tools REFNAME=t2tChrY DEPTH=1  MEANLEN=24000
-	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb
+#	make eval_tools REFNAME=t2tChrY DEPTH=10
+	make eval_tools REFNAME=chm13   DEPTH=1
+#	make eval_tools REFNAME=t2tChrY DEPTH=10  MEANLEN=24000
+#	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
 
 eval_shmap_on_datasets:
 	make eval_shmap REFNAME=t2tChrY DEPTH=10
 	make eval_shmap REFNAME=chm13   DEPTH=0.1
-	make eval_shmap REFNAME=t2tChrY DEPTH=1 	MEANLEN=24000
-	make eval_shmap REFNAME=chm13   READS_PREFIX=HG002_24kb
+	make eval_shmap REFNAME=t2tChrY DEPTH=10 	MEANLEN=24000
+	make eval_shmap REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
 
 #eval_tools_on_SV:
 #	make eval_tools REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
@@ -227,6 +228,9 @@ eval_shmap_on_datasets:
 clean_evals:
 	rm -r $(ALLREADS_DIR)
 	rm -r $(ALLOUT_DIR)
+
+# 10GB reads: (10737418240 bytes):
+# curl -r 0-10737418239  https://storage.googleapis.com/brain-genomics-public/research/deepconsensus/publication/deepconsensus_predictions/hg002_24kb/two_smrt_cells/HG002_24kb_132517_061936_2fl_DC_hifi_reads.fastq >HG002_24kb_132517_061936_2fl_DC_hifi_reads.10GB.fastq
 
 # TODO: add curl -r 0-1073741823 https://storage.googleapis.com/brain-genomics-public/research/deepconsensus/publication/deepconsensus_predictions/hg002_24kb/two_smrt_cells/HG002_24kb_132517_061936_2fl_DC_hifi_reads.fastq >HG002_24kb_132517_061936_2fl_DC_hifi_reads.1GB.fastq
 # TODO: `seqtk seq -AU` for mapquik
