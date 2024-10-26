@@ -426,9 +426,9 @@ class SHMapper : public Mapper {
 				//cerr << "seed matches=" << seed_matches << ", matches_in_B=" << matches_in_B << ", max_seed_matches=" << max_seed_matches << ", seeds=" << seeds << ", S=" << S << ", i=" << i << endl;
 
 				H->T.start("match_rest");
-				vector<Mapping> maps;
-				int total_matches, best_idx, best2_idx, final_buckets;
-				match_rest(seed_matches, P_sz, lmax, m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, best2_idx, final_buckets);
+					vector<Mapping> maps;
+					int total_matches, best_idx, best2_idx, final_buckets;
+					match_rest(seed_matches, P_sz, lmax, m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, best2_idx, final_buckets);
 				H->T.stop("match_rest");
 			H->T.stop("query_mapping");
 
