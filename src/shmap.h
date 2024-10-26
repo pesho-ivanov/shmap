@@ -480,6 +480,7 @@ class SHMapper : public Mapper {
 							const auto &segm = tidx.T[m.segm_id];
 							m.seeds = S;
 							m.total_matches = total_matches;
+							m.match_inefficiency = 1.0 * m.total_matches / m.intersection;
 							m.max_seed_matches = max_seed_matches;
 							m.seed_matches = seed_matches;
 							m.seeded_buckets = seeded_buckets;
@@ -551,8 +552,8 @@ class SHMapper : public Mapper {
 		cerr << " |  | seeds:                  " << H->C.frac("kmers_seeds", "reads") << " (" << H->C.perc("kmers_seeds", "kmers") << "%)" << endl;
 		cerr << " | Matches:               " << H->C.frac("total_matches", "reads") << " p/ read" << endl;
 		cerr << " |  | seed matches:           " << H->C.frac("seed_matches", "reads") << " (" << H->C.perc("seed_matches", "total_matches") << "%)" << endl;
-		cerr << " |  | in reported mappings:   " << H->C.frac("matches_in_reported_mappings", "reads") << " (" << H->C.frac("total_matches", "matches_in_reported_mappings") << "x less)" << endl;
-		cerr << " |  | possible_matches:       " << H->C.frac("possible_matches", "reads") << " (" <<H->C.frac("possible_matches", "total_matches") << "x)" << endl;
+		cerr << " |  | in reported mappings:   " << H->C.frac("matches_in_reported_mappings", "reads") << " (match inefficiency: " << H->C.frac("total_matches", "matches_in_reported_mappings") << "x less)" << endl;
+		cerr << " |  | possible matches:       " << H->C.frac("possible_matches", "reads") << " (" <<H->C.frac("possible_matches", "total_matches") << "x)" << endl;
 //		cerr << " |  | frequent:               " << H->C.count("matches_freq") << " (" << H->C.perc("matches_freq", "total_matches") << "%)" << endl;
 //		cerr << " |  | Seed h. reduction:      " << H->C.frac("possible_matches", "seed_matches") << "x" << endl;
 		//cerr << " | Seed limit reached:    " << H->C.count("seeds_limit_reached") << " (" << H->C.perc("seeds_limit_reached", "reads") << "%)" << endl;

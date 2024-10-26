@@ -134,6 +134,7 @@ struct Mapping {
 	rpos_t max_seed_matches;// number of matches of the most frequent seed
 	rpos_t seed_matches;    // number of matches of seeds
 	rpos_t total_matches;   // number of matches of all kmers
+	double match_inefficiency;   // intersection / total_matches
 	rpos_t seeded_buckets;     // the initial number of buckets
 	rpos_t final_buckets;   // the number of buckets after pruning with all kmers
 	bucket_t bucket;			 // the bucket where the mapping is found
@@ -166,6 +167,7 @@ struct Mapping {
 		seed_matches = -1;
 		seeded_buckets = -1;
 		final_buckets = -1;
+		match_inefficiency = -1.0;
 		J2 = -1.0;
 		intersection2 = -1;
 		sigmas_diff = -1.0;
@@ -272,6 +274,7 @@ struct Mapping {
 			<< "\t" << "MSeedmax:i:"	<< mapping.max_seed_matches
 			<< "\t" << "MSeed:i:"		<< mapping.seed_matches
 			<< "\t" << "M:i:"			<< mapping.total_matches
+			<< "\t" << "Mineff:f:"		<< mapping.match_inefficiency
 			<< "\t" << "Bmax:i:"		<< mapping.seeded_buckets
 			<< "\t" << "Bfinal:i:"		<< mapping.final_buckets
 			<< "\t" << "b:s:"			<< mapping.bucket.segm_id << "," << mapping.bucket.b
