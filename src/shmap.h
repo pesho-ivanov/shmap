@@ -332,8 +332,6 @@ class SHMapper : public Mapper {
 					qpos_t P_sz = P.size();
 
 					H->C.inc("read_len", P_sz);
-					Timer read_mapping_time;  // TODO: change to H->T.start
-					read_mapping_time.start();
 
 					Seeds kmers = select_kmers(p);
 					qpos_t m = 0;
@@ -432,70 +430,50 @@ class SHMapper : public Mapper {
 				int total_matches, best_idx, best2_idx, final_buckets;
 				match_rest(seed_matches, P_sz, lmax, m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, best2_idx, final_buckets);
 				H->T.stop("match_rest");
+			H->T.stop("query_mapping");
 
-				H->T.start("output");
-					vector<Mapping> final_mappings;
+			H->T.start("output");
+				if (H->params.onlybest && maps.size() >= 1) {
+					H->C.inc("mapped_reads");
+					if (best_idx != -1) 
+					//if (maps[best_idx].J >= H->params.theta)
+					{
+						assert(0 <= best_idx && best_idx < (int)maps.size());
+						Mapping &m = maps[best_idx];
 
-					if (H->params.onlybest && maps.size() >= 1) {
-						H->C.inc("mapped_reads");
-						if (best_idx != -1) 
-						//if (maps[best_idx].J >= H->params.theta)
-						{
-							assert(0 <= best_idx && best_idx < (int)maps.size());
-							Mapping &m = maps[best_idx];
+						const auto &segm = tidx.T[m.segm_id];
+						m.seeds = S;
+						m.total_matches = total_matches;
+						m.match_inefficiency = 1.0 * m.total_matches / m.intersection;
+						m.max_seed_matches = max_seed_matches;
+						m.seed_matches = seed_matches;
+						m.seeded_buckets = seeded_buckets;
+						m.final_buckets = final_buckets;
+						m.query_id = query_id.c_str();
+						m.segm_name = segm.name.c_str();
+						m.segm_sz = segm.sz;
+						m.map_time = H->T.secs("query_mapping");
 
-							const auto &segm = tidx.T[m.segm_id];
-							m.seeds = S;
-							m.total_matches = total_matches;
-							m.match_inefficiency = 1.0 * m.total_matches / m.intersection;
-							m.max_seed_matches = max_seed_matches;
-							m.seed_matches = seed_matches;
-							m.seeded_buckets = seeded_buckets;
-							m.final_buckets = final_buckets;
-							m.query_id = query_id.c_str();
-							m.segm_name = segm.name.c_str();
-							m.segm_sz = segm.sz;
-
-							if (best2_idx != -1) {
-								//cerr << "best_idx: " << best_idx << ", best2_idx: " << best2_idx << endl;
-								m.J2 = maps[best2_idx].J;
-								m.bucket2 = maps[best2_idx].bucket;
-								m.intersection2 = maps[best2_idx].intersection;
-								m.sigmas_diff = sigmas_diff(m.intersection2, m.intersection);
-								//assert(m.bucket.segm_id != m.bucket2.segm_id || abs(m.bucket.b - m.bucket2.b) > 1);
-								//m.ed2 = edit_distance(m.bucket, P, P_sz, m, kmers);
-							}
-
-							m.mapq = mapq(m);
-							if (m.mapq == 60)
-								H->C.inc("mapq60");
-
-							//if (m.mapq > 0)
-								final_mappings.push_back(m);
-							H->C.inc("matches_in_reported_mappings", m.intersection);
+						if (best2_idx != -1) {
+							//cerr << "best_idx: " << best_idx << ", best2_idx: " << best2_idx << endl;
+							m.J2 = maps[best2_idx].J;
+							m.bucket2 = maps[best2_idx].bucket;
+							m.intersection2 = maps[best2_idx].intersection;
+							m.sigmas_diff = sigmas_diff(m.intersection2, m.intersection);
+							//assert(m.bucket.segm_id != m.bucket2.segm_id || abs(m.bucket.b - m.bucket2.b) > 1);
+							//m.ed2 = edit_distance(m.bucket, P, P_sz, m, kmers);
 						}
-					}
 
-					read_mapping_time.stop();
+						m.mapq = mapq(m);
+						m.print_paf();
 
-					for (auto &m: final_mappings) {
-						m.map_time = read_mapping_time.secs() / (double)final_mappings.size();
-		//				if (H->params.sam) {
-		//					auto ed = m.print_sam(query_id, segm, (int)matches.size(), seq->seq.s, seq->seq.l);
-		//					H->C.inc("total_edit_distance", ed);
-		//				}
-		//				else
-							m.print_paf();
-						//  H->C.inc("spurious_matches", spurious_matches(m, matches));
-						assert(m.J >= 0);
+						if (m.mapq == 60) H->C.inc("mapq60");
+						H->C.inc("matches_in_reported_mappings", m.intersection);
 						H->C.inc("J_best", rpos_t(10000.0*m.J));
 						H->C.inc("mappings");
 					}
-		//			H->C.inc("matches", matches.size());
-					//H->T.stop("postproc");
-
-				H->T.stop("output");
-				H->T.stop("query_mapping");
+				}
+			H->T.stop("output");
 			H->T.start("query_reading");
 		});
 		H->T.stop("query_reading");
