@@ -3,7 +3,7 @@ CC = g++
 CXX_STANDARD = -std=c++20
 DEBUG_FLAGS = -g -DDEBUG
 RELEASE_FLAGS = -O3 -DNDEBUG -flto
-CFLAGS = -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto #-Wconversion 
+CFLAGS = -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
 ifeq ($(DEBUG), 1)
     CFLAGS += $(DEBUG_FLAGS)
 	SHMAP_BIN = ./debug/map
@@ -178,8 +178,8 @@ eval_winnowmap: gen_reads
 		$(MERYL_BIN) count k=15 output merylDB $(REF); \
 		$(MERYL_BIN) print greater-than distinct=0.9998 merylDB > $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt; \
 	fi
-	$(TIME_CMD) -o $(WINNOWMAP_PREF).index.time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 --secondary=no $(REF) $(ONE_READ) >/dev/null 2>/dev/null
-	$(TIME_CMD) -o $(WINNOWMAP_PREF).time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(WINNOWMAP_PREF).log) >$(WINNOWMAP_PREF).paf 
+	$(TIME_CMD) -o $(WINNOWMAP_PREF).index.time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 --secondary=no --sv-off $(REF) $(ONE_READ) >/dev/null 2>/dev/null
+	$(TIME_CMD) -o $(WINNOWMAP_PREF).time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 --secondary=no --sv-off -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(WINNOWMAP_PREF).log) >$(WINNOWMAP_PREF).paf 
 	-paftools.js mapeval $(WINNOWMAP_PREF).paf | tee $(WINNOWMAP_PREF).eval
 
 eval_minimap: gen_reads
@@ -223,7 +223,7 @@ eval_shmap_on_datasets:
 	make eval_shmap REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
 
 eval_winnowmap_on_datasets:
-#	make eval_winnowmap REFNAME=t2tChrY DEPTH=10
+	make eval_winnowmap REFNAME=t2tChrY DEPTH=10
 	make eval_winnowmap REFNAME=chm13   DEPTH=1
 	make eval_winnowmap REFNAME=t2tChrY DEPTH=10  MEANLEN=24000
 	make eval_winnowmap REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
