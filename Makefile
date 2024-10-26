@@ -6,10 +6,10 @@ RELEASE_FLAGS = -O3 -DNDEBUG -flto
 CFLAGS = -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
 ifeq ($(DEBUG), 1)
     CFLAGS += $(DEBUG_FLAGS)
-	SHMAP_BIN = ./debug/map
+	SHMAP_BIN = ./debug/shmap
 else
     CFLAGS += $(RELEASE_FLAGS)
-	SHMAP_BIN = ./release/map
+	SHMAP_BIN = ./release/shmap
 endif
 LIBS = -lz
 DEPFLAGS = -MMD -MP
