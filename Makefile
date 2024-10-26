@@ -38,7 +38,7 @@ READSIM_REFNAME ?= $(REFNAME)
 
 K ?= 25
 R ?= 0.05
-T ?= 0.92
+T ?= 0.9
 
 M ?= 100000
 S ?= 30000
@@ -207,20 +207,26 @@ eval_mapquik: gen_reads
 	$(TIME_CMD) -o $(MAPQUIK_PREF).time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(MAPQUIK_PREF) | tee $(MAPQUIK_PREF).log
 	-paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
-eval_tools: eval_shmap eval_shmap_noprune eval_minimap eval_mapquik eval_blend #eval_winnowmap #eval_shmap_onesweep #eval_mm2 
-#eval_tools: eval_minimap eval_mapquik eval_blend
+#eval_tools: eval_shmap eval_shmap_noprune eval_minimap eval_mapquik eval_blend #eval_winnowmap #eval_shmap_onesweep #eval_mm2 
+eval_tools: eval_minimap eval_mapquik eval_blend eval_winnowmap
 
 eval_tools_on_datasets:
 #	make eval_tools REFNAME=t2tChrY DEPTH=10
 	make eval_tools REFNAME=chm13   DEPTH=1
-#	make eval_tools REFNAME=t2tChrY DEPTH=10  MEANLEN=24000
-#	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
+	make eval_tools REFNAME=t2tChrY DEPTH=10  MEANLEN=24000
+	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
 
 eval_shmap_on_datasets:
 	make eval_shmap REFNAME=t2tChrY DEPTH=10
-	make eval_shmap REFNAME=chm13   DEPTH=0.1
+	make eval_shmap REFNAME=chm13   DEPTH=1
 	make eval_shmap REFNAME=t2tChrY DEPTH=10 	MEANLEN=24000
 	make eval_shmap REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
+
+eval_winnowmap_on_datasets:
+#	make eval_winnowmap REFNAME=t2tChrY DEPTH=10
+	make eval_winnowmap REFNAME=chm13   DEPTH=1
+	make eval_winnowmap REFNAME=t2tChrY DEPTH=10  MEANLEN=24000
+	make eval_winnowmap REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
 
 #eval_tools_on_SV:
 #	make eval_tools REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
