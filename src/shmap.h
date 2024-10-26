@@ -212,18 +212,6 @@ class SHMapper : public Mapper {
 		} else {
 			return 0;
 		}
-
-		//if (abs(m.intersection - m.intersection2) == 0)
-		//	return 0;
-		//return sigmas_diff(m.intersection, m.intersection2) >= 0.2 ? 60 : 0;
-		//if (m.J < H->params.theta)
-		//	return 5;
-		//double bound = m.J * 0.9;
-		//double r = max(m.J2 - bound, 0.0) / (m.J - bound);  // low is good
-		//double J_fl = 60.0 * (1.0 - 1.0 * r);  // high is good
-		//return int(J_fl/10.0) * 10;
-		//return 60.0 * (1.0 - 1.0 * pow(J_second / J_best, 0.5) );
-		//return  60.0 * (1.0 - 1.0 * pow(r, 2.0));
 	}
 
 	void match_rest(qpos_t seed_matches, qpos_t P_sz, qpos_t lmax, qpos_t m, const Seeds &kmers, const Buckets &B, Hist &diff_hist, int seeds, int first_kmer_after_seeds, const unordered_map<hash_t, Seed> &p_ht,
@@ -261,23 +249,13 @@ class SHMapper : public Mapper {
 				total_matches += M.size();
 				++final_buckets;
 
-				//cerr << "seed matches=" << seed_matches << ", max_matches_in_bucket=" << max_matches_in_bucket << ", M.size()=" << M.size() << endl;
-				//assert((rpos_t)M.size() >= seed_matches);
-
 				H->T.start("sweep");
 					auto bucket_best = sweep(M, P_sz, lmax, m, kmers, b, diff_hist);
-					//if (best.J >= H->params.theta)
-					//cerr << "B=" << B.size() << ", bucket= " << bucket << ", best=" << best;
-					//if (best.J > lowest_sh + 1e-7) {
-					//	cerr << std::fixed << std::setprecision(5);
-					//	cerr << "lowest_sh=" << lowest_sh << ", best=" << best << ", b=" << b << ", seed_matches=" << seed_matches << ", seeds=" << seeds << ", i=" << i << ", best_idx=" << best_idx << ", best2_idx=" << best2_idx << endl;
-					//}
 					assert(bucket_best.J <= lowest_sh + 1e-7);
 					if (bucket_best.J >= H->params.theta)
 						maps.push_back(bucket_best);
 				H->T.stop("sweep");
 				
-				//cerr << "Bucket " << b << " (" << seed_matches << " matches) has " << maps.size() << " good mappings" << endl;
 				for (; maps_idx < static_cast<int>(maps.size()); ++maps_idx) {
 					for (int i = 0; i < 4; ++i) {
 						if (bests_idx[i] == -1 || maps[bests_idx[i]].J < maps[maps_idx].J) {
@@ -308,25 +286,9 @@ class SHMapper : public Mapper {
 				best_J = max(best_J, bucket_best.J);
 				if (best2_idx != -1) best_J2 = max(best_J2, maps[best2_idx].J);
 				assert(best_idx == -1 || fabs(maps[best_idx].J - best_J) < 1e-7);
-
-				//if (best2_idx != -1 && fabs(maps[best2_idx].J - best_J2) >= 1e-7) {
-				//	cerr << std::fixed << std::setprecision(4);
-				//	cerr << "best_idx: " << best_idx << ", best2_idx: " << best2_idx << ", best_J: " << best_J << ", best_J2: " << best_J2 << endl;
-				//	for (int i=0; i<4; ++i) {
-				//		cerr << "bests_idx[" << i << "] = " << bests_idx[i];
-				//		if (bests_idx[i] != -1) cerr << ", J=" << maps[bests_idx[i]].J << ", mapping=" << maps[bests_idx[i]];
-				//		cerr << endl;
-				//	}
-				//	cerr << "bucket_best: " << bucket_best << endl;
-				//	cerr << "maps[best2_idx]: " << maps[best2_idx] << endl;
-				//}
-				//assert(best2_idx == -1 || fabs(maps[best2_idx].J - best_J2) < 1e-7);
-
-				//assert(best2_idx == -1 || abs(maps[best_idx].bucket - maps[best2_idx].bucket) > 1);
 			}
 		}
 		assert(best_idx != -1 || maps.empty());
-		//cerr << "read " << query_id << ", seeded buckets: " << B.size() << ", final buckets: " << final_buckets.size() << ", maps.size(): " << maps.size() << ", best_idx: " << best_idx << ", best2_idx: " << best2_idx << endl;
 		
 		int lost_on_pruning = (best_idx == -1);
 		H->C.inc("final_buckets", final_buckets);
@@ -602,193 +564,3 @@ class SHMapper : public Mapper {
 };
 
 }  // namespace sweepmap
-
-//	double covered_frac(rpos_t bucket_a, rpos_t bucket_b, rpos_t gt_a, rpos_t gt_b) {
-//		return 1.0*max(0, min(bucket_b, gt_b) - max(bucket_a, gt_a)) / (gt_b - gt_a);
-//	}
-	
-	// TODO: works only in original coordinates
-//	bool is_safe(const string &query_id, const vector<pair<int,int>> &potential_buckets, int lmax, int *gt_a, int *gt_b) {
-//		std::vector<std::string> tokens;
-//		std::stringstream ss(query_id);
-//		std::string token;
-//
-//		while (std::getline(ss, token, '!'))
-//			tokens.push_back(token);
-//
-//		if (tokens.size() < 4)
-//			return true;
-//
-//		*gt_a = std::stoi(tokens[2]);
-//		*gt_b = std::stoi(tokens[3]) + 1;
-//
-//		//cerr << "safety check: " << query_id << " " << *gt_a << " " << *gt_b << " among " << potential_buckets.size() << " buckets." << endl;
-//		for (const auto &[b, matches]: potential_buckets) {
-//			int bucket_a = b*lmax;
-//			int bucket_b = (b+2)*lmax;
-//			//if (bucket_a <= *gt_a && *gt_b <= bucket_b)
-//			//cerr << "safety check: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
-//			if (covered_frac(bucket_a, bucket_b, *gt_a, *gt_b) >= 0.9) {
-//				//cerr << "SAFE: " << query_id << " " << bucket_a << " " << bucket_b << " " << *gt_a << " " << *gt_b << endl;
-//				return true;
-//			}
-//		}
-//		return false;
-//	}
-
-//	int mapq_ed(int ed_best, int ed_second) {
-//		if (ed_best == -1)
-//			return 0;
-//		if (ed_second == -1)
-//			return 60;
-//		assert(ed_best <= ed_second);
-//		double bound = ed_best * 1.25;
-//		double r = max((bound - ed_second) / (bound - ed_best), 0.0);  // small r is good
-//		assert(r <= 1.0);
-//		return int(60.0 * (1.0 - 1.0 * r));  // big score is good
-//	}
-	
-//	int edit_distance(int b, const char *P, const pos_t P_sz, int lmax) {
-//		int max_ed = -1;
-//		char *s = tidx.T[0].seq.c_str() + (b*lmax);
-//		int S_sz = 2*lmax;
-//		auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0);
-//		EdlibAlignResult result = edlibAlign(P, P_sz, s, S_sz, config);
-//		assert(result.status == EDLIB_STATUS_OK);
-//		int ed = result.editDistance;
-//		
-//		//string cigar = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_STANDARD);
-//		//cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << ", mapping: " << *mapping << endl;
-//		//cerr << cigar << endl;
-//		edlibFreeAlignResult(result);
-//		return ed;
-//	}
-
-	// returns cigar
-//	string add_edit_distance(Mapping *mapping, const char *P, const pos_t P_sz) {
-//		int max_ed = 1000; // -1 for none // TODO: make it a function of theta
-//		int delta = 10000;  // TODO: remove delta
-//
-//		auto segm_id = mapping->segm_id;
-//		int S_a = mapping->T_l, S_b = mapping->T_r;
-//		char strand = mapping->strand;
-//		auto &ref = tidx.T[segm_id].seq;
-//		
-//		// TODO: remove
-//		S_a = max(0, S_a - delta);
-//		S_b = min((int)ref.size()-1, S_b + delta);
-//		
-//		S_a -= H->params.k + 1;
-//		assert(S_a >= 0 && S_a < (int)ref.size());
-//		assert(S_b >= 0 && S_b < (int)ref.size());
-//		
-//		int S_sz = S_b - S_a;
-//		const char *s;
-//		string s_rev;
-//		if (strand == '+')
-//			s = ref.c_str() + S_a;
-//		else {
-//			assert(strand == '-');
-//			s_rev = Mapping::reverseComplement(ref.substr(S_a, S_sz));
-//			s = s_rev.c_str();
-//		}
-//
-//		// edlib query: s
-//		// edlib target: p
-//		//auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
-//		auto config = edlibNewAlignConfig(max_ed, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0);
-//		//EdlibAlignResult result = edlibAlign(s, S_sz, P, P_sz, config);
-//		EdlibAlignResult result = edlibAlign(P, P_sz, s, S_sz, config);
-//		assert(result.status == EDLIB_STATUS_OK);
-//		mapping->ed = result.editDistance;
-//		
-//		string cigar = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_STANDARD);
-//		//cerr << "S_sz=" << S_sz << ", P_sz=" << P_sz << ", edit distance: " << result.editDistance << ", mapping: " << *mapping << endl;
-//		//cerr << cigar << endl;
-//		edlibFreeAlignResult(result);
-//		return cigar;
-//	}
-				//int best_ed_idx = -1, best2_ed_idx = -1; 
-				//if (use_ed) {
-				//	for (int i=0; i < (int)maps.size(); ++i) {
-				//		auto &mapping = maps[i];
-				//		add_edit_distance(&mapping, P, P_sz, m, kmers);
-				//		if (mapping.ed != -1 && (best_ed_idx == -1 || mapping.ed < maps[best_ed_idx].ed)) {
-				//			best2_ed_idx = best_ed_idx;
-				//			best_ed_idx = i;
-				//		} else if (mapping.ed != -1 && (best2_ed_idx == -1 || mapping.ed > maps[best2_ed_idx].ed)) {
-				//			best2_ed_idx = i;
-				//		}
-				//	}
-				//}
-
-	//						if (best2_idx != -1 && final_mapping.mapq == 0) {
-	//							string cigar1, cigar2;
-	//							cigar1 = add_edit_distance(&maps[best_idx], P, P_sz, m, kmers);
-	//							cigar2 = add_edit_distance(&maps[best2_idx], P, P_sz, m, kmers);
-	//							if (maps[best_idx].ed != maps[best2_idx].ed) {
-	//								cerr << endl;
-	//								cerr << "mapq = 0 for read " << query_id << endl;
-	//								cerr << maps[best_idx] << " " << cigar1 << endl;
-	//								cerr << maps[best2_idx] << " " << cigar2 << endl;
-	//							}
-	//						}
-	//				int gt_a, gt_b;
-	//				lost_on_seeding = !is_safe(query_id, B_vec, lmax, &gt_a, &gt_b);
-	//				if (!is_safe(query_id, B_vec, lmax, &gt_a, &gt_b))
-	//					cerr << "Before bucket pruning, ground-truth mapping is lost: query_id=" << query_id << endl; 
-
-//							if (use_ed) {
-	//							//cerr << "best_ed_idx=" << best_ed_idx << " best2_ed_idx=" << best2_ed_idx << " final_mapping.ed=" << final_mapping.ed << endl;
-	//							assert(best_ed_idx != -1);
-	//							assert(final_mapping.ed != -1);
-	//							final_mapping.ed2 = best2_ed_idx == -1 ? -1 : maps[best2_ed_idx].ed;
-	//							final_mapping.mapq = mapq_ed(final_mapping.ed, final_mapping.ed2);
-	//							//if (final_mapping.mapq > 0)
-	//								final_mappings.push_back(final_mapping);
-//							} else {
-	//				if (maps.size() == 1) { // && maps.front().mapq > 0) {
-	//					if (!is_safe(query_id, final_buckets, lmax, &gt_a, &gt_b)) {
-	//						cerr << "After edit distance, ground-truth mapping is lost: query_id=" << query_id << endl;
-	//						//cerr << "         mapq: " << maps.front().mapq << endl;
-	//						if (best_idx != -1) {
-	//							int bb = maps[best_idx].bucket;
-	//							cerr << "         best: " << best_idx <<  ", bucket=" << bb << "[" << bb*lmax << ", " << (bb+2)*lmax << ")"; if (best_idx != -1) cerr << ", " << std::setprecision(5) << maps[best_idx] << endl; else cerr << endl;
-	//						}
-	//						if (best2_idx != -1) {
-	//							int bb2 = maps[best2_idx].bucket;
-	//							cerr << "  best2_idx: " << best2_idx << ", bucket=" << bb2 << "[" << bb2*lmax << ", " << (bb2+2)*lmax << ")"; if (best2_idx != -1) cerr << ", " << std::setprecision(5) << maps[best2_idx] << endl; else cerr << endl;
-	//						}
-	//					} else
-	//						lost_on_pruning = 0;
-	//				}
-
-			
-//	void no_sweep(const vector<Match> &B, const qpos_t P_sz, qpos_t lmax, const qpos_t m, const Seeds &kmers, vector<Mapping> *maps, rpos_t bucket, Hist diff_hist) {
-//		int intersection = 0;
-//		int same_strand_seeds = 0;
-//		//Mapping best;
-//		auto l = B.begin(), r = B.begin();
-//		
-//		for(auto it = B.begin(); it != B.end(); ++it) {
-//			if (it->hit.tpos < l->hit.tpos) l = it;
-//			if (it->hit.tpos > r->hit.tpos) r = it;
-//
-//			same_strand_seeds += it->is_same_strand() ? +1 : -1;
-//			if (--diff_hist[it->seed.kmer.h] >= 0)
-//				++intersection;
-//		}
-//
-//		double J = 1.0*intersection / m;
-//		assert(J <= 1.0);
-//		Mapping mapping(H->params.k, P_sz, m, l->hit.r, r->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, r, bucket);
-//		
-//		//if (best.J >= H->params.theta)
-//		if (mapping.J >= 0)
-//			maps->push_back(mapping);
-//	}
-
-
-    //using Kmer = Seed;
-//	using hist_t = vector<int>;
-//	using Intervals = vector<pair<int, int>>;
