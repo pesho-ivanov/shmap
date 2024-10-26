@@ -228,6 +228,6 @@ struct params_t {
 };
 
 // seq->name.s, seq->comment.l, seq->comment.s, seq->seq.s, seq->qual.l
-void read_fasta_klib(const std::string& filename, std::function<void(kseq_t*)> callback);
+void read_fasta_klib(const std::string& filename, std::function<void(const std::string&, const std::string&)> callback);
 
 } // namespace sweepmap

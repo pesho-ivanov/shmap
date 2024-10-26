@@ -2,13 +2,15 @@
 
 namespace sweepmap {
 
-void read_fasta_klib(const std::string& filename, std::function<void(kseq_t*)> callback) {
+void read_fasta_klib(const std::string& filename, std::function<void(const std::string&, const std::string&)> callback) {
     gzFile fp = gzopen(filename.c_str(), "r");
     kseq_t *seq = kseq_init(fp);
     int l;
 
     while ((l = kseq_read(seq)) >= 0) {
-        callback(seq);
+        string query_id = seq->name.s;
+        string P = seq->seq.s;
+        callback(query_id, P);
     }
 
     //if (l != -1)  // -1  end of file; do nothing

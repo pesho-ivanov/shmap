@@ -140,13 +140,10 @@ public:
 		}
 	}
 
-	void add_segment(const kseq_t *seq, const sketch_t& sketch) {
-		string segm_name = seq->name.s;
-		string segm_seq = seq->seq.s;
-		rpos_t segm_size = seq->seq.l;
-		T.push_back(RefSegment(sketch, segm_name, segm_seq, segm_size));
+	void add_segment(const string &segm_name, const string &segm_seq, const sketch_t& sketch) {
+		T.push_back(RefSegment(sketch, segm_name, segm_seq, segm_seq.size()));
 		H->C.inc("segments");
-		H->C.inc("total_nucls", segm_size);
+		H->C.inc("total_nucls", segm_seq.size());
 		populate_h2pos(sketch, T.size()-1);
 	}
 
@@ -156,14 +153,14 @@ public:
 		H->T.start("indexing");
 		cerr << "Indexing " << H->params.tFile << "..." << endl;
 		H->T.start("index_reading");
-		read_fasta_klib(H->params.tFile, [this](kseq_t *seq) {
+		read_fasta_klib(H->params.tFile, [this](const string &segm_name, const string &T) {
 			H->T.stop("index_reading");
 			H->T.start("index_sketching");
-			sketch_t t = H->sketcher.sketch(seq->seq.s);
+			sketch_t t = H->sketcher.sketch(T);
 			H->T.stop("index_sketching");
 
 			H->T.start("index_initializing");
-			add_segment(seq, t);
+			add_segment(segm_name, T, t);
 			H->T.stop("index_initializing");
 
 			H->T.start("index_reading");

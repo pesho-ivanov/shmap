@@ -172,6 +172,7 @@ class SHMapper : public Mapper {
 				thr2 = maps[bests_idx[i]].J;
 				break;
 			}
+//		double thr2 = best_idx == -1 ? H->params.theta : maps[best_idx].J;
 
 		if (hseed(m, seeds, max_matches) < thr2)
 			return false;
@@ -245,18 +246,19 @@ class SHMapper : public Mapper {
 		H->T.start("mapping");
 		H->T.start("query_reading");
 
-		read_fasta_klib(pFile, [this](kseq_t *seq) {
+		read_fasta_klib(pFile, [this](const string &query_id, const string &P) {
 			H->C.inc("reads");
 			H->T.stop("query_reading");
 			H->T.start("query_mapping");
 				H->T.start("sketching");
-					const char *P = seq->seq.s;
+					//const char *P = seq->seq.s;
 					sketch_t p = H->sketcher.sketch(P);
 					H->T.stop("sketching");
 
 				H->T.start("prepare");
-					char *query_id = seq->name.s;
-					qpos_t P_sz = (qpos_t)seq->seq.l;
+					//char *query_id = seq->name.s;
+					//qpos_t P_sz = (qpos_t)seq->seq.l;
+					qpos_t P_sz = P.size();
 
 					H->C.inc("read_len", P_sz);
 					Timer read_mapping_time;  // TODO: change to H->T.start
@@ -485,7 +487,7 @@ class SHMapper : public Mapper {
 							m.seed_matches = seed_matches;
 							m.seeded_buckets = seeded_buckets;
 							m.final_buckets = final_buckets.size();
-							m.query_id = query_id;
+							m.query_id = query_id.c_str();
 							m.segm_name = segm.name.c_str();
 							m.segm_sz = segm.sz;
 
@@ -552,7 +554,7 @@ class SHMapper : public Mapper {
 		cerr << " |  | seeds:                  " << H->C.frac("kmers_seeds", "reads") << " (" << H->C.perc("kmers_seeds", "kmers") << "%)" << endl;
 		cerr << " | Matches:               " << H->C.frac("total_matches", "reads") << " p/ read" << endl;
 		cerr << " |  | seed matches:           " << H->C.frac("seed_matches", "reads") << " (" << H->C.perc("seed_matches", "total_matches") << "%)" << endl;
-		cerr << " |  | in reported mappings:   " << H->C.frac("matches_in_reported_mappings", "reads") << " (match inefficiency: " << H->C.frac("total_matches", "matches_in_reported_mappings") << "x less)" << endl;
+		cerr << " |  | in reported mappings:   " << H->C.frac("matches_in_reported_mappings", "reads") << " (match inefficiency: " << H->C.frac("total_matches", "matches_in_reported_mappings") << "x)" << endl;
 		cerr << " |  | possible matches:       " << H->C.frac("possible_matches", "reads") << " (" <<H->C.frac("possible_matches", "total_matches") << "x)" << endl;
 //		cerr << " |  | frequent:               " << H->C.count("matches_freq") << " (" << H->C.perc("matches_freq", "total_matches") << "%)" << endl;
 //		cerr << " |  | Seed h. reduction:      " << H->C.frac("possible_matches", "seed_matches") << "x" << endl;
