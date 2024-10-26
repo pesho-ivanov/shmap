@@ -240,6 +240,7 @@ class SHMapper : public Mapper {
 		H->C.inc("total_edit_distance", 0);
 		H->C.inc("intersection_diff", 0);
 		H->C.inc("mapq60", 0);
+		H->C.inc("matches_in_reported_mappings", 0);
 
 		H->T.start("mapping");
 		H->T.start("query_reading");
@@ -268,14 +269,14 @@ class SHMapper : public Mapper {
 
 					unordered_map<hash_t, Seed> p_ht;
 					Hist diff_hist;
-					rpos_t potential_matches(0);
+					rpos_t possible_matches(0);
 					for (const auto kmer: kmers) {
 						p_ht.insert(make_pair(kmer.kmer.h, kmer));
 						//diff_hist[kmer.kmer.h] = 1;
 						diff_hist[kmer.kmer.h] = kmer.occs_in_p;
-						potential_matches += kmer.hits_in_T;
+						possible_matches += kmer.hits_in_T;
 					}
-					H->C.inc("potential_matches", potential_matches);
+					H->C.inc("possible_matches", possible_matches);
 
 					qpos_t lmax = m/0.8;
 					//qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
@@ -345,6 +346,7 @@ class SHMapper : public Mapper {
 						}
 						seeds += seed.occs_in_p;
 					}
+					seed_matches *= 2;  // since we match each seed to 2 buckets
 					seeded_buckets = B.size();
 					H->C.inc("seeded_buckets", seeded_buckets);
 					H->C.inc("seed_matches", seed_matches);
@@ -476,6 +478,7 @@ class SHMapper : public Mapper {
 							Mapping &m = maps[best_idx];
 
 							const auto &segm = tidx.T[m.segm_id];
+							m.seeds = S;
 							m.total_matches = total_matches;
 							m.max_seed_matches = max_seed_matches;
 							m.seed_matches = seed_matches;
@@ -501,6 +504,7 @@ class SHMapper : public Mapper {
 
 							//if (m.mapq > 0)
 								final_mappings.push_back(m);
+							H->C.inc("matches_in_reported_mappings", m.intersection);
 						}
 					}
 
@@ -546,10 +550,11 @@ class SHMapper : public Mapper {
 		cerr << " |  | unique:                 " << H->C.frac("kmers_unique", "reads") << " (" << H->C.perc("kmers_unique", "kmers") << "%)" << endl;
 		cerr << " |  | seeds:                  " << H->C.frac("kmers_seeds", "reads") << " (" << H->C.perc("kmers_seeds", "kmers") << "%)" << endl;
 		cerr << " | Matches:               " << H->C.frac("total_matches", "reads") << " p/ read" << endl;
-		cerr << " |  | potential_matches:      " << H->C.frac("potential_matches", "reads") << " (" <<H->C.frac("potential_matches", "total_matches") << "x)" << endl;
 		cerr << " |  | seed matches:           " << H->C.frac("seed_matches", "reads") << " (" << H->C.perc("seed_matches", "total_matches") << "%)" << endl;
+		cerr << " |  | in reported mappings:   " << H->C.frac("matches_in_reported_mappings", "reads") << " (" << H->C.frac("total_matches", "matches_in_reported_mappings") << "x less)" << endl;
+		cerr << " |  | possible_matches:       " << H->C.frac("possible_matches", "reads") << " (" <<H->C.frac("possible_matches", "total_matches") << "x)" << endl;
 //		cerr << " |  | frequent:               " << H->C.count("matches_freq") << " (" << H->C.perc("matches_freq", "total_matches") << "%)" << endl;
-//		cerr << " |  | Seed h. reduction:      " << H->C.frac("potential_matches", "seed_matches") << "x" << endl;
+//		cerr << " |  | Seed h. reduction:      " << H->C.frac("possible_matches", "seed_matches") << "x" << endl;
 		//cerr << " | Seed limit reached:    " << H->C.count("seeds_limit_reached") << " (" << H->C.perc("seeds_limit_reached", "reads") << "%)" << endl;
 		//cerr << " | Matches limit reached: " << H->C.count("matches_limit_reached") << " (" << H->C.perc("matches_limit_reached", "reads") << "%)" << endl;
 		//cerr << " | Spurious matches:      " << H->C.count("spurious_matches") << " (" << H->C.perc("spurious_matches", "matches") << "%)" << endl;

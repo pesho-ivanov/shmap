@@ -126,13 +126,14 @@ struct Mapping {
 	char strand;    // '+' or '-'
 	bool unreasonable;  // reserved for filtering matches
 	std::vector<Match>::const_iterator l, r;
-	qpos_t ed;         // edit distance
-	qpos_t ed2;         // second best edit distance
+//	qpos_t ed;         // edit distance
+//	qpos_t ed2;         // second best edit distance
 
 	// internal stats
-	rpos_t total_matches;   // number of matches of all kmers
+	qpos_t seeds;               // number of seeds before pruning
 	rpos_t max_seed_matches;// number of matches of the most frequent seed
 	rpos_t seed_matches;    // number of matches of seeds
+	rpos_t total_matches;   // number of matches of all kmers
 	rpos_t seeded_buckets;     // the initial number of buckets
 	rpos_t final_buckets;   // the number of buckets after pruning with all kmers
 	bucket_t bucket;			 // the bucket where the mapping is found
@@ -152,13 +153,14 @@ struct Mapping {
 		segm_sz = -1;
 		s_sz = r->hit.tpos - l->hit.tpos + 1;
 		mapq = 255;
-		ed = -1;
-		ed2 = -1;
+//		ed = -1;
+//		ed2 = -1;
 		strand = same_strand_seeds > 0 ? '+' : '-';
 		P_start = 0;
 		P_end = P_sz-1;
 
 		// stats
+		seeds = -1;
 		total_matches = -1;
 		max_seed_matches = -1;
 		seed_matches = -1;
@@ -264,8 +266,9 @@ struct Mapping {
 			<< "\t" << "J:f:"			<< mapping.J   // Similarity [0; 1]
 			<< "\t" << "J2:f:"			<< mapping.J2   // second best mapping similarity [0; 1]
 			<< "\t" << "Jdiff:f:"		<< mapping.J - mapping.J2   // second best mapping similarity [0; 1]
-			<< "\t" << "ed:i:"			<< mapping.ed
-			<< "\t" << "ed2:i:"			<< mapping.ed2
+//			<< "\t" << "ed:i:"			<< mapping.ed
+//			<< "\t" << "ed2:i:"			<< mapping.ed2
+			<< "\t" << "Seeds:i:"		<< mapping.seeds
 			<< "\t" << "MSeedmax:i:"	<< mapping.max_seed_matches
 			<< "\t" << "MSeed:i:"		<< mapping.seed_matches
 			<< "\t" << "M:i:"			<< mapping.total_matches
