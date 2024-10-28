@@ -215,17 +215,14 @@ class SHMapper : public Mapper {
 		}
 	}
 
-	void match_rest(qpos_t seed_matches, qpos_t P_sz, qpos_t lmax, qpos_t m, const Seeds &kmers, const Buckets &B, Hist &diff_hist, int seeds, int first_kmer_after_seeds, const unordered_map<hash_t, Seed> &p_ht,
+	void match_rest(qpos_t seed_matches, qpos_t P_sz, qpos_t lmax, qpos_t m, const Seeds &kmers, const vector<Bucket> &B_vec, Hist &diff_hist, int seeds, int first_kmer_after_seeds, const unordered_map<hash_t, Seed> &p_ht,
 			vector<Mapping> &maps, int &total_matches, int &best_idx, int &best2_idx, int &final_buckets, double thr_init, int forbidden_idx) {
 		double best_J = -1.0, best_J2 = -1.0;
 		total_matches = seed_matches;
-		vector<Bucket> B_vec(B.begin(), B.end());
-		sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 
 		int lost_on_seeding = (0);
 		H->C.inc("lost_on_seeding", lost_on_seeding);
 
-		best_idx=-1, best2_idx=-1;
 		int bests_idx[4] = {-1, -1, -1, -1};  // best_idx[0] -- best bucket, best_idx[1] -- best bucket size, the rest are the 3 next best (at least one of them will not be adjacent to best_idx[0])
 		int maps_idx = 0;
 		final_buckets = 0;
@@ -430,8 +427,10 @@ class SHMapper : public Mapper {
 
 				H->T.start("match_rest");
 					vector<Mapping> maps;
-					int total_matches, best_idx, best2_idx, final_buckets;
-					match_rest(seed_matches, P_sz, lmax, m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, best2_idx, final_buckets, H->params.theta, -1);
+					vector<Bucket> B_vec(B.begin(), B.end());
+					sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
+					int total_matches, best_idx=-1, best2_idx=-1, final_buckets;
+					match_rest(seed_matches, P_sz, lmax, m, kmers, B_vec, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, best2_idx, final_buckets, H->params.theta, -1);
 				H->T.stop("match_rest");
 			H->T.stop("query_mapping");
 
