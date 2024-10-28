@@ -161,19 +161,13 @@ class SHMapper : public Mapper {
 	}
 
 	bool seed_heuristic_pass(const vector<Mapping> &maps, const Seeds &kmers, qpos_t lmax, qpos_t m, bucket_t b, rpos_t max_matches, qpos_t i, qpos_t seeds,
-			int best_idx, int best2_idx, int bests_idx[4], double *lowest_sh, double thr_init) {
+			int best_idx, double *lowest_sh, double thr_init) {
 		if (H->params.no_bucket_pruning)
 			return true;
 
 		*lowest_sh = 1.0; // should only get lower
 
-		double thr2 = thr_init; //H->params.theta;  // safe threshold for the second best
-		for (int i=3; i>=1; i--)
-			if (bests_idx[i] != -1) {
-				thr2 = maps[bests_idx[i]].J;
-				break;
-			}
-//		double thr2 = best_idx == -1 ? H->params.theta : maps[best_idx].J;
+		double thr2 = best_idx == -1 ? thr_init : maps[best_idx].J-0.015;
 
 		if (hseed(m, seeds, max_matches) < thr2)
 			return false;
@@ -184,7 +178,6 @@ class SHMapper : public Mapper {
 			seeds += kmers[i].occs_in_p;
 			if (tidx.matches_in_bucket(kmers[i], b, lmax))
 				max_matches += kmers[i].occs_in_p;
-			//double thr2 = best2_idx == -1 ? H->params.theta : maps[best2_idx].J; 
 			double sh = hseed(m, seeds, max_matches);
 			assert(sh <= *lowest_sh);
 			*lowest_sh = min(*lowest_sh, sh);	
@@ -216,24 +209,20 @@ class SHMapper : public Mapper {
 	}
 
 	void match_rest(qpos_t seed_matches, qpos_t P_sz, qpos_t lmax, qpos_t m, const Seeds &kmers, const vector<Bucket> &B_vec, Hist &diff_hist, int seeds, int first_kmer_after_seeds, const unordered_map<hash_t, Seed> &p_ht,
-			vector<Mapping> &maps, int &total_matches, int &best_idx, int &best2_idx, int &final_buckets, double thr_init, int forbidden_idx) {
+			vector<Mapping> &maps, int &total_matches, int &best_idx, int &final_buckets, double thr_init, int forbidden_idx) {
 		double best_J = -1.0, best_J2 = -1.0;
 		total_matches = seed_matches;
 
 		int lost_on_seeding = (0);
 		H->C.inc("lost_on_seeding", lost_on_seeding);
 
-		int bests_idx[4] = {-1, -1, -1, -1};  // best_idx[0] -- best bucket, best_idx[1] -- best bucket size, the rest are the 3 next best (at least one of them will not be adjacent to best_idx[0])
-		int maps_idx = 0;
 		final_buckets = 0;
 		H->T.start("seed_heuristic"); H->T.stop("seed_heuristic");  // init
 		H->T.start("match_collect"); H->T.stop("match_collect");
 		H->T.start("sweep"); H->T.stop("sweep");
 		for (auto &[b, seed_matches]: B_vec) {
-			if (forbidden_idx != -1 && b.segm_id == maps[forbidden_idx].bucket.segm_id && abs(b.b - maps[forbidden_idx].bucket.b) <= 1)
-				continue;
 			double lowest_sh;
-			if (seed_heuristic_pass(maps, kmers, lmax, m, b, seed_matches, first_kmer_after_seeds, seeds, best_idx, best2_idx, bests_idx, &lowest_sh, thr_init)) {
+			if (seed_heuristic_pass(maps, kmers, lmax, m, b, seed_matches, first_kmer_after_seeds, seeds, best_idx, &lowest_sh, thr_init)) {
 				H->T.start("match_collect");
 					Matches M;
 					for (rpos_t i = b.b*lmax; i < std::min((b.b+2)*lmax, (rpos_t)tidx.T[b.segm_id].kmers.size()); i++) {
@@ -252,40 +241,16 @@ class SHMapper : public Mapper {
 				H->T.start("sweep");
 					auto bucket_best = sweep(M, P_sz, lmax, m, kmers, b, diff_hist);
 					assert(bucket_best.J <= lowest_sh + 1e-7);
-					if (bucket_best.J >= H->params.theta)
+					if (bucket_best.J >= H->params.theta) {
 						maps.push_back(bucket_best);
-				H->T.stop("sweep");
-				
-				for (; maps_idx < static_cast<int>(maps.size()); ++maps_idx) {
-					for (int i = 0; i < 4; ++i) {
-						if (bests_idx[i] == -1 || maps[bests_idx[i]].J < maps[maps_idx].J) {
-							for (int j=3; j>=i+1; --j)
-								bests_idx[j] = bests_idx[j-1];
-							bests_idx[i] = maps_idx;
-
-							best_idx = bests_idx[0];
-							int j;
-							for (j=1; j<4; ++j) {
-								assert(bests_idx[j] == -1 || maps[ bests_idx[j-1] ].J >= maps[ bests_idx[j] ].J);
-								if (bests_idx[j] == -1 || overlap(maps[bests_idx[j]], maps[best_idx]) < 0.5) {
-									best2_idx = bests_idx[j];
-									break;
-								}
+						if (bucket_best.J > best_J) {
+							if (forbidden_idx == -1 || overlap(maps.back(), maps[forbidden_idx]) < 0.5) {
+								best_J = max(best_J, bucket_best.J);
+								best_idx = maps.size()-1;
 							}
-							assert(j < 4);
-							break;
 						}
 					}
-				}
-				for (int i=0; i<4; ++i) {
-					assert(bests_idx[i] == -1 || maps[bests_idx[i]].J >= 0);
-					assert(i==0 || bests_idx[i] == -1 || maps[bests_idx[i-1]].J >= maps[bests_idx[i]].J);
-				}
-				assert(best_idx == -1 || maps[best_idx].J >= bucket_best.J);
-
-				best_J = max(best_J, bucket_best.J);
-				if (best2_idx != -1) best_J2 = max(best_J2, maps[best2_idx].J);
-				assert(best_idx == -1 || fabs(maps[best_idx].J - best_J) < 1e-7);
+				H->T.stop("sweep");
 			}
 		}
 		assert(best_idx != -1 || maps.empty());
@@ -430,7 +395,10 @@ class SHMapper : public Mapper {
 					vector<Bucket> B_vec(B.begin(), B.end());
 					sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 					int total_matches, best_idx=-1, best2_idx=-1, final_buckets;
-					match_rest(seed_matches, P_sz, lmax, m, kmers, B_vec, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, best2_idx, final_buckets, H->params.theta, -1);
+					match_rest(seed_matches, P_sz, lmax, m, kmers, B_vec, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, H->params.theta, -1);
+					if (best_idx != -1) {
+						match_rest(seed_matches, P_sz, lmax, m, kmers, B_vec, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, maps[best_idx].J, best_idx);
+					}
 				H->T.stop("match_rest");
 			H->T.stop("query_mapping");
 
