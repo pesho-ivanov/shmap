@@ -160,13 +160,14 @@ class SHMapper : public Mapper {
 		return 1.0 - double(seeds - matches) / p;
 	}
 
-	bool seed_heuristic_pass(const vector<Mapping> &maps, const Seeds &kmers, qpos_t lmax, qpos_t m, bucket_t b, rpos_t max_matches, qpos_t i, qpos_t seeds, int best_idx, int best2_idx, int bests_idx[4], double *lowest_sh) {
+	bool seed_heuristic_pass(const vector<Mapping> &maps, const Seeds &kmers, qpos_t lmax, qpos_t m, bucket_t b, rpos_t max_matches, qpos_t i, qpos_t seeds,
+			int best_idx, int best2_idx, int bests_idx[4], double *lowest_sh, double thr_init) {
 		if (H->params.no_bucket_pruning)
 			return true;
 
 		*lowest_sh = 1.0; // should only get lower
 
-		double thr2 = H->params.theta;  // safe threshold for the second best
+		double thr2 = thr_init; //H->params.theta;  // safe threshold for the second best
 		for (int i=3; i>=1; i--)
 			if (bests_idx[i] != -1) {
 				thr2 = maps[bests_idx[i]].J;
@@ -215,7 +216,7 @@ class SHMapper : public Mapper {
 	}
 
 	void match_rest(qpos_t seed_matches, qpos_t P_sz, qpos_t lmax, qpos_t m, const Seeds &kmers, const Buckets &B, Hist &diff_hist, int seeds, int first_kmer_after_seeds, const unordered_map<hash_t, Seed> &p_ht,
-			vector<Mapping> &maps, int &total_matches, int &best_idx, int &best2_idx, int &final_buckets) {
+			vector<Mapping> &maps, int &total_matches, int &best_idx, int &best2_idx, int &final_buckets, double thr_init) {
 		double best_J = -1.0, best_J2 = -1.0;
 		total_matches = seed_matches;
 		vector<Bucket> B_vec(B.begin(), B.end());
@@ -233,7 +234,7 @@ class SHMapper : public Mapper {
 		H->T.start("sweep"); H->T.stop("sweep");
 		for (auto &[b, seed_matches]: B_vec) {
 			double lowest_sh;
-			if (seed_heuristic_pass(maps, kmers, lmax, m, b, seed_matches, first_kmer_after_seeds, seeds, best_idx, best2_idx, bests_idx, &lowest_sh)) {
+			if (seed_heuristic_pass(maps, kmers, lmax, m, b, seed_matches, first_kmer_after_seeds, seeds, best_idx, best2_idx, bests_idx, &lowest_sh, thr_init)) {
 				H->T.start("match_collect");
 					Matches M;
 					for (rpos_t i = b.b*lmax; i < std::min((b.b+2)*lmax, (rpos_t)tidx.T[b.segm_id].kmers.size()); i++) {
@@ -417,7 +418,7 @@ class SHMapper : public Mapper {
 						}
 						seeds += seed.occs_in_p;
 					}
-					seed_matches *= 2;  // since we match each seed to 2 buckets
+					//seed_matches *= 2;  // since we match each seed to 2 buckets
 					seeded_buckets = B.size();
 					H->C.inc("seeded_buckets", seeded_buckets);
 					H->C.inc("seed_matches", seed_matches);
@@ -428,7 +429,7 @@ class SHMapper : public Mapper {
 				H->T.start("match_rest");
 					vector<Mapping> maps;
 					int total_matches, best_idx, best2_idx, final_buckets;
-					match_rest(seed_matches, P_sz, lmax, m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, best2_idx, final_buckets);
+					match_rest(seed_matches, P_sz, lmax, m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, best2_idx, final_buckets, H->params.theta);
 				H->T.stop("match_rest");
 			H->T.stop("query_mapping");
 
