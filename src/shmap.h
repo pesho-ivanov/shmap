@@ -216,7 +216,7 @@ class SHMapper : public Mapper {
 	}
 
 	void match_rest(qpos_t seed_matches, qpos_t P_sz, qpos_t lmax, qpos_t m, const Seeds &kmers, const Buckets &B, Hist &diff_hist, int seeds, int first_kmer_after_seeds, const unordered_map<hash_t, Seed> &p_ht,
-			vector<Mapping> &maps, int &total_matches, int &best_idx, int &best2_idx, int &final_buckets, double thr_init) {
+			vector<Mapping> &maps, int &total_matches, int &best_idx, int &best2_idx, int &final_buckets, double thr_init, int forbidden_idx) {
 		double best_J = -1.0, best_J2 = -1.0;
 		total_matches = seed_matches;
 		vector<Bucket> B_vec(B.begin(), B.end());
@@ -233,6 +233,8 @@ class SHMapper : public Mapper {
 		H->T.start("match_collect"); H->T.stop("match_collect");
 		H->T.start("sweep"); H->T.stop("sweep");
 		for (auto &[b, seed_matches]: B_vec) {
+			if (forbidden_idx != -1 && b.segm_id == maps[forbidden_idx].bucket.segm_id && abs(b.b - maps[forbidden_idx].bucket.b) <= 1)
+				continue;
 			double lowest_sh;
 			if (seed_heuristic_pass(maps, kmers, lmax, m, b, seed_matches, first_kmer_after_seeds, seeds, best_idx, best2_idx, bests_idx, &lowest_sh, thr_init)) {
 				H->T.start("match_collect");
@@ -429,7 +431,7 @@ class SHMapper : public Mapper {
 				H->T.start("match_rest");
 					vector<Mapping> maps;
 					int total_matches, best_idx, best2_idx, final_buckets;
-					match_rest(seed_matches, P_sz, lmax, m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, best2_idx, final_buckets, H->params.theta);
+					match_rest(seed_matches, P_sz, lmax, m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, best2_idx, final_buckets, H->params.theta, -1);
 				H->T.stop("match_rest");
 			H->T.stop("query_mapping");
 
