@@ -41,7 +41,7 @@ class SHMapper : public Mapper {
 				++strike;
 				if (ppos == p.size()-1 || p[ppos].h != p[ppos+1].h) {
 					rpos_t hits_in_t = tidx.count(p[ppos].h);
-					if (hits_in_t > 0) {
+					if (hits_in_t > 0)
 						if (H->params.max_matches == -1 || hits_in_t <= H->params.max_matches) {
 							Seed el(p[ppos], hits_in_t, kmers.size());
 							//strike = 1; // comment out for Weighted metric
@@ -50,7 +50,6 @@ class SHMapper : public Mapper {
 							if (H->params.max_seeds != -1 && (rpos_t)kmers.size() >= H->params.max_seeds)  // TODO maybe account for occs_in_p
 								break;
 						}
-					}
 					strike = 0;
 				}
 			}
@@ -90,7 +89,7 @@ class SHMapper : public Mapper {
 		for (int i=1; i<(int)M.size(); i++)
 			assert(M[i-1].hit.tpos < M[i].hit.tpos);
 		assert(M.size() == 0 || (int)M.size() <= M.back().hit.tpos - M.front().hit.tpos + 1);
-		
+
 		// Increase the left point end of the window [l,r) one by one. O(matches)
 		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l) {
 			// Increase the right end of the window [l,r) until it gets out.
@@ -191,6 +190,8 @@ class SHMapper : public Mapper {
 	}
 	
 	double sigmas_diff(qpos_t X, qpos_t Y) {
+		if (X==-1) X=0;
+		if (Y==-1) Y=0;
 		return std::abs(X - Y) / std::sqrt(X + Y);
 	}
 
@@ -200,7 +201,7 @@ class SHMapper : public Mapper {
 		if (m.J2 < H->params.theta)
 			m.J2 = H->params.theta;
 		if (m.J - m.J2 > 0.015) {
-			if (abs(m.same_strand_seeds) < 200)
+			if (abs(m.same_strand_seeds) < m.intersection/2)
 				return 5;
 			return 60;
 		} else {
@@ -314,8 +315,9 @@ class SHMapper : public Mapper {
 					}
 					H->C.inc("possible_matches", possible_matches);
 
-					qpos_t lmax = m/0.8;
+					//qpos_t lmax = m/0.8;
 					//qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
+					qpos_t lmax = qpos_t(p.size() / H->params.theta);					// maximum length of a similar mapping
 					qpos_t S = qpos_t((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
 					Buckets B;  			// B[segment][b] -- #matched kmers[0...i] in [bl, (b+2)l)
 					qpos_t seeds = 0;
