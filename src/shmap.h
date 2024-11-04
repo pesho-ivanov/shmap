@@ -12,7 +12,6 @@
 #include "cmath"
 
 #include "edlib.h"
-//#include "phmap.hpp"
 #include <ankerl/unordered_dense.h>
 
 namespace sweepmap {
@@ -90,15 +89,12 @@ class SHMapper : public Mapper {
 			assert(M[i-1].hit.tpos < M[i].hit.tpos);
 		assert(M.size() == 0 || (int)M.size() <= M.back().hit.tpos - M.front().hit.tpos + 1);
 
-		// Increase the left point end of the window [l,r) one by one. O(matches)
-		for(auto l = M.begin(), r = M.begin(); l != M.end(); ++l) {
-			// Increase the right end of the window [l,r) until it gets out.
-			for(;  r != M.end()
+		auto l = M.begin(), r = M.begin();
+		for(; l != M.end(); ++l) {
+			for(;  r != M.end() && r->hit.tpos <= l->hit.tpos + lmax ; ++r) {
 				//&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
 				//&& r->hit.tpos + H->params.k <= l->hit.tpos + P_sz
 				//&& r->hit.r + H->params.k <= l->hit.r + P_sz
-				&& r->hit.tpos <= l->hit.tpos + lmax 
-				; ++r) {
 				assert(diff_hist.contains(r->seed.kmer.h));
 				if (--diff_hist[r->seed.kmer.h] >= 0) {
 					++intersection;
@@ -131,6 +127,7 @@ class SHMapper : public Mapper {
 			if (J > best.J)
 				best = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r), bucket);
 
+			//cerr << "l: " << l-M.begin() << ", r: " << r-M.begin() << endl;
 			assert(diff_hist.contains(l->seed.kmer.h));
 			if (++diff_hist[l->seed.kmer.h] >= 1) {
 				--intersection;
@@ -139,8 +136,10 @@ class SHMapper : public Mapper {
 
 			assert(intersection >= 0);
 		}
+		assert(l == M.end());
+		assert(r == M.end());
 		assert(intersection == 0);
-		assert(same_strand_seeds == 0);
+		//assert(same_strand_seeds == 0);
 		
 		return best;
 	}
@@ -210,8 +209,8 @@ class SHMapper : public Mapper {
 	}
 
 	void match_rest(qpos_t seed_matches, qpos_t P_sz, qpos_t lmax, qpos_t m, const Seeds &kmers, const vector<Bucket> &B_vec, Hist &diff_hist, int seeds, int first_kmer_after_seeds, const unordered_map<hash_t, Seed> &p_ht,
-			vector<Mapping> &maps, int &total_matches, int &best_idx, int &final_buckets, double thr_init, int forbidden_idx) {
-		double best_J = -1.0, best_J2 = -1.0;
+			vector<Mapping> &maps, int &total_matches, int &best_idx, int &final_buckets, double thr_init, int forbidden_idx, const string &query_id, int *lost_on_pruning) {
+		double best_J = -1.0;
 		total_matches = seed_matches;
 
 		int lost_on_seeding = (0);
@@ -224,6 +223,8 @@ class SHMapper : public Mapper {
 		for (auto &[b, seed_matches]: B_vec) {
 			double lowest_sh;
 			if (seed_heuristic_pass(maps, kmers, lmax, m, b, seed_matches, first_kmer_after_seeds, seeds, best_idx, &lowest_sh, thr_init)) {
+				if (do_overlap(query_id, b, lmax, tidx))
+					*lost_on_pruning = 0;
 				H->T.start("match_collect");
 					Matches M;
 					for (rpos_t i = b.b*lmax; i < std::min((b.b+2)*lmax, (rpos_t)tidx.T[b.segm_id].kmers.size()); i++) {
@@ -255,13 +256,89 @@ class SHMapper : public Mapper {
 			}
 		}
 		assert(best_idx != -1 || maps.empty());
-		
-		int lost_on_pruning = (best_idx == -1);
+
 		H->C.inc("final_buckets", final_buckets);
 		H->C.inc("final_mappings", maps.size());
-		H->C.inc("lost_on_pruning", lost_on_pruning);
 		H->C.inc("total_matches", total_matches);
 	}
+
+    struct ParsedQueryId {
+        bool valid;
+        string segm_id;
+        rpos_t start_pos;
+        rpos_t end_pos;
+		char strand;
+        
+        static ParsedQueryId parse(const string& query_id) {
+			// query_id is in the form "S1_21!NC_060948.1!57693539!57715501!+"
+            ParsedQueryId result{false, "", 0, 0, '?'};
+            
+            // Skip if query_id doesn't contain correct mapping info
+            if (query_id.find('!') == string::npos) return result;
+
+            // Split query_id on '!' character
+            vector<string> parts;
+            size_t start = 0;
+            size_t end = query_id.find('!');
+            while (end != string::npos) {
+                parts.push_back(query_id.substr(start, end - start));
+                start = end + 1;
+                end = query_id.find('!', start);
+            }
+            parts.push_back(query_id.substr(start));
+
+            // Need 5 parts: read_id, segment, start, end, strand
+            if (parts.size() != 5) return result;
+
+			result.segm_id = parts[1];
+            result.start_pos = stoll(parts[2]);
+            result.end_pos = stoll(parts[3]);
+			result.strand = parts[4][0];
+            result.valid = true;
+            
+            return result;
+        }
+    };
+
+    bool do_overlap(const string& query_id, const bucket_t& b, int lmax, const SketchIndex &tidx) {
+        auto parsed = ParsedQueryId::parse(query_id);
+        if (!parsed.valid) return false;
+		//cerr << "name: " << tidx.T[b.first.segm_id].name<< ", parsed.segm_id: " << parsed.segm_id << endl;
+		assert(b.segm_id >= 0 && b.segm_id < (rpos_t)tidx.T.size());
+		const auto &segm = tidx.T[b.segm_id];
+		if (segm.name == parsed.segm_id) {
+			rpos_t bucket_start_t = b.b * lmax;
+			rpos_t bucket_end_t = bucket_start_t + 2 * lmax;
+			assert(bucket_start_t >= 0 && bucket_start_t < (rpos_t)segm.kmers.size());
+			rpos_t bucket_start_T = segm.kmers[bucket_start_t].r;
+			//assert(bucket_end_t >= 0 && bucket_end_t < (rpos_t)segm.kmers.size());
+			rpos_t bucket_end_T = bucket_end_t < (rpos_t)segm.kmers.size() ? segm.kmers[bucket_end_t].r : segm.sz;
+
+//			cerr << "bucket_start_t: " << bucket_start_t << ", bucket_end_t: " << bucket_end_t << ", bucket_start_T: " << bucket_start_T << ", bucket_end_T: " << bucket_end_T << endl;
+			if (bucket_start_T < parsed.end_pos && bucket_end_T >= parsed.start_pos) {  // if overlap
+				return true;
+			}
+		}
+		return false;
+	}
+
+    bool lost_correct_mapping(const string& query_id, const Buckets& B, int lmax, const SketchIndex &tidx) {
+		bool res = true;
+
+        for (const auto& b : B)
+			if (do_overlap(query_id, b.first, lmax, tidx)) {
+				res = false;
+				break;
+			}
+
+//		cerr << "Parsed: valid=" << parsed.valid 
+//             << " segm_id=" << parsed.segm_id 
+//             << " start=" << parsed.start_pos 
+//             << " end=" << parsed.end_pos
+//             << " strand=" << parsed.strand
+//             << " res=" << res << endl;
+        return res;
+    }
 
 	void map(const string &pFile) {
 		cerr << "Mapping reads using SHmap..." << endl;
@@ -279,6 +356,8 @@ class SHMapper : public Mapper {
 		H->C.inc("intersection_diff", 0);
 		H->C.inc("mapq60", 0);
 		H->C.inc("matches_in_reported_mappings", 0);
+		H->C.inc("lost_on_seeding", 0);
+		H->C.inc("lost_on_pruning", 0);
 
 		H->T.start("mapping");
 		H->T.start("query_reading");
@@ -315,7 +394,6 @@ class SHMapper : public Mapper {
 					}
 					H->C.inc("possible_matches", possible_matches);
 
-					//qpos_t lmax = m/0.8;
 					//qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
 					qpos_t lmax = qpos_t(p.size() / H->params.theta);					// maximum length of a similar mapping
 					qpos_t S = qpos_t((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
@@ -390,18 +468,21 @@ class SHMapper : public Mapper {
 					H->C.inc("seed_matches", seed_matches);
 				H->T.stop("match_seeds");
 
-				//cerr << "seed matches=" << seed_matches << ", matches_in_B=" << matches_in_B << ", max_seed_matches=" << max_seed_matches << ", seeds=" << seeds << ", S=" << S << ", i=" << i << endl;
+				int lost_on_seeding = lost_correct_mapping(query_id, B, lmax, tidx);
+				H->C.inc("lost_on_seeding", lost_on_seeding);
 
+				int lost_on_pruning = 1;
 				H->T.start("match_rest");
 					vector<Mapping> maps;
 					vector<Bucket> B_vec(B.begin(), B.end());
 					sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 					int total_matches, best_idx=-1, best2_idx=-1, final_buckets;
-					match_rest(seed_matches, P_sz, lmax, m, kmers, B_vec, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, H->params.theta, -1);
+					match_rest(seed_matches, P_sz, lmax, m, kmers, B_vec, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, H->params.theta, -1, query_id, &lost_on_pruning);
 					if (best_idx != -1) {
-						match_rest(seed_matches, P_sz, lmax, m, kmers, B_vec, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, maps[best_idx].J, best_idx);
+						match_rest(seed_matches, P_sz, lmax, m, kmers, B_vec, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, maps[best_idx].J, best_idx, query_id, &lost_on_pruning);
 					}
 				H->T.stop("match_rest");
+				H->C.inc("lost_on_pruning", lost_on_pruning);
 			H->T.stop("query_mapping");
 
 			H->T.start("output");
