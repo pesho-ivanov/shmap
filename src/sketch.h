@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <iomanip>
 
 #include "../ext/edlib.h"
 #include "io.h"
@@ -137,6 +138,7 @@ struct Mapping {
 	double match_inefficiency;   // intersection / total_matches
 	rpos_t seeded_buckets;     // the initial number of buckets
 	rpos_t final_buckets;   // the number of buckets after pruning with all kmers
+	double FDR;			// false discovery rate: FP / PP
 	bucket_t bucket;			 // the bucket where the mapping is found
 	bucket_t bucket2;  // the bucket of the second best mapping
 	qpos_t intersection2; // number of matches in the second best mapping
@@ -167,6 +169,7 @@ struct Mapping {
 		seed_matches = -1;
 		seeded_buckets = -1;
 		final_buckets = -1;
+		FDR = -1.0;
 		match_inefficiency = -1.0;
 		J2 = -1.0;
 		intersection2 = -1;
@@ -277,6 +280,7 @@ struct Mapping {
 			<< "\t" << "Mineff:f:"		<< mapping.match_inefficiency
 			<< "\t" << "Bmax:i:"		<< mapping.seeded_buckets
 			<< "\t" << "Bfinal:i:"		<< mapping.final_buckets
+			<< "\t" << "FDR:f:"			<< std::fixed << std::setprecision(3) << mapping.FDR
 			<< "\t" << "b:s:"			<< mapping.bucket.segm_id << "," << mapping.bucket.b
 			<< "\t" << "b2:s:"			<< mapping.bucket2.segm_id << "," << mapping.bucket2.b
 			<< "\t" << "strand:i:"		<< mapping.same_strand_seeds
