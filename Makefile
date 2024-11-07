@@ -42,8 +42,16 @@ K ?= 25
 R ?= 0.05
 T ?= 0.60
 
+THETAS = 0.95 0.9 0.85 0.8 0.75 0.7 0.65 0.6 0.55 0.5  
+
+Ks = 14 16 18 20 22 24 26
+Rs = 0.01 0.05 0.1 0.15 0.2
+
 M ?= 100000
 S ?= 30000
+
+MAX_SEEDS = 10 30 100 300 1000 3000 10000
+MAX_MATCHES = 100 300 1000 3000 10000 30000 100000 300000
 
 K_SLOW ?= $(K)
 R_SLOW ?= $(R)
@@ -77,12 +85,6 @@ MM2_PREF           = $(ALLOUT_DIR)/mm2-fast/$(READS_PREFIX)/mm2-fast   # NOT USE
 BLEND_PREF         = $(ALLOUT_DIR)/blend/$(READS_PREFIX)/blend
 MAPQUIK_PREF       = $(ALLOUT_DIR)/mapquik/$(READS_PREFIX)/mapquik
 WINNOWMAP_PREF     = $(ALLOUT_DIR)/winnowmap/$(READS_PREFIX)/winnowmap
-
-MAX_SEEDS = 10 30 100 300 1000 3000 10000
-MAX_MATCHES = 100 300 1000 3000 10000 30000 100000 300000
-
-Ks = 14 16 18 20 22 24 26
-Rs = 0.01 0.05 0.1 0.15 0.2
 
 all: $(SHMAP_BIN)
 
@@ -160,6 +162,16 @@ eval_thinning: sweepmap gen_reads
 		done \
     done
 
+fdr_per_theta: $(SHMAP_BIN) gen_reads
+	@DIR=$(OUTDIR)/fdr_per_theta; \
+	mkdir -p $${DIR}; \
+	for t in $(THETAS); do \
+		f=$${DIR}/"shmap-T$${t}"; \
+		echo "Processing $${f}"; \
+		$(TIME_CMD) -o $${f}.time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $${f}.params -x -t $${t} -k $(K) -r $(R) 2> >(tee $${f}.log) >$${f}.paf; \
+		-paftools.js mapeval $${f}.paf | tee $${f}.eval; \
+	done
+
 eval_shmap: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_PREF))
 	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -x 2>/dev/null >/dev/null
@@ -236,6 +248,7 @@ eval_winnowmap_on_datasets:
 	make eval_winnowmap REFNAME=chm13   DEPTH=1
 	make eval_winnowmap REFNAME=t2tChrY DEPTH=10  MEANLEN=24000
 	make eval_winnowmap REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
+
 
 #eval_tools_on_SV:
 #	make eval_tools REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
