@@ -80,9 +80,9 @@ public:
 //		return false;
 //	}
 
-	bool matches_in_bucket(const Seed &s, const bucket_t b, qpos_t lmax) const {
-		rpos_t from = b.b * lmax;
-		rpos_t to = (b.b + 2) * lmax;
+	bool matches_in_bucket(const Seed &s, const bucket_t b, qpos_t bucket_l) const {
+		rpos_t from = b.b * bucket_l;
+		rpos_t to = (b.b + 2) * bucket_l;
 		if (s.hits_in_T == 0) {
 			return false;
 		} else if (s.hits_in_T == 1) {
