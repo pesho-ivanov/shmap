@@ -15,7 +15,7 @@
 #include <ankerl/unordered_dense.h>
 
 namespace sweepmap {
-	
+
 class SHMapper : public Mapper {
 	const SketchIndex &tidx;
 	Handler *H;
@@ -329,44 +329,6 @@ class SHMapper : public Mapper {
 		H->C.inc("total_matches", total_matches);
 	}
 
-    struct ParsedQueryId {
-        bool valid;
-        string segm_id;
-        rpos_t start_pos;
-        rpos_t end_pos;
-		char strand;
-        
-        static ParsedQueryId parse(const string& query_id) {
-			// query_id is in the form "S1_21!NC_060948.1!57693539!57715501!+"
-            ParsedQueryId result{false, "", 0, 0, '?'};
-            
-            // Skip if query_id doesn't contain correct mapping info
-            if (query_id.find('!') == string::npos) return result;
-
-            // Split query_id on '!' character
-            vector<string> parts;
-            size_t start = 0;
-            size_t end = query_id.find('!');
-            while (end != string::npos) {
-                parts.push_back(query_id.substr(start, end - start));
-                start = end + 1;
-                end = query_id.find('!', start);
-            }
-            parts.push_back(query_id.substr(start));
-
-            // Need 5 parts: read_id, segment, start, end, strand
-            if (parts.size() != 5) return result;
-
-			result.segm_id = parts[1];
-            result.start_pos = stoll(parts[2]);
-            result.end_pos = stoll(parts[3]);
-			result.strand = parts[4][0];
-            result.valid = true;
-            
-            return result;
-        }
-    };
-
     bool do_overlap(const string& query_id, const bucket_t& b, int lmax, const SketchIndex &tidx) {
         auto parsed = ParsedQueryId::parse(query_id);
         if (!parsed.valid) return false;
@@ -391,19 +353,11 @@ class SHMapper : public Mapper {
 
     bool lost_correct_mapping(const string& query_id, const Buckets& B, int lmax, const SketchIndex &tidx) {
 		bool res = true;
-
         for (const auto& b : B)
 			if (do_overlap(query_id, b.first, lmax, tidx)) {
 				res = false;
 				break;
 			}
-
-//		cerr << "Parsed: valid=" << parsed.valid 
-//             << " segm_id=" << parsed.segm_id 
-//             << " start=" << parsed.start_pos 
-//             << " end=" << parsed.end_pos
-//             << " strand=" << parsed.strand
-//             << " res=" << res << endl;
         return res;
     }
 

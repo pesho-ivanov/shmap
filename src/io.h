@@ -227,6 +227,45 @@ struct params_t {
 	}
 };
 
+struct ParsedQueryId {
+	bool valid;
+	string segm_id;
+	rpos_t start_pos;
+	rpos_t end_pos;
+	char strand;
+	
+	static ParsedQueryId parse(const string& query_id) {
+		// query_id is in the form "S1_21!NC_060948.1!57693539!57715501!+"
+		ParsedQueryId result{false, "", 0, 0, '?'};
+		
+		// Skip if query_id doesn't contain correct mapping info
+		if (query_id.find('!') == string::npos) return result;
+
+		// Split query_id on '!' character
+		std::vector<string> parts;
+		size_t start = 0;
+		size_t end = query_id.find('!');
+		while (end != string::npos) {
+			parts.push_back(query_id.substr(start, end - start));
+			start = end + 1;
+			end = query_id.find('!', start);
+		}
+		parts.push_back(query_id.substr(start));
+
+		// Need 5 parts: read_id, segment, start, end, strand
+		if (parts.size() != 5) return result;
+
+		result.segm_id = parts[1];
+		result.start_pos = stoll(parts[2]);
+		result.end_pos = stoll(parts[3]);
+		result.strand = parts[4][0];
+		result.valid = true;
+		
+		return result;
+	}
+};
+	
+
 // seq->name.s, seq->comment.l, seq->comment.s, seq->seq.s, seq->qual.l
 void read_fasta_klib(const std::string& filename, std::function<void(const std::string&, const std::string&)> callback);
 
