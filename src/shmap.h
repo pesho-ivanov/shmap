@@ -30,7 +30,7 @@ class SHMapper : public Mapper {
 	//using Hist = gtl::flat_hash_map<hash_t, qpos_t>;
 	using Hist = ankerl::unordered_dense::map<hash_t, qpos_t>;
 
-	Seeds select_kmers(sketch_t& p) {
+	Seeds select_kmers(sketch_t& p, int &nonzero) {
 		H->T.start("seeding");
 		H->T.start("collect_kmer_info");
 			Seeds kmers;
@@ -40,7 +40,8 @@ class SHMapper : public Mapper {
 				++strike;
 				if (ppos == p.size()-1 || p[ppos].h != p[ppos+1].h) {
 					rpos_t hits_in_t = tidx.count(p[ppos].h);
-					if (hits_in_t > 0)
+					if (hits_in_t > 0) {
+						nonzero += strike;
 						if (H->params.max_matches == -1 || hits_in_t <= H->params.max_matches) {
 							Seed el(p[ppos], hits_in_t, kmers.size());
 							//strike = 1; // comment out for Weighted metric
@@ -49,6 +50,7 @@ class SHMapper : public Mapper {
 							if (H->params.max_seeds != -1 && (rpos_t)kmers.size() >= H->params.max_seeds)  // TODO maybe account for occs_in_p
 								break;
 						}
+					}
 					strike = 0;
 				}
 			}
@@ -91,7 +93,7 @@ class SHMapper : public Mapper {
 
 		auto l = M.begin(), r = M.begin();
 		for(; l != M.end(); ++l) {
-			for(;  r != M.end() && r->hit.tpos <= l->hit.tpos + lmax ; ++r) {
+			for(;  r != M.end()  && r->hit.tpos <= l->hit.tpos + lmax; ++r) {
 				//&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
 				//&& r->hit.tpos + H->params.k <= l->hit.tpos + P_sz
 				//&& r->hit.r + H->params.k <= l->hit.r + P_sz
@@ -194,11 +196,11 @@ class SHMapper : public Mapper {
 		return std::abs(X - Y) / std::sqrt(X + Y);
 	}
 
-	int mapq(Mapping m) {
+	int mapq(Mapping m, double new_theta) {
 		// minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
 		assert(m.J >= 0.0);
-		if (m.J2 < H->params.theta)
-			m.J2 = H->params.theta;
+		if (m.J2 < new_theta)
+			m.J2 = new_theta;
 		if (m.J - m.J2 > 0.015) {
 			if (abs(m.same_strand_seeds) < m.intersection/2)
 				return 5;
@@ -344,6 +346,7 @@ class SHMapper : public Mapper {
 		cerr << "Mapping reads using SHmap..." << endl;
 
 		H->C.inc("kmers", 0);
+		H->C.inc("kmers_notmatched", 0);
 		H->C.inc("seeds", 0);
 		H->C.inc("matches", 0);
 		H->C.inc("seed_matches", 0);
@@ -378,10 +381,14 @@ class SHMapper : public Mapper {
 
 					H->C.inc("read_len", P_sz);
 
-					Seeds kmers = select_kmers(p);
+					int nonzero = 0;
+					Seeds kmers = select_kmers(p, nonzero);
 					qpos_t m = 0;
 					for (const auto kmer: kmers)
 						m += kmer.occs_in_p;
+					assert(m <= p.size());
+					H->C.inc("kmers_notmatched", m - nonzero);
+					//cerr << "notmatched: " << m - nonzero << endl;
 
 					unordered_map<hash_t, Seed> p_ht;
 					Hist diff_hist;
@@ -396,7 +403,13 @@ class SHMapper : public Mapper {
 
 					//qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
 					qpos_t lmax = qpos_t(p.size() / H->params.theta);					// maximum length of a similar mapping
-					qpos_t S = qpos_t((1.0 - H->params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
+
+					double coef = 1.0;// * nonzero / p.size();
+					//cerr << "coef: " << coef << endl;
+					double new_theta = coef * H->params.theta;
+					//cerr << "theta: " << H->params.theta << " -> " << new_theta << endl;
+
+					qpos_t S = qpos_t((1.0 - new_theta) * m) + 1;			// any similar mapping includes at least 1 seed match
 					Buckets B;  			// B[segment][b] -- #matched kmers[0...i] in [bl, (b+2)l)
 					qpos_t seeds = 0;
 
@@ -517,7 +530,7 @@ class SHMapper : public Mapper {
 							//m.ed2 = edit_distance(m.bucket, P, P_sz, m, kmers);
 						}
 
-						m.mapq = mapq(m);
+						m.mapq = mapq(m, new_theta);
 						m.print_paf();
 
 						if (m.mapq == 60) H->C.inc("mapq60");
@@ -546,6 +559,7 @@ class SHMapper : public Mapper {
 //		cerr << " |  |  | intersect. diff:     " << H->C.frac("intersection_diff", "mapped_reads") << " p/ mapped read" << endl;
 		cerr << " | Kmers:                 " << H->C.frac("kmers", "reads") << " p/ read" << endl;
 		cerr << " |  | sketched:               " << H->C.frac("kmers_sketched", "reads") << " (" << H->C.perc("kmers_sketched", "kmers") << "%)" << endl;
+		cerr << " |  | not matched:            " << H->C.frac("kmers_notmatched", "reads") << " (" << H->C.perc("kmers_notmatched", "kmers") << "%)" << endl;
 		cerr << " |  | unique:                 " << H->C.frac("kmers_unique", "reads") << " (" << H->C.perc("kmers_unique", "kmers") << "%)" << endl;
 		cerr << " |  | seeds:                  " << H->C.frac("kmers_seeds", "reads") << " (" << H->C.perc("kmers_seeds", "kmers") << "%)" << endl;
 		cerr << " | Matches:               " << H->C.frac("total_matches", "reads") << " p/ read" << endl;
