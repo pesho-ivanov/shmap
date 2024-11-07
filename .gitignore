@@ -33,3 +33,5 @@ evals/refs/
 src/fenwick.h
 evals/evals-table.tex
 release/shmap
+release_flag
+debug/shmap
