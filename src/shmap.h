@@ -16,6 +16,11 @@
 
 namespace sweepmap {
 
+enum class Metric {
+	JACCARD,
+	CONTAINMENT_INDEX
+};
+
 class SHMapper : public Mapper {
 	const SketchIndex &tidx;
 	Handler *H;
@@ -83,7 +88,21 @@ class SHMapper : public Mapper {
 		return 1.0 * cap / cup;
 	}
 
-	Mapping Jaccard(const vector<Match> &M, const qpos_t P_sz, qpos_t lmin, qpos_t lmax, const qpos_t m, const Seeds &kmers, const bucket_t &bucket, Hist diff_hist) {
+	double ContainmentIndex(qpos_t intersection, qpos_t m) {
+		assert(intersection <= s_sz);
+		assert(intersection <= m);
+		assert(1.0*intersection / m <= 1.0);
+		return 1.0*intersection / m;
+	}
+
+	double Jaccard(qpos_t intersection, qpos_t m, qpos_t s_sz) {
+		assert(intersection <= s_sz);
+		assert(intersection <= m);
+		assert(1.0*intersection / (m + s_sz - intersection) <= 1.0);
+		return 1.0*intersection / (m + s_sz - intersection);
+	}
+
+	Mapping bestIncludedJaccard(const vector<Match> &M, const qpos_t P_sz, qpos_t lmin, qpos_t lmax, const qpos_t m, const Seeds &kmers, const bucket_t &bucket, Hist diff_hist) {
 		qpos_t intersection = 0;
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 		Mapping best;
@@ -115,11 +134,7 @@ class SHMapper : public Mapper {
 				//cerr << "l: " << l-M.begin() << ", r: " << r-M.begin() << ", intersection: " << intersection << endl;
 				if (l < r) {
 					int s_sz = r->hit.tpos - l->hit.tpos + 1;
-					assert(intersection <= s_sz);
-					assert(intersection <= m);
-					double J = 1.0*intersection / (m + s_sz - intersection);
-
-					assert(J <= 1.0);
+					double J = Jaccard(intersection, m, s_sz);
 					if (J > best.J)
 						best = Mapping(H->params.k, P_sz, m, l->hit.r, r->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, r, bucket);
 				}
@@ -141,7 +156,7 @@ class SHMapper : public Mapper {
 		return best;
 	}
 
-	Mapping sweep(const vector<Match> &M, const qpos_t P_sz, qpos_t lmax, const qpos_t m, const Seeds &kmers, const bucket_t &bucket, Hist &diff_hist) {
+	Mapping bestFixedLength(const vector<Match> &M, const qpos_t P_sz, qpos_t lmax, const qpos_t m, const Seeds &kmers, const bucket_t &bucket, Hist &diff_hist, Metric metric) {
 		qpos_t intersection = 0;
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 		Mapping best;
@@ -165,23 +180,16 @@ class SHMapper : public Mapper {
 				assert (l->hit.r <= r->hit.r);
 			}
 
-			//double J = 1.0*intersection / kmers.size();
-			double J = 1.0*intersection / m;
-			//int s_sz = prev(r)->hit.tpos - l->hit.tpos + 1;
-			//assert(s_sz >= 1);
-			//assert(intersection <= s_sz);
-			//assert(intersection <= m);
-			//double J = 1.0*intersection / (m + s_sz - intersection);
-
-			//if (fabs(J-J_) > 0.1)
-			//	cerr << J << " " << J_ << endl;
-			//cerr << std::fixed << std::setprecision(3) << J << " " << 1.0*intersection / m << endl;
-			//double J = 1.0*intersection / m; //kmers.size();
-			//cerr << "l=" << l->hit.r << ", r=" << prev(r)->hit.r << ", intersection=" << intersection << ", P_sz=" << P_sz << ", J= " << J << endl;
-			//assert(m > 0);
-			//double J = 1.0*intersection / m;
-			//J = 1.0*intersection / p_sz;
-			//J = 1.0*intersection / std::min(p_sz, s_sz);
+			double J;
+			if (metric == Metric::JACCARD) {
+				int s_sz = prev(r)->hit.tpos - l->hit.tpos + 1;
+				J = Jaccard(intersection, m, s_sz);
+			} else if (metric == Metric::CONTAINMENT_INDEX) {
+				J = ContainmentIndex(intersection, m);
+			} else {
+				J = -1.0;
+				assert(false);
+			}
 
 			assert(J >= -0.0);
 			assert(J <= 1.0);
@@ -308,7 +316,7 @@ class SHMapper : public Mapper {
 				++final_buckets;
 
 				H->T.start("sweep");
-					auto bucket_best = sweep(M, P_sz, lmax, m, kmers, b, diff_hist);
+					auto bucket_best = bestFixedLength(M, P_sz, lmax, m, kmers, b, diff_hist, Metric::CONTAINMENT_INDEX);
 					assert(bucket_best.J <= lowest_sh + 1e-7);
 					if (bucket_best.J >= H->params.theta) {
 						maps.push_back(bucket_best);
@@ -368,7 +376,7 @@ class SHMapper : public Mapper {
 		PP = maps.size();
 		for (auto &mapping: maps) {
 			auto M = collect_matches(mapping.bucket, lmax, tidx, p_ht);
-			auto mapping_best_J = Jaccard(M, P_sz, lmin, lmax, m, kmers, mapping.bucket, diff_hist);
+			auto mapping_best_J = bestIncludedJaccard(M, P_sz, lmin, lmax, m, kmers, mapping.bucket, diff_hist);
 			//cerr << std::fixed << std::setprecision(3) << "mapping_best_J: " << mapping_best_J.J << ", theta: " << H->params.theta << ", mapping.J: " << mapping.J << endl;
 			if (mapping_best_J.J < H->params.theta)
 				++FP;
