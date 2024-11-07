@@ -7,9 +7,11 @@ CFLAGS = -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unu
 ifeq ($(DEBUG), 1)
     CFLAGS += $(DEBUG_FLAGS)
 	SHMAP_BIN = ./debug/shmap
+	FLAG_FILE = debug_flag
 else
     CFLAGS += $(RELEASE_FLAGS)
 	SHMAP_BIN = ./release/shmap
+	FLAG_FILE = release_flag
 endif
 LIBS = -lz
 DEPFLAGS = -MMD -MP
@@ -84,9 +86,15 @@ Rs = 0.01 0.05 0.1 0.15 0.2
 
 all: $(SHMAP_BIN)
 
-$(SHMAP_BIN): $(OBJS) 
+# Add the flag file as a prerequisite and create it if needed
+$(SHMAP_BIN): $(OBJS) | $(FLAG_FILE)
 	mkdir -p $(shell dirname $@)
-	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $@ $^ $(LIBS)
+	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $@ $(OBJS) $(LIBS)
+
+# Create flag files if they don't exist
+$(FLAG_FILE):
+	@rm -f debug_flag release_flag
+	@touch $@
 
 %.o: %.cpp
 	$(CXX) $(CXX_STANDARD) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
@@ -94,7 +102,8 @@ $(SHMAP_BIN): $(OBJS)
 -include $(DEPS)
 
 clean:
-	rm -f $(OBJS) $(SHMAP_BIN) $(DEPS)
+	rm -f $(OBJS) debug_flag release_flag
+	rm -rf debug release
 
 simulate_SVs:
 	cd $(REF_DIR);\
@@ -263,7 +272,7 @@ clean_evals:
 #	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out
 #	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -z $(DIR)/out/sweep-b-e.params >out/sweep-b-e.out
 #	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -a extend_equally -z $(DIR)/out/sweep-b-e-a.params >out/sweep-b-e-a.out
-#
+
 #	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -z $(DIR)/out/sweep.params >out/sweep.out
 #	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -a extend_equally -z $(DIR)/out/sweep-a.params >out/sweep-a.out
 #	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -z $(DIR)/out/sweep-e.params >out/sweep-e.out
