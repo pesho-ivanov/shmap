@@ -365,22 +365,23 @@ class SHMapper : public Mapper {
         return res;
     }
 
-	std::tuple<int, int, double> calc_FDR(vector<Mapping> &maps, double theta, qpos_t lmax, qpos_t bucket_l, const SketchIndex &tidx, const unordered_map<hash_t, Seed> &p_ht, qpos_t P_sz, qpos_t lmin, qpos_t m, const Seeds &kmers, const Hist &diff_hist) {
-		int PP = 0, FP = 0;
-		double FDR = 0.0;
-
-		PP = maps.size();
+	std::tuple<int, int, double, double> calc_FDR(vector<Mapping> &maps, double theta, qpos_t lmax, qpos_t bucket_l, const SketchIndex &tidx, const unordered_map<hash_t, Seed> &p_ht, qpos_t P_sz, qpos_t lmin, qpos_t m, const Seeds &kmers, const Hist &diff_hist) {
+		int FP = 0;
 		for (auto &mapping: maps) {
 			auto M = collect_matches(mapping.bucket, bucket_l, tidx, p_ht);
 			auto mapping_best_J = bestIncludedJaccard(M, P_sz, lmin, lmax, m, kmers, mapping.bucket, diff_hist);
 			if (mapping_best_J.J < H->params.theta)
 				++FP;
 		}
-		FDR = 1.0 * FP / PP;
+
+		int PP = maps.size();
+		double FDR = 1.0 * FP / PP;
+		double FPTP = (PP - FP > 0) ?  1.0 * FP / (PP - FP) : 0.0;
 		H->C.inc("FP", FP);
 		H->C.inc("PP", PP);
 		H->C.inc("FDR", FDR);
-		return {PP, FP, FDR};
+		H->C.inc("FPTP", FPTP);
+		return {PP, FP, FDR, FPTP};
 	}
 
 	void map(const string &pFile) {
@@ -533,7 +534,7 @@ class SHMapper : public Mapper {
 					sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 					int total_matches, best_idx=-1, best2_idx=-1, final_buckets;
 					match_rest(seed_matches, P_sz, lmax, bucket_l, m, kmers, B_vec, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, H->params.theta, -1, query_id, &lost_on_pruning);
-					auto [FP, PP, FDR] = calc_FDR(maps, H->params.theta, lmax, bucket_l, tidx, p_ht, P_sz, lmin, m, kmers, diff_hist);
+					auto [FP, PP, FDR, FPTP] = calc_FDR(maps, H->params.theta, lmax, bucket_l, tidx, p_ht, P_sz, lmin, m, kmers, diff_hist);
 
 					if (best_idx != -1) {
 						// find second best mapping for mapq computation
@@ -560,7 +561,7 @@ class SHMapper : public Mapper {
 						m.seed_matches = seed_matches;
 						m.seeded_buckets = seeded_buckets;
 						m.final_buckets = final_buckets;
-						m.FDR = FDR;
+						m.FPTP = FPTP;
 						m.query_id = query_id.c_str();
 						m.segm_name = segm.name.c_str();
 						m.segm_sz = segm.sz;
