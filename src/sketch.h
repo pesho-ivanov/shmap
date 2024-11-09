@@ -143,6 +143,7 @@ struct Mapping {
 	bucket_t bucket2;  // the bucket of the second best mapping
 	qpos_t intersection2; // number of matches in the second best mapping
 	double sigmas_diff;  // how many sigmas is the diff between intersection1 and intersection2
+	double gt_J, gt_C;  // Jaccard and Containment index of the best mapping
 
     Mapping() : J(-1.0) {}
 	Mapping(int k, qpos_t P_sz, qpos_t p_sz, rpos_t T_l, rpos_t T_r, segm_t segm_id, qpos_t intersection, double J, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r, bucket_t bucket)
@@ -271,6 +272,8 @@ struct Mapping {
 			<< "\t" << "J:f:"			<< mapping.J   // Similarity [0; 1]
 			<< "\t" << "J2:f:"			<< mapping.J2   // second best mapping similarity [0; 1]
 			<< "\t" << "Jdiff:f:"		<< mapping.J - mapping.J2   // second best mapping similarity [0; 1]
+			<< "\t" << "gt_J:f:"		<< mapping.gt_J
+			<< "\t" << "gt_C:f:"		<< mapping.gt_C
 //			<< "\t" << "ed:i:"			<< mapping.ed
 //			<< "\t" << "ed2:i:"			<< mapping.ed2
 			<< "\t" << "Seeds:i:"		<< mapping.seeds

@@ -364,7 +364,7 @@ class SHMapper : public Mapper {
         return res;
     }
 
- 	Mapping gt_Jaccard(const string& query_id, int P_sz, Hist diff_hist, int m, unordered_map<hash_t, Seed> p_ht, const SketchIndex &tidx) {
+ 	void gt_Jaccard(const string& query_id, int P_sz, Hist diff_hist, int m, unordered_map<hash_t, Seed> p_ht, const SketchIndex &tidx, int lmax, int bucket_l, Mapping *best_mapping) {
 		auto parsed = ParsedQueryId::parse(query_id);
 		assert(parsed.valid);
 		
@@ -382,18 +382,24 @@ class SHMapper : public Mapper {
 
 		qpos_t start = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.start_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
 		qpos_t end  = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.end_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
-		int lmin = end - start - 1;
-		int lmax = end - start + 1;
-		cerr << "lmin: " << lmin << ", lmax: " << lmax << ", start: " << start << ", end: " << end << ", segm.kmers[start].r: " << segm.kmers[start].r << ", segm.kmers[end].r: " << segm.kmers[end].r << ", parsed.start_pos: " << parsed.start_pos << ", parsed.end_pos: " << parsed.end_pos << endl;
+		int gt_lmin = end - start - 1;
+		int gt_lmax = end - start + 1;
 		//qpos_t lmax = segm.kmers.size();
 		//qpos_t lmin = lmax;
 
-		int bucket_l = lmax;
+		//int bucket_l = lmax;
+		assert(bucket_l > gt_lmax);
 		bucket_t b(segm_id, start/bucket_l);
 		auto M = collect_matches(b, bucket_l, tidx, p_ht);
+		//cerr << "lmin: " << lmin << ", lmax: " << lmax << ", start: " << start << ", end: " << end << ", segm.kmers[start].r: " << segm.kmers[start].r << ", segm.kmers[end].r: " << segm.kmers[end].r << ", parsed.start_pos: " << parsed.start_pos << ", parsed.end_pos: " << parsed.end_pos << ", M.front(): " << M.front().hit.tpos << ", M.back(): " << M.back().hit.tpos << endl;	
 		
-		return bestIncludedJaccard(M, P_sz, lmin, lmax, m, b, diff_hist);
-		//return bestFixedLength(M, P_sz, lmax, m, b, diff_hist, Metric::JACCARD);
+		auto mapping_J = bestIncludedJaccard(M, P_sz, gt_lmin, gt_lmax, m, b, diff_hist);
+		auto mapping_C = bestFixedLength(M, P_sz, lmax, m, b, diff_hist, Metric::CONTAINMENT_INDEX);
+
+		best_mapping->gt_J = mapping_J.J;
+		best_mapping->gt_C = mapping_C.J;
+
+		//return mapping_J;
 	}
 
 	std::tuple<int, int, double, double> calc_FDR(vector<Mapping> &maps, double theta, qpos_t lmax, qpos_t bucket_l, const SketchIndex &tidx, const unordered_map<hash_t, Seed> &p_ht, qpos_t P_sz, qpos_t lmin, qpos_t m, const Hist &diff_hist) {
@@ -575,10 +581,17 @@ class SHMapper : public Mapper {
 				H->C.inc("lost_on_pruning", lost_on_pruning);
 			H->T.stop("query_mapping");
 
-			// TODO: remove this
-			//Mapping gt_mapping = gt_Jaccard(query_id, P_sz, diff_hist, m, p_ht, tidx);
-			//maps.push_back(gt_mapping);
-			//best_idx = maps.size() - 1;
+			{
+				//if (best_idx == -1) {
+				//	maps.push_back(Mapping());
+				//	best_idx = maps.size() - 1;
+				//}
+				// TODO: remove this
+				if (best_idx != -1)
+					gt_Jaccard(query_id, P_sz, diff_hist, m, p_ht, tidx, lmax, bucket_l, &maps[best_idx]);
+//				maps.push_back(gt_mapping);
+//				best_idx = maps.size() - 1;
+			}
 
 			H->T.start("output");
 				if (H->params.onlybest && maps.size() >= 1) {
