@@ -143,7 +143,7 @@ struct Mapping {
 	bucket_t bucket2;  // the bucket of the second best mapping
 	qpos_t intersection2; // number of matches in the second best mapping
 	double sigmas_diff;  // how many sigmas is the diff between intersection1 and intersection2
-	double gt_J, gt_C;  // Jaccard and Containment index of the best mapping
+	double gt_J, gt_C, gt_C_bucket;  // Jaccard and Containment index of the ground truth mapping
 
     Mapping() : J(-1.0) {}
 	Mapping(int k, qpos_t P_sz, qpos_t p_sz, rpos_t T_l, rpos_t T_r, segm_t segm_id, qpos_t intersection, double J, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r, bucket_t bucket)
@@ -248,6 +248,7 @@ struct Mapping {
 //	}
 
 	friend std::ostream& operator<<(std::ostream& os, const Mapping& mapping) {
+		os << std::fixed << std::setprecision(3);
 		os 
 			<< mapping.query_id  	// Query sequence name
 			<< "\t" << mapping.P_sz     // query sequence length
@@ -274,6 +275,7 @@ struct Mapping {
 			<< "\t" << "Jdiff:f:"		<< mapping.J - mapping.J2   // second best mapping similarity [0; 1]
 			<< "\t" << "gt_J:f:"		<< mapping.gt_J
 			<< "\t" << "gt_C:f:"		<< mapping.gt_C
+			<< "\t" << "gt_C_bucket:f:"	<< mapping.gt_C_bucket
 //			<< "\t" << "ed:i:"			<< mapping.ed
 //			<< "\t" << "ed2:i:"			<< mapping.ed2
 			<< "\t" << "Seeds:i:"		<< mapping.seeds
@@ -283,7 +285,7 @@ struct Mapping {
 			<< "\t" << "Mineff:f:"		<< mapping.match_inefficiency
 			<< "\t" << "Bmax:i:"		<< mapping.seeded_buckets
 			<< "\t" << "Bfinal:i:"		<< mapping.final_buckets
-			<< "\t" << "FPTP:f:"		<< std::fixed << std::setprecision(2) << mapping.FPTP
+			<< "\t" << "FPTP:f:"		<< mapping.FPTP
 			<< "\t" << "b:s:"			<< mapping.bucket.segm_id << "," << mapping.bucket.b
 			<< "\t" << "b2:s:"			<< mapping.bucket2.segm_id << "," << mapping.bucket2.b
 			<< "\t" << "strand:i:"		<< mapping.same_strand_seeds

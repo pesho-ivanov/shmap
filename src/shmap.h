@@ -393,11 +393,9 @@ class SHMapper : public Mapper {
 		auto M = collect_matches(b, bucket_l, tidx, p_ht);
 		//cerr << "lmin: " << lmin << ", lmax: " << lmax << ", start: " << start << ", end: " << end << ", segm.kmers[start].r: " << segm.kmers[start].r << ", segm.kmers[end].r: " << segm.kmers[end].r << ", parsed.start_pos: " << parsed.start_pos << ", parsed.end_pos: " << parsed.end_pos << ", M.front(): " << M.front().hit.tpos << ", M.back(): " << M.back().hit.tpos << endl;	
 		
-		auto mapping_J = bestIncludedJaccard(M, P_sz, gt_lmin, gt_lmax, m, b, diff_hist);
-		auto mapping_C = bestFixedLength(M, P_sz, lmax, m, b, diff_hist, Metric::CONTAINMENT_INDEX);
-
-		best_mapping->gt_J = mapping_J.J;
-		best_mapping->gt_C = mapping_C.J;
+		best_mapping->gt_J 			= bestIncludedJaccard(M, P_sz, gt_lmin, gt_lmax, m, b, diff_hist).J;
+		best_mapping->gt_C 			= bestFixedLength(M, P_sz, lmax, m, b, diff_hist, Metric::CONTAINMENT_INDEX).J;
+		best_mapping->gt_C_bucket 	= bestFixedLength(M, P_sz, bucket_l, m, b, diff_hist, Metric::CONTAINMENT_INDEX).J;
 
 		//return mapping_J;
 	}
@@ -414,10 +412,6 @@ class SHMapper : public Mapper {
 		int PP = maps.size();
 		double FDR = 1.0 * FP / PP;
 		double FPTP = (PP - FP > 0) ?  1.0 * FP / (PP - FP) : 0.0;
-		H->C.inc("FP", FP);
-		H->C.inc("PP", PP);
-		H->C.inc("FDR", FDR);
-		H->C.inc("FPTP", FPTP);
 		return {PP, FP, FDR, FPTP};
 	}
 
@@ -571,7 +565,12 @@ class SHMapper : public Mapper {
 					sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 					int total_matches, best_idx=-1, best2_idx=-1, final_buckets;
 					match_rest(seed_matches, P_sz, lmax, bucket_l, m, kmers, B_vec, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, H->params.theta, -1, query_id, &lost_on_pruning);
-					auto [FP, PP, FDR, FPTP] = calc_FDR(maps, H->params.theta, lmax, bucket_l, tidx, p_ht, P_sz, lmin, m, diff_hist);
+					auto [FP, PP, FDR, FPTP] = tuple(-1, -1, -1, -1);
+					//auto [FP, PP, FDR, FPTP] = calc_FDR(maps, H->params.theta, lmax, bucket_l, tidx, p_ht, P_sz, lmin, m, diff_hist);
+					H->C.inc("FP", FP);
+					H->C.inc("PP", PP);
+					H->C.inc("FDR", FDR);
+					H->C.inc("FPTP", FPTP);
 
 					if (best_idx != -1) {
 						// find second best mapping for mapq computation
@@ -587,10 +586,8 @@ class SHMapper : public Mapper {
 				//	best_idx = maps.size() - 1;
 				//}
 				// TODO: remove this
-				if (best_idx != -1)
-					gt_Jaccard(query_id, P_sz, diff_hist, m, p_ht, tidx, lmax, bucket_l, &maps[best_idx]);
-//				maps.push_back(gt_mapping);
-//				best_idx = maps.size() - 1;
+				//if (best_idx != -1)
+				//	gt_Jaccard(query_id, P_sz, diff_hist, m, p_ht, tidx, lmax, bucket_l, &maps[best_idx]);
 			}
 
 			H->T.start("output");
