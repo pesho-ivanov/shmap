@@ -40,7 +40,7 @@ READSIM_REFNAME ?= $(REFNAME)
 
 K ?= 25
 R ?= 0.05
-T ?= 0.70
+T ?= 0.75
 
 THETAS = 0.95 0.9 0.85 0.8 0.75 0.7 0.65 0.6 0.55 0.5  
 
@@ -126,8 +126,10 @@ ifeq ($(wildcard $(READS)),)
 		   --length-mean $(MEANLEN)
 
 	samtools faidx $(READSIM_REF)
-	-paftools.js pbsim2fq $(READSIM_REF).fai "$(READS_PREFIX)"_*.maf >$(READS)
+	-paftools.js pbsim2fq $(READSIM_REF).fai "$(READS_PREFIX)"_*.maf >$(READS).unshuf
+	~/miniconda3/bin/seqkit shuffle $(READS).unshuf -o $(READS)
 	rm -f "$(READS_PREFIX)"_*.maf "$(READS_PREFIX)"_*.ref "$(READS_PREFIX)"_*.fastq
+
 # take only positive strand reads
 #	mv $(READS)_ $(READS)
 #	awk '/^>/ {printit = /+$$/} printit' $(READS)_ >$(READS)
