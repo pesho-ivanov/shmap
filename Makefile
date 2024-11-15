@@ -322,7 +322,7 @@ TEST_EXEC = ./test_shmap
 
 # Test target
 test: $(TEST_OBJS)
-	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $(TEST_EXEC) $(TEST_OBJS) $(GTEST_INCLUDE) $(GTEST_LIBS) $(LIBS)
+	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $(TEST_EXEC) $(TEST_OBJS) $(LIBS)
 	./$(TEST_EXEC)
 
 # Compile test objects with TESTING defined

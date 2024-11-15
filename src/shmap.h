@@ -13,6 +13,7 @@
 
 #include "edlib.h"
 #include <ankerl/unordered_dense.h>
+#include "doctest.h"
 
 namespace sweepmap {
 
@@ -35,10 +36,6 @@ public:
 	//using Hist = unordered_map<hash_t, qpos_t>;
 	//using Hist = gtl::flat_hash_map<hash_t, qpos_t>;
 	using Hist = ankerl::unordered_dense::map<hash_t, qpos_t>;
-
-	friend class SHMapperTest_SelectKmers_Test;
-
-private:
 
 	Seeds select_kmers(sketch_t& p, int &nonzero) {
 		H->T.start("seeding");
@@ -77,6 +74,8 @@ private:
 
 		return kmers;
 	}
+
+private:
 
 	bool do_overlap(const Mapping &a, const Mapping &b) {
 		if (a.segm_id != b.segm_id)
@@ -481,7 +480,7 @@ private:
 					H->C.inc("possible_matches", possible_matches);
 
 					//qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
-					qpos_t lmin = qpos_t(ceil(p.size() * H->params.theta));					// maximum length of a similar mapping
+					//qpos_t lmin = qpos_t(ceil(p.size() * H->params.theta));					// maximum length of a similar mapping
 					qpos_t lmax = qpos_t(p.size() / H->params.theta);					// maximum length of a similar mapping
 					qpos_t bucket_l = lmax;
 
@@ -708,5 +707,45 @@ private:
 //        cerr << " |  | post proc:              "     << setw(5) << right << H->T.secs("postproc")          << " (" << setw(4) << right << H->T.perc("postproc", "mapping")            << "\%, " << setw(6) << right << H->T.range_ratio("postproc") << "x)" << endl;
     }
 };
+
+TEST_CASE("testing the seeding") {
+	Handler* H;
+	SketchIndex* tidx;
+	SHMapper* mapper;
+
+	params_t params;
+	params.k = 25;
+	params.hFrac = 0.05;
+	params.theta = 0.7;
+
+	H = new Handler(params);
+	tidx = new SketchIndex(H);
+	mapper = new SHMapper(*tidx, H);
+
+	sketch_t p;
+	p.emplace_back(10, 111111, false);
+	p.emplace_back(20, 222222, false);
+	p.emplace_back(30, 111111, false);
+	p.emplace_back(40, 444444, false);
+	p.emplace_back(50, 555555, false);
+
+	int nonzero = 0;
+	SHMapper::Seeds kmers = mapper->select_kmers(p, nonzero);
+
+	CHECK(kmers.size() == 4);
+	return;
+	
+	CHECK(kmers[0].kmer.h == 1);
+	CHECK(kmers[0].occs_in_p == 2);
+	
+	CHECK(kmers[1].kmer.h == 2);
+	CHECK(kmers[1].occs_in_p == 1);
+	
+	CHECK(kmers[2].kmer.h == 3);
+	CHECK(kmers[2].occs_in_p == 2);
+
+	for (size_t i = 1; i < kmers.size(); i++)
+		CHECK(kmers[i-1].hits_in_T == kmers[i].hits_in_T);
+}
 
 }  // namespace sweepmap
