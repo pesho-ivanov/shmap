@@ -25,7 +25,8 @@ class SHMapper : public Mapper {
 	const SketchIndex &tidx;
 	Handler *H;
 
-	using Seeds = vector<Seed>;
+public:
+	typedef vector<Seed> Seeds;
 	using Matches = vector<Match>;
 	using Bucket = pair<bucket_t, qpos_t>;
 	//using Buckets = std::unordered_map<bucket_t, qpos_t>;
@@ -34,6 +35,10 @@ class SHMapper : public Mapper {
 	//using Hist = unordered_map<hash_t, qpos_t>;
 	//using Hist = gtl::flat_hash_map<hash_t, qpos_t>;
 	using Hist = ankerl::unordered_dense::map<hash_t, qpos_t>;
+
+	friend class SHMapperTest_SelectKmers_Test;
+
+private:
 
 	Seeds select_kmers(sketch_t& p, int &nonzero) {
 		H->T.start("seeding");
@@ -218,6 +223,7 @@ class SHMapper : public Mapper {
             exit(1);
         }
     }
+	virtual ~SHMapper() = default;
 
 	double hseed(qpos_t p, qpos_t seeds, qpos_t matches) {
 		return 1.0 - double(seeds - matches) / p;
