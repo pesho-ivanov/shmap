@@ -178,8 +178,8 @@ eval_shmap: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_PREF))
 	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -x 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -x     2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
-	-paftools.js mapeval -r 0.1 $(SHMAP_PREF).paf | tee $(SHMAP_PREF).eval
-	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_PREF).paf >$(SHMAP_PREF).wrong
+	$(PAFTOOLS) mapeval -r 0.1 $(SHMAP_PREF).paf 2>/dev/null | tee $(SHMAP_PREF).eval || true
+	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_PREF).paf >$(SHMAP_PREF).wrong 2>/dev/null || true
 
 eval_shmap_noprune: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_NOPRUNE_PREF))
@@ -231,13 +231,14 @@ eval_mapquik: gen_reads
 	-paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
 #eval_tools: eval_shmap eval_shmap_noprune eval_minimap eval_mapquik eval_blend #eval_winnowmap #eval_shmap_onesweep #eval_mm2 
-eval_tools: eval_minimap eval_mapquik eval_blend eval_winnowmap
+eval_tools: eval_shmap# eval_minimap eval_mapquik eval_blend eval_winnowmap
 
 eval_tools_on_datasets:
 #	make eval_tools REFNAME=t2tChrY DEPTH=10
-	make eval_tools REFNAME=chm13   DEPTH=1
-	make eval_tools REFNAME=t2tChrY DEPTH=10  MEANLEN=24000
-	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
+#	make eval_tools REFNAME=chm13   DEPTH=1
+#	make eval_tools REFNAME=t2tChrY DEPTH=10  MEANLEN=24000
+#	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
+	make eval_tools REFNAME=chm13   READS_PREFIX=hg002_hifi_10000
 
 eval_shmap_on_datasets:
 	make eval_shmap REFNAME=t2tChrY DEPTH=10
@@ -250,7 +251,6 @@ eval_winnowmap_on_datasets:
 	make eval_winnowmap REFNAME=chm13   DEPTH=1
 	make eval_winnowmap REFNAME=t2tChrY DEPTH=10  MEANLEN=24000
 	make eval_winnowmap REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
-
 
 #eval_tools_on_SV:
 #	make eval_tools REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
@@ -265,6 +265,9 @@ clean_evals:
 # TODO: add curl -r 0-1073741823 https://storage.googleapis.com/brain-genomics-public/research/deepconsensus/publication/deepconsensus_predictions/hg002_24kb/two_smrt_cells/HG002_24kb_132517_061936_2fl_DC_hifi_reads.fastq >HG002_24kb_132517_061936_2fl_DC_hifi_reads.1GB.fastq
 # TODO: `seqtk seq -AU` for mapquik
 # TODO: `seqtk seq -A HG002_24kb.fastq >HG002_24kb.fa`
+
+# new HG002 dataset
+# https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/scratch/HG002/sequencing/hifirevio/m84005_220827_014912_s1.hifi_reads.fastq.gz
 
 #EDLIB_BIN = ~/libs/edlib/build/bin/edlib-aligner
 #VERITYMAP_BIN = ~/libs/VerityMap/veritymap/main.py
@@ -311,3 +314,20 @@ clean_evals:
 #	-paftools.js mapeval $(SWEEPMAP_PREF).sam | tee $(SWEEPMAP_PREF).eval
 #	@-paftools.js mapeval -Q 60 $(SWEEPMAP_PREF).sam >$(SWEEPMAP_PREF).wrong
 #
+
+# Test-specific variables
+TEST_SRCS = src/test_shmap.cpp
+TEST_OBJS = src/mapper.o src/io.o ext/edlib.o src/test_shmap.o  # Remove map.o as it contains main()
+TEST_EXEC = ./test_shmap
+
+# Test target
+test: $(TEST_OBJS)
+	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $(TEST_EXEC) $(TEST_OBJS) $(GTEST_INCLUDE) $(GTEST_LIBS) $(LIBS)
+	./$(TEST_EXEC)
+
+# Compile test objects with TESTING defined
+src/test_shmap.o: src/test_shmap.cpp
+	$(CXX) $(CXX_STANDARD) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+
+clean_test:
+	rm -f $(TEST_OBJS) $(TEST_EXEC)
