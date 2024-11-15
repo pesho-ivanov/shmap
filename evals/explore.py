@@ -16,14 +16,13 @@ def __():
 
 @app.cell
 def __(parse_paf):
-    handle = open('simple_test_gt.paf')
+    handle = open('evals/simple_test_gt.paf')
     df = parse_paf(handle, dataframe=True)
     return df, handle
 
 
 @app.cell
 def __(df, np, parse_paf, plt):
-
     def plot_corr(f):
         handle = open(f)
         df = parse_paf(handle, dataframe=True)
