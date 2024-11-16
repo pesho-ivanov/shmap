@@ -1,22 +1,41 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "../ext/doctest.h"
+#include <thread>
+#include <chrono>
 
 #include "shmap.h"
 
 using namespace sweepmap;
 
-TEST_CASE("Counters") {
-    Counters C;
-    CHECK_THROWS_AS(C.count("c1"), std::out_of_range);
-    C.inc("c1");
-    CHECK(C.count("c1") == 1);
-    C.inc("c2", 2);
-    CHECK(C.count("c2") == 2);
-    CHECK(C.frac("c1", "c2") == doctest::Approx(0.5));
-    CHECK(C.perc("c1", "c2") == doctest::Approx(50.0));
+TEST_CASE("Counting") {
+    SUBCASE("Counter") {
+        Counter c;
+        c.inc(5);
+        CHECK(c.count() == 5);
+    }
+    SUBCASE("Counters") {
+        Counters C;
+        CHECK_THROWS_AS(C.count("c1"), std::out_of_range);
+        C.inc("c1");
+        CHECK(C.count("c1") == 1);
+        C.inc("c2", 2);
+        CHECK(C.count("c2") == 2);
+        CHECK(C.frac("c1", "c2") == doctest::Approx(0.5));
+        CHECK(C.perc("c1", "c2") == doctest::Approx(50.0));
+    }
 }
 
-TEST_CASE("Timers") {
+TEST_CASE("Timing") {
+    SUBCASE("Timer") {
+        Timer t;
+        t.start();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        t.stop();
+        CHECK(t.secs() == doctest::Approx(0.01).epsilon(0.001));
+    }
+    SUBCASE("Timers") {
+        Timers T;
+    }
 }
 
 TEST_CASE("FracMinHash sketching") {
