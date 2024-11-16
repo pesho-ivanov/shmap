@@ -708,7 +708,7 @@ private:
     }
 };
 
-TEST_CASE("testing the seeding") {
+TEST_CASE("Mapping a toy read") {
 	Handler* H;
 	SketchIndex* tidx;
 	SHMapper* mapper;
@@ -732,7 +732,14 @@ TEST_CASE("testing the seeding") {
 	int nonzero = 0;
 	SHMapper::Seeds kmers = mapper->select_kmers(p, nonzero);
 
-	CHECK(kmers.size() == 4);
+	INFO("Seeding");
+	CHECK_MESSAGE(kmers.size() == 4, "wrong number of read kmers");
+	for (int i=0; i<(int)kmers.size(); i++) {
+		CHECK_MESSAGE(kmers[i-1].hits_in_T <= kmers[i].hits_in_T,
+			"read kmers[", i-1, "].hits_in_T=", kmers[i-1].hits_in_T,
+			" and read kmers[", i, "].hits_in_T=", kmers[i].hits_in_T,
+			" not ordered by increasing hits");
+	}
 	return;
 	
 	CHECK(kmers[0].kmer.h == 1);
