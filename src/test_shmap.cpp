@@ -5,6 +5,67 @@
 
 using namespace sweepmap;
 
+TEST_CASE("Counters") {
+    Counters C;
+    CHECK_THROWS_AS(C.count("c1"), std::out_of_range);
+    C.inc("c1");
+    CHECK(C.count("c1") == 1);
+    C.inc("c2", 2);
+    CHECK(C.count("c2") == 2);
+    CHECK(C.frac("c1", "c2") == doctest::Approx(0.5));
+    CHECK(C.perc("c1", "c2") == doctest::Approx(50.0));
+}
+
+TEST_CASE("Timers") {
+}
+
+TEST_CASE("FracMinHash sketching") {
+    int k = 25;
+    double hFrac = 0.05;
+    Counters C;
+    Timers T;
+    FracMinHash sketcher(k, hFrac, &C, &T);
+
+    SUBCASE("Sketching a simple sequence") {
+        std::string s    = "ACGGT";
+        std::string s_rc = "ACGT";
+        sketch_t sk_s    = sketcher.sketch(s);
+        sketch_t sk_s_rc = sketcher.sketch(s_rc);
+        for (size_t i = 0; i < sk_s.size(); i++) {
+            CHECK(sk_s[i].r == i);
+            CHECK(sk_s[i].h == sk_s_rc[i].h);
+            CHECK(sk_s[i].strand == false);
+        }
+        CHECK(sk_s == sk_s_rc);
+//        int C_sketch_seqs = C.count("sketched_seqs");
+//        CHECK(C_sketch_seqs == 1);
+    }
+}
+
+TEST_CASE("Parameters in handler") {
+	Handler* H;
+
+	params_t params;
+	params.k = 25;
+	params.hFrac = 0.05;
+	params.theta = 0.7;
+
+	H = new Handler(params);
+}
+
+TEST_CASE("Indexing a toy sequence") {
+	Handler* H;
+	SketchIndex* tidx;
+
+	params_t params;
+	params.k = 25;
+	params.hFrac = 0.05;
+	params.theta = 0.7;
+
+	H = new Handler(params);
+	tidx = new SketchIndex(H);
+}
+
 TEST_CASE("Mapping a toy read") {
 	Handler* H;
 	SketchIndex* tidx;
