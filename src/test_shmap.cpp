@@ -11,6 +11,7 @@ using namespace sweepmap;
 TEST_SUITE("Counting") {
     TEST_CASE("Counter") {
         Counter c;
+        CHECK(c.count() == 0);
         c.inc(5);
         CHECK(c.count() == 5);
     }
@@ -23,6 +24,11 @@ TEST_SUITE("Counting") {
         CHECK(C.count("c2") == 2);
         CHECK(C.frac("c1", "c2") == doctest::Approx(0.5));
         CHECK(C.perc("c1", "c2") == doctest::Approx(50.0));
+        CHECK_THROWS(C.frac("c1", "c3"));
+        CHECK_THROWS(C.perc("c1", "c3"));
+        C.inc("c4", 0);
+        CHECK(C.frac("c1", "c4") == std::numeric_limits<double>::infinity());
+        CHECK(C.perc("c1", "c4") == std::numeric_limits<double>::infinity());
     }
 }
 
@@ -36,6 +42,7 @@ TEST_SUITE("Timing") {
     }
     TEST_CASE("Timers") {
         Timers T;
+        //FAIL("unimplemented");
     }
 }
 
