@@ -323,7 +323,7 @@ TEST_EXEC = ./test_shmap
 # Test target
 test: $(TEST_OBJS)
 	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $(TEST_EXEC) $(TEST_OBJS) $(LIBS)
-	./$(TEST_EXEC)
+	./$(TEST_EXEC) --no-intro --no-version 2>/dev/null
 
 # Compile test objects with TESTING defined
 src/test_shmap.o: src/test_shmap.cpp

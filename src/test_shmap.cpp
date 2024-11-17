@@ -1,4 +1,5 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#define DOCTEST_CONFIG_SUPER_FAST_ASSERTS
 #include "../ext/doctest.h"
 #include <thread>
 #include <chrono>
@@ -7,13 +8,13 @@
 
 using namespace sweepmap;
 
-TEST_CASE("Counting") {
-    SUBCASE("Counter") {
+TEST_SUITE("Counting") {
+    TEST_CASE("Counter") {
         Counter c;
         c.inc(5);
         CHECK(c.count() == 5);
     }
-    SUBCASE("Counters") {
+    TEST_CASE("Counters") {
         Counters C;
         CHECK_THROWS_AS(C.count("c1"), std::out_of_range);
         C.inc("c1");
@@ -25,15 +26,15 @@ TEST_CASE("Counting") {
     }
 }
 
-TEST_CASE("Timing") {
-    SUBCASE("Timer") {
+TEST_SUITE("Timing") {
+    TEST_CASE("Timer") {
         Timer t;
         t.start();
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         t.stop();
         CHECK(t.secs() == doctest::Approx(0.01).epsilon(0.001));
     }
-    SUBCASE("Timers") {
+    TEST_CASE("Timers") {
         Timers T;
     }
 }
