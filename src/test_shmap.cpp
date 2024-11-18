@@ -153,7 +153,7 @@ TEST_CASE("Mapping a toy read") {
 
 	INFO("Seeding");
 	CHECK_MESSAGE(kmers.size() == 4, "wrong number of read kmers");
-	for (int i=0; i<(int)kmers.size(); i++) {
+	for (int i=1; i<(int)kmers.size(); i++) {
 		CHECK_MESSAGE(kmers[i-1].hits_in_T <= kmers[i].hits_in_T,
 			"read kmers[", i-1, "].hits_in_T=", kmers[i-1].hits_in_T,
 			" and read kmers[", i, "].hits_in_T=", kmers[i].hits_in_T,
