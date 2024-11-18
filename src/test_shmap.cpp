@@ -7,6 +7,7 @@
 #include "shmap.h"
 
 using namespace sweepmap;
+using namespace doctest;
 
 TEST_SUITE("Counting") {
     TEST_CASE("Counter") {
@@ -22,8 +23,8 @@ TEST_SUITE("Counting") {
         CHECK(C.count("c1") == 1);
         C.inc("c2", 2);
         CHECK(C.count("c2") == 2);
-        CHECK(C.frac("c1", "c2") == doctest::Approx(0.5));
-        CHECK(C.perc("c1", "c2") == doctest::Approx(50.0));
+        CHECK(C.frac("c1", "c2") == Approx(0.5));
+        CHECK(C.perc("c1", "c2") == Approx(50.0));
         CHECK_THROWS(C.frac("c1", "c3"));
         CHECK_THROWS(C.perc("c1", "c3"));
         C.inc("c4", 0);
@@ -34,16 +35,42 @@ TEST_SUITE("Counting") {
 
 TEST_SUITE("Timing") {
     TEST_CASE("Timer") {
-        Timer t;
-        CHECK(t.secs() == doctest::Approx(0.00));
+        sweepmap::Timer t;
+        CHECK(t.secs() == Approx(0.00));
+        CHECK_THROWS(t.range_ratio());
         t.start();
         CHECK_THROWS(t.secs());
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         t.stop();
-        CHECK(t.secs() == doctest::Approx(0.01).epsilon(0.001));
+        CHECK(t.secs() == Approx(0.01).epsilon(0.001));
+        CHECK(t.range_ratio() == Approx(1.0).epsilon(0.001));
+
+        t.start();
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        t.stop();
+        CHECK(t.range_ratio() == Approx(2.0).epsilon(0.01));
     }
     TEST_CASE("Timers") {
         Timers T;
+        CHECK_THROWS(T.range_ratio("t1"));
+
+        T.start("t1");
+        T.start("t2");
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        T.stop("t1");
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        T.stop("t2");
+
+        CHECK(T.secs("t1") == Approx(0.01).epsilon(0.001));
+        CHECK(T.secs("t2") == Approx(0.02).epsilon(0.001));
+        CHECK(T.perc("t1", "t2") == Approx(50.0).epsilon(1.0));
+        CHECK(T.perc("t2", "t1") == Approx(200.0).epsilon(4.0));
+
+        CHECK(T.range_ratio("t2") == Approx(1.0).epsilon(0.1));
+        T.start("t2");
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        T.stop("t2");
+        CHECK(T.range_ratio("t2") == Approx(2.0).epsilon(0.1));
     }
 }
 

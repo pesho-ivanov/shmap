@@ -25,34 +25,34 @@ public:
     Timer() : accumulated_time_(0.0), min_(1e9), max_(-1.0), running_(false) {}
 
     void start() {
-//        return;
-        if (!running_) {
-            start_time_point_ = std::chrono::high_resolution_clock::now();
-            running_ = true;
-        }
+		if (running_)
+            throw std::runtime_error("Timer cannot be started since it is already running.");
+        start_time_point_ = std::chrono::high_resolution_clock::now();
+        running_ = true;
     }
 
     void stop() {
-//        return;
-		assert(running_);
-        if (running_) {
-            end_time_point_ = std::chrono::high_resolution_clock::now();
-            auto diff = std::chrono::duration<double>(end_time_point_ - start_time_point_).count();
-            accumulated_time_ += diff;
-            running_ = false;
-            if (diff < min_) min_ = diff;
-            if (diff > max_) max_ = diff;
-        }
+		if (!running_)
+            throw std::runtime_error("Timer cannot be stopped since it is not running.");
+        end_time_point_ = std::chrono::high_resolution_clock::now();
+        auto diff = std::chrono::duration<double>(end_time_point_ - start_time_point_).count();
+        accumulated_time_ += diff;
+        running_ = false;
+        if (diff < min_) min_ = diff;
+        if (diff > max_) max_ = diff;
     }
 
     double secs() const {
 		if (running_)
-            throw std::runtime_error("Timer is still running");
+            throw std::runtime_error("Timer is still running.");
 		return accumulated_time_;
     }
 
     double range_ratio() const {
-        assert(!running_);
+		if (running_)
+            throw std::runtime_error("Timer is still running.");
+		if (max_ < 0.0)
+            throw std::runtime_error("There is no range ratio since the timer has not been run.");
         return max_ / min_;
     }
 };
@@ -85,12 +85,9 @@ public:
 
     double range_ratio(const std::string& name) const {
         auto it = timers_.find(name);
-		assert(it != timers_.end());
-        if (it != timers_.end()) {
-            return it->second.range_ratio();
-        }
-        assert(false);
-        return 0.0;
+		if (it == timers_.end())
+            throw std::runtime_error("Timer " + name + " not found.");
+        return it->second.range_ratio();
     }
 
     double perc(const std::string& name, const std::string& total) const {
