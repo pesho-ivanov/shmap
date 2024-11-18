@@ -343,7 +343,7 @@ public:
 			h = strand ? h_rc : h_fw;
 
 			if (h <= hThres) // optimize to only look at specific bits
-				kmers.push_back(Kmer(r, h, strand));
+				kmers.push_back(Kmer(r-1, h, strand));
 						
 			if (r >= rpos_t(s.size())) break;
 

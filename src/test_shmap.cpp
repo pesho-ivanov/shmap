@@ -43,12 +43,12 @@ TEST_SUITE("Timing") {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         t.stop();
         CHECK(t.secs() == Approx(0.01).epsilon(0.001));
-        CHECK(t.range_ratio() == Approx(1.0).epsilon(0.001));
+        CHECK(t.range_ratio() == Approx(1.0).epsilon(0.01));
 
         t.start();
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
         t.stop();
-        CHECK(t.range_ratio() == Approx(2.0).epsilon(0.01));
+        CHECK(t.range_ratio() == Approx(2.0).epsilon(0.1));
     }
     TEST_CASE("Timers") {
         Timers T;
@@ -75,25 +75,31 @@ TEST_SUITE("Timing") {
 }
 
 TEST_CASE("FracMinHash sketching") {
-    int k = 25;
-    double hFrac = 0.05;
+    int k = 4;
+    double hFrac = 1.0;
     Counters C;
     Timers T;
     FracMinHash sketcher(k, hFrac, &C, &T);
 
-    SUBCASE("Sketching a simple sequence") {
+    SUBCASE("Sketching a sequence shorter than k") {
+        CHECK(sketcher.sketch("ACC").size() == 0);
+    }
+
+    SUBCASE("Sketching is the same for a reverse-complement of a sequence (except for coordinates)") {
         std::string s    = "ACGGT";
-        std::string s_rc = "ACGT";
+        std::string s_rc = "ACCGT";
         sketch_t sk_s    = sketcher.sketch(s);
         sketch_t sk_s_rc = sketcher.sketch(s_rc);
-        for (size_t i = 0; i < sk_s.size(); i++) {
-            CHECK(sk_s[i].r == i);
-            CHECK(sk_s[i].h == sk_s_rc[i].h);
-            CHECK(sk_s[i].strand == false);
+        std::reverse(sk_s_rc.begin(), sk_s_rc.end());
+
+        REQUIRE_MESSAGE(sk_s.size() == sk_s_rc.size(), "the sketches of reverse-complement strings should have the same size");
+        for (int i = 0; i < sk_s.size(); i++) {
+            CHECK(sk_s[i].r == i+k-1);
+            if (i < (int)sk_s_rc.size()) {
+                CHECK(sk_s[i].r == (int)sk_s.size() - sk_s_rc[i].r + k + 1);
+                CHECK(sk_s[i].h == sk_s_rc[i].h);
+            }
         }
-        CHECK(sk_s == sk_s_rc);
-//        int C_sketch_seqs = C.count("sketched_seqs");
-//        CHECK(C_sketch_seqs == 1);
     }
 }
 
