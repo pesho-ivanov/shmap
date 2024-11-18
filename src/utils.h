@@ -46,7 +46,8 @@ public:
     }
 
     double secs() const {
-		assert(!running_);
+		if (running_)
+            throw std::runtime_error("Timer is still running");
 		return accumulated_time_;
     }
 

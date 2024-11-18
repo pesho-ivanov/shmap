@@ -13,7 +13,6 @@
 
 #include "edlib.h"
 #include <ankerl/unordered_dense.h>
-#include "doctest.h"
 
 namespace sweepmap {
 

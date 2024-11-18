@@ -38,3 +38,4 @@ debug/shmap
 test_shmap
 evals/chm13_gt.paf
 evals/simple_test_gt.paf
+debug_flag

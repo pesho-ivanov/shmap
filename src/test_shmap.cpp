@@ -35,14 +35,15 @@ TEST_SUITE("Counting") {
 TEST_SUITE("Timing") {
     TEST_CASE("Timer") {
         Timer t;
+        CHECK(t.secs() == doctest::Approx(0.00));
         t.start();
+        CHECK_THROWS(t.secs());
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         t.stop();
         CHECK(t.secs() == doctest::Approx(0.01).epsilon(0.001));
     }
     TEST_CASE("Timers") {
         Timers T;
-        //FAIL("unimplemented");
     }
 }
 
