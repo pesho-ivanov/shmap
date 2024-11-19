@@ -146,8 +146,8 @@ struct Mapping {
 	double gt_J, gt_C, gt_C_bucket;  // Jaccard and Containment index of the ground truth mapping
 
     Mapping() : J(-1.0) {}
-	Mapping(int k, qpos_t P_sz, qpos_t p_sz, rpos_t T_l, rpos_t T_r, segm_t segm_id, qpos_t intersection, double J, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r, bucket_t bucket)
-		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), intersection(intersection), J(J), same_strand_seeds(same_strand_seeds), unreasonable(false), l(l), r(r), bucket(bucket) {
+	Mapping(int k, qpos_t P_sz, qpos_t p_sz, rpos_t T_l, rpos_t T_r, segm_t segm_id, qpos_t intersection, double J, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r)
+		: k(k), P_sz(P_sz), p_sz(p_sz), T_l(T_l), T_r(T_r), segm_id(segm_id), intersection(intersection), J(J), same_strand_seeds(same_strand_seeds), unreasonable(false), l(l), r(r) {
 		//if (J > 1.0)
 		//	cerr << "s_sz = " << s_sz << ", intersection = " << intersection << ", p_sz = " << p_sz << ", J = " << J << ", r-l=" << r-l << endl;
 		assert(J >= -0.0);

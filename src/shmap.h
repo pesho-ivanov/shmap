@@ -105,7 +105,7 @@ private:
 		return 1.0*intersection / (m + s_sz - intersection);
 	}
 
-	Mapping bestIncludedJaccard(const vector<Match> &M, const qpos_t P_sz, qpos_t lmin, qpos_t lmax, const qpos_t m, const bucket_t &bucket, Hist diff_hist) {
+	Mapping bestIncludedJaccard(const vector<Match> &M, const qpos_t P_sz, qpos_t lmin, qpos_t lmax, const qpos_t m, Hist diff_hist) {
 		qpos_t intersection = 0;
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 		Mapping best;
@@ -138,7 +138,7 @@ private:
 					int s_sz = r->hit.tpos - l->hit.tpos + 1;
 					double J = Jaccard(intersection, m, s_sz);
 					if (J > best.J)
-						best = Mapping(H->params.k, P_sz, m, l->hit.r, r->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, r, bucket);
+						best = Mapping(H->params.k, P_sz, m, l->hit.r, r->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, r);
 				}
 			}
 
@@ -157,7 +157,7 @@ private:
 		return best;
 	}
 
-	Mapping bestFixedLength(const vector<Match> &M, const qpos_t P_sz, qpos_t lmax, const qpos_t m, const bucket_t &bucket, Hist &diff_hist, Metric metric) {
+	Mapping bestFixedLength(const vector<Match> &M, const qpos_t P_sz, qpos_t lmax, const qpos_t m, Hist &diff_hist, Metric metric) {
 		qpos_t intersection = 0;
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 		Mapping best;
@@ -195,7 +195,7 @@ private:
 			assert(J >= -0.0);
 			assert(J <= 1.0);
 			if (J > best.J)
-				best = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r), bucket);
+				best = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r));
 
 			assert(diff_hist.contains(l->seed.kmer.h));
 			if (++diff_hist[l->seed.kmer.h] >= 1) {
@@ -315,7 +315,8 @@ private:
 				++final_buckets;
 
 				H->T.start("sweep");
-					auto bucket_best = bestFixedLength(M, P_sz, lmax, m, b, diff_hist, Metric::CONTAINMENT_INDEX);
+					auto bucket_best = bestFixedLength(M, P_sz, lmax, m, diff_hist, Metric::CONTAINMENT_INDEX);
+					bucket_best.bucket = b;
 					assert(bucket_best.J <= lowest_sh + 1e-7);
 					if (bucket_best.J >= H->params.theta) {
 						maps.push_back(bucket_best);
@@ -397,9 +398,9 @@ private:
 		auto M = collect_matches(b, bucket_l, tidx, p_ht);
 		//cerr << "lmin: " << lmin << ", lmax: " << lmax << ", start: " << start << ", end: " << end << ", segm.kmers[start].r: " << segm.kmers[start].r << ", segm.kmers[end].r: " << segm.kmers[end].r << ", parsed.start_pos: " << parsed.start_pos << ", parsed.end_pos: " << parsed.end_pos << ", M.front(): " << M.front().hit.tpos << ", M.back(): " << M.back().hit.tpos << endl;	
 		
-		best_mapping->gt_J 			= bestIncludedJaccard(M, P_sz, gt_lmin, gt_lmax, m, b, diff_hist).J;
-		best_mapping->gt_C 			= bestFixedLength(M, P_sz, lmax, m, b, diff_hist, Metric::CONTAINMENT_INDEX).J;
-		best_mapping->gt_C_bucket 	= bestFixedLength(M, P_sz, bucket_l, m, b, diff_hist, Metric::CONTAINMENT_INDEX).J;
+		best_mapping->gt_J 			= bestIncludedJaccard(M, P_sz, gt_lmin, gt_lmax, m, diff_hist).J;
+		best_mapping->gt_C 			= bestFixedLength(M, P_sz, lmax, m, diff_hist, Metric::CONTAINMENT_INDEX).J;
+		best_mapping->gt_C_bucket 	= bestFixedLength(M, P_sz, bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX).J;
 
 		//return mapping_J;
 	}
@@ -408,7 +409,8 @@ private:
 		int FP = 0;
 		for (auto &mapping: maps) {
 			auto M = collect_matches(mapping.bucket, bucket_l, tidx, p_ht);
-			auto mapping_best_J = bestIncludedJaccard(M, P_sz, lmin, lmax, m, mapping.bucket, diff_hist);
+			auto mapping_best_J = bestIncludedJaccard(M, P_sz, lmin, lmax, m, diff_hist);
+			mapping_best_J.bucket = mapping.bucket;
 			if (mapping_best_J.J < H->params.theta)
 				++FP;
 		}
