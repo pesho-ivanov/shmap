@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ankerl/unordered_dense.h>
+#include <functional>  // for std::hash
 
 #include "utils.h"
 
@@ -33,9 +34,13 @@ public:
 		rpos_t end() const {
 			return (b + 2) * parent->len;
 		}
-    };
-
-	using bucket_map_t = ankerl::unordered_dense::map<Bucket, qpos_t>;
+	};
+	struct BucketHash {
+		std::size_t operator()(const Bucket& b) const {
+			return std::hash<segm_t>()(b.segm_id) ^ (std::hash<rpos_t>()(b.b) << 1);
+		}
+	};
+	using bucket_map_t = ankerl::unordered_dense::map<Bucket, qpos_t, BucketHash, std::equal_to<Bucket> >;
 
 	struct Pos {
 		segm_t segm_id;
@@ -186,10 +191,3 @@ private:
 };
 
 } // namespace sweepmap
-
-template <>
-struct std::hash<sweepmap::Buckets::Bucket> {
-	std::size_t operator()(const sweepmap::Buckets::Bucket& b) const {
-		return std::hash<sweepmap::segm_t>()(b.segm_id) ^ (std::hash<sweepmap::rpos_t>()(b.b) << 1);
-	}
-};

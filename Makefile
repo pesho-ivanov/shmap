@@ -106,6 +106,7 @@ $(FLAG_FILE):
 clean:
 	rm -f $(OBJS) debug_flag release_flag
 	rm -rf debug release
+	$(MAKE) clean_test
 
 simulate_SVs:
 	cd $(REF_DIR);\
