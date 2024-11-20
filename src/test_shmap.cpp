@@ -114,40 +114,45 @@ TEST_CASE("FracMinHash sketching") {
 //	H = new Handler(params);
 //}
 
-//TEST_CASE("Indexing") {
-//	Handler* H;
-//	SketchIndex* tidx;
-//
-//	params_t params;
-//	params.k = 3;
-//	params.hFrac = 1.0; 
-//
-//    string ref_file = "ref.fa";
-//    string T = "ACCAGTACC";
-//
-//	H = new Handler(params);
-// 
-//    // create a sketch index
-//	tidx = new SketchIndex(H);
-//    std::ofstream refFile(ref_file);
-//    refFile << ">ref\n" << T << std::endl;
-//    refFile.close();
-//    tidx->build_index(ref_file);
-//    //std::remove(ref_file.c_str());
-//
-//    SUBCASE("Counts") {
-//        CHECK(tidx->H->C.count("indexed_hits") == 7);
-//        CHECK(tidx->H->C.count("indexed_kmers") == 6);
-//    }
-//
-//    SUBCASE("Get matches") {
-////    Matches matches;
-////    Kmer kmer(0, 0, false);
-////    rpos_t hits_in_t = 1; 
-////    Seed el(kmer, hits_in_t, kmers.size());
-////    tidx->get_matches(&matches, seed);
-//    }
-//}
+TEST_CASE("Indexing") {
+	Handler* H;
+	SketchIndex* tidx;
+
+	params_t params;
+	params.k = 4;
+	params.hFrac = 1.0; 
+
+    string ref_file = "ref.fa";
+    string T = "ACCAGTACCA";
+    vector<int> cnt = {2, 1, 1, 1, 1, 1, 2};
+
+	H = new Handler(params);
+ 
+    // create a sketch index
+	tidx = new SketchIndex(H);
+    std::ofstream refFile(ref_file);
+    refFile << ">ref\n" << T << std::endl;
+    refFile.close();
+    tidx->build_index(ref_file);
+    std::remove(ref_file.c_str());
+
+    SUBCASE("Counts") {
+        sketch_t t = H->sketcher.sketch(T);
+        REQUIRE(t.size() == 7);
+        for (int i=0; i<(int)t.size(); i++)
+            CHECK(tidx->count(t[i].h) == cnt[i]);
+        CHECK(tidx->H->C.count("indexed_hits") == 7);
+        CHECK(tidx->H->C.count("indexed_kmers") == 6);
+    }
+
+    SUBCASE("Get matches") {
+//    Matches matches;
+//    Kmer kmer(0, 0, false);
+//    rpos_t hits_in_t = 1; 
+//    Seed el(kmer, hits_in_t, kmers.size());
+//    tidx->get_matches(&matches, seed);
+    }
+}
 
 TEST_CASE("Bucketing") {
     int l = 10;

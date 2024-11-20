@@ -149,9 +149,9 @@ public:
 
 	void build_index(const std::string &tFile) {
 		H->T.start("indexing");
-		cerr << "Indexing " << H->params.tFile << "..." << endl;
+		cerr << "Indexing " << tFile << "..." << endl;
 		H->T.start("index_reading");
-		read_fasta_klib(H->params.tFile, [this](const string &segm_name, const string &T) {
+		read_fasta_klib(tFile, [this](const string &segm_name, const string &T) {
 			H->T.stop("index_reading");
 			H->T.start("index_sketching");
 			sketch_t t = H->sketcher.sketch(T);
