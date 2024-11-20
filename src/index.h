@@ -80,18 +80,16 @@ public:
 //		return false;
 //	}
 
-	bool matches_in_bucket(const Seed &s, const bucket_t b, qpos_t bucket_l) const {
-		rpos_t from = b.b * bucket_l;
-		rpos_t to = (b.b + 2) * bucket_l;
+	bool matches_in_bucket(const Seed &s, const Buckets::Bucket b) const {
 		if (s.hits_in_T == 0) {
 			return false;
 		} else if (s.hits_in_T == 1) {
 			auto &hit = h2single.at(s.kmer.h);
-			return from <= hit.tpos && hit.tpos < to;
+			return b.begin() <= hit.tpos && hit.tpos < b.end();
 		} else if (s.hits_in_T > 1) {
 			const vector<Hit> &hits = h2multi.at(s.kmer.h);
 			//for (int i=1; i<(int)hits.size(); i++) assert(hits[i-1].r <= hits[i].r);
-			auto it = lower_bound(hits.begin(), hits.end(), from, [&b](const Hit &hit, rpos_t pos) {
+			auto it = lower_bound(hits.begin(), hits.end(), b.begin(), [&b](const Hit &hit, rpos_t pos) {
 				if (hit.segm_id != b.segm_id)
 					return hit.segm_id < b.segm_id;
 				return hit.tpos < pos;
@@ -99,7 +97,7 @@ public:
 			//auto it_prev = it; if (it_prev != hits.begin()) { --it_prev; assert(it_prev->r < from); }
 			//if (it != hits.end()) assert(from <= it->r);
 			//cout << (it != hits.end() && it->r < to) << ", [" << from << ", " << to << ")" << ", it: " << (it != hits.end() ? it->r : -1) << endl;
-			return it != hits.end() && it->tpos < to;
+			return it != hits.end() && it->tpos < b.end();
 		}
 		return false;
 	}

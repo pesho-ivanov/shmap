@@ -9,6 +9,7 @@
 #include "../ext/edlib.h"
 #include "io.h"
 #include "utils.h"
+#include "buckets.h"
 
 namespace sweepmap {
 
@@ -81,31 +82,6 @@ struct RefSegment {
 		: kmers(sk), name(name), seq(seq), sz(sz) {}
 };
 
-struct bucket_t {
-	segm_t segm_id;		// segm_id refers to tidx.T[segm_id]
-	rpos_t b;   		// b refers to interval [lmax*b, lmax*(b+2)) in tidx.T[segm_id].kmers
-	bucket_t() : segm_id(-1), b(-1) {}
-	bucket_t(segm_t segm_id, rpos_t b) : segm_id(segm_id), b(b) {}
-    bool operator==(const bucket_t &other) const {
-        return segm_id == other.segm_id && b == other.b;
-    }
-	friend std::ostream& operator<<(std::ostream& os, const bucket_t& b) {
-		os << "(" << b.segm_id << "," << b.b << ")";
-		return os;
-	}
-};
-
-} // namespace sweepmap
-
-template <>
-struct std::hash<sweepmap::bucket_t> {
-	std::size_t operator()(const sweepmap::bucket_t& b) const {
-		return std::hash<sweepmap::segm_t>()(b.segm_id) ^ (std::hash<sweepmap::rpos_t>()(b.b) << 1);
-	}
-};
-
-namespace sweepmap {
-
 struct Mapping {
 	int k; 	   // kmer size
 	const char* query_id;
@@ -139,8 +115,8 @@ struct Mapping {
 	rpos_t seeded_buckets;     // the initial number of buckets
 	rpos_t final_buckets;   // the number of buckets after pruning with all kmers
 	double FPTP;			// false discovery rate: FP / PP
-	bucket_t bucket;			 // the bucket where the mapping is found
-	bucket_t bucket2;  // the bucket of the second best mapping
+	Buckets::Bucket bucket;			 // the bucket where the mapping is found
+	Buckets::Bucket bucket2;  // the bucket of the second best mapping
 	qpos_t intersection2; // number of matches in the second best mapping
 	double sigmas_diff;  // how many sigmas is the diff between intersection1 and intersection2
 	double gt_J, gt_C, gt_C_bucket;  // Jaccard and Containment index of the ground truth mapping

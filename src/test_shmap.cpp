@@ -187,6 +187,20 @@ TEST_CASE("Bucketing") {
     }
 }
 
+TEST_SUITE("Metrics") {
+    qpos_t intersection = 5;
+    qpos_t m = 10;
+    qpos_t s_sz = 15;
+    TEST_CASE("Jaccard") {
+        double ans = 1.0*intersection / (m + s_sz - intersection);
+	    CHECK(SHMapper::Jaccard(intersection, m, s_sz) == Approx(ans));
+    }
+    TEST_CASE("Containment index") {
+        double ans = 1.0*intersection / m;
+	    CHECK(SHMapper::ContainmentIndex(intersection, m) == Approx(ans));
+    }
+}
+
 TEST_CASE("Mapping a toy read") {
 	Handler* H;
 	SketchIndex* tidx;
