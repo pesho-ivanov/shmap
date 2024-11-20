@@ -121,28 +121,47 @@ TEST_CASE("Indexing") {
 	params_t params;
 	params.k = 4;
 	params.hFrac = 1.0; 
-
-    string ref_file = "ref.fa";
-    string T = "ACCAGTACCA";
-    vector<int> cnt = {2, 1, 1, 1, 1, 1, 2};
-
 	H = new Handler(params);
- 
-    // create a sketch index
 	tidx = new SketchIndex(H);
-    std::ofstream refFile(ref_file);
-    refFile << ">ref\n" << T << std::endl;
-    refFile.close();
-    tidx->build_index(ref_file);
-    std::remove(ref_file.c_str());
 
-    SUBCASE("Counts") {
+    SUBCASE("Single segment") {
+        string ref_file = "ref.fa";
+        string T = "ACCAGTACCA";
+        vector<int> cnt = {2, 1, 1, 1, 1, 1, 2};
+    
+        std::ofstream refFile(ref_file);
+        refFile << ">ref\n" << T << std::endl;
+        refFile.close();
+        tidx->build_index(ref_file);
+        std::remove(ref_file.c_str());
+
         sketch_t t = H->sketcher.sketch(T);
         REQUIRE(t.size() == 7);
         for (int i=0; i<(int)t.size(); i++)
             CHECK(tidx->count(t[i].h) == cnt[i]);
         CHECK(tidx->H->C.count("indexed_hits") == 7);
         CHECK(tidx->H->C.count("indexed_kmers") == 6);
+    }
+
+    SUBCASE("Two segments") {
+        string ref_file = "ref2.fa";
+        string segm1 = "ACCAGTACCA";
+        string segm2 = "GGACCA";
+        vector<int> cnt = {3, 1, 1, 1, 1, 1, 3};
+    
+        std::ofstream refFile(ref_file);
+        refFile << ">segm1\n" << segm1 << std::endl;
+        refFile << ">segm2\n" << segm2 << std::endl;
+        refFile.close();
+        tidx->build_index(ref_file);
+        std::remove(ref_file.c_str());
+
+        sketch_t t1 = H->sketcher.sketch(segm1);
+        REQUIRE(t1.size() == 7);
+        for (int i=0; i<(int)t1.size(); i++)
+            CHECK(tidx->count(t1[i].h) == cnt[i]);
+        CHECK(tidx->H->C.count("indexed_hits") == 10);
+        CHECK(tidx->H->C.count("indexed_kmers") == 8);
     }
 
     SUBCASE("Get matches") {
