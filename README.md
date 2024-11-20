@@ -1,10 +1,10 @@
-# SweepMap - Fast and accurate sketch-based read mapper
+# Map-SHmap - Fast and accurate sketch-based read mapper
 
 ![Test Status](https://github.com/pesho-ivanov/sweepmap/actions/workflows/test.yml/badge.svg)
 
 ## Description
 
-SweepMap is an algorithm for sketch-based read mapping of genomic sequences.
+Map-SHmap is an algorithm for sketch-based read mapping of genomic sequences.
 
 ## Dependencies
 
