@@ -27,8 +27,6 @@ class SHMapper : public Mapper {
 	Handler *H;
 
 public:
-	typedef vector<Seed> Seeds;
-	using Matches = vector<Match>;
 	//typedef pair<bucket_t, qpos_t> Bucket;
 	//using Buckets = std::unordered_map<bucket_t, qpos_t>;
 	//using Buckets = gtl::flat_hash_map<bucket_t, qpos_t>;

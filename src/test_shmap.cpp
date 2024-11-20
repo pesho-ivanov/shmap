@@ -114,17 +114,39 @@ TEST_CASE("FracMinHash sketching") {
 //	H = new Handler(params);
 //}
 
-//TEST_CASE("Indexing a toy sequence") {
+//TEST_CASE("Indexing") {
 //	Handler* H;
 //	SketchIndex* tidx;
 //
 //	params_t params;
-//	params.k = 25;
-//	params.hFrac = 0.05;
-//	params.theta = 0.7;
+//	params.k = 3;
+//	params.hFrac = 1.0; 
+//
+//    string ref_file = "ref.fa";
+//    string T = "ACCAGTACC";
 //
 //	H = new Handler(params);
+// 
+//    // create a sketch index
 //	tidx = new SketchIndex(H);
+//    std::ofstream refFile(ref_file);
+//    refFile << ">ref\n" << T << std::endl;
+//    refFile.close();
+//    tidx->build_index(ref_file);
+//    //std::remove(ref_file.c_str());
+//
+//    SUBCASE("Counts") {
+//        CHECK(tidx->H->C.count("indexed_hits") == 7);
+//        CHECK(tidx->H->C.count("indexed_kmers") == 6);
+//    }
+//
+//    SUBCASE("Get matches") {
+////    Matches matches;
+////    Kmer kmer(0, 0, false);
+////    rpos_t hits_in_t = 1; 
+////    Seed el(kmer, hits_in_t, kmers.size());
+////    tidx->get_matches(&matches, seed);
+//    }
 //}
 
 TEST_CASE("Bucketing") {
@@ -223,7 +245,7 @@ TEST_CASE("Mapping a toy read") {
 	p.emplace_back(50, 555555, false);
 
 	int nonzero = 0;
-	SHMapper::Seeds kmers = mapper->select_kmers(p, nonzero);
+	Seeds kmers = mapper->select_kmers(p, nonzero);
 
 	INFO("Seeding");
 	CHECK_MESSAGE(kmers.size() == 4, "wrong number of read kmers");

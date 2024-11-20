@@ -56,6 +56,7 @@ struct Seed {
 		return os;
 	}
 };
+using Seeds = std::vector<Seed>;
 
 // Match -- a pair of a seed and a hit
 struct Match {
@@ -72,6 +73,7 @@ struct Match {
 		return os;
 	}
 };
+using Matches = std::vector<Match>;
 
 struct RefSegment {
 	sketch_t kmers;
