@@ -93,7 +93,7 @@ TEST_CASE("FracMinHash sketching") {
         std::reverse(sk_s_rc.begin(), sk_s_rc.end());
 
         REQUIRE_MESSAGE(sk_s.size() == sk_s_rc.size(), "the sketches of reverse-complement strings should have the same size");
-        for (int i = 0; i < sk_s.size(); i++) {
+        for (int i = 0; i < (int)sk_s.size(); i++) {
             CHECK(sk_s[i].r == i+k-1);
             if (i < (int)sk_s_rc.size()) {
                 CHECK(sk_s[i].r == (int)sk_s.size() - sk_s_rc[i].r + k + 1);
@@ -103,28 +103,88 @@ TEST_CASE("FracMinHash sketching") {
     }
 }
 
-TEST_CASE("Parameters in handler") {
-	Handler* H;
+//TEST_CASE("Parameters in handler") {
+//	Handler* H;
+//
+//	params_t params;
+//	params.k = 25;
+//	params.hFrac = 0.05;
+//	params.theta = 0.7;
+//
+//	H = new Handler(params);
+//}
 
-	params_t params;
-	params.k = 25;
-	params.hFrac = 0.05;
-	params.theta = 0.7;
+//TEST_CASE("Indexing a toy sequence") {
+//	Handler* H;
+//	SketchIndex* tidx;
+//
+//	params_t params;
+//	params.k = 25;
+//	params.hFrac = 0.05;
+//	params.theta = 0.7;
+//
+//	H = new Handler(params);
+//	tidx = new SketchIndex(H);
+//}
 
-	H = new Handler(params);
-}
-
-TEST_CASE("Indexing a toy sequence") {
-	Handler* H;
-	SketchIndex* tidx;
-
-	params_t params;
-	params.k = 25;
-	params.hFrac = 0.05;
-	params.theta = 0.7;
-
-	H = new Handler(params);
-	tidx = new SketchIndex(H);
+TEST_CASE("Bucketing") {
+    int l = 10;
+	Buckets B(l);
+    CHECK(B.get_bucket_len() == 10);
+    segm_t segm_id = 0;
+    SUBCASE("Bucket") {
+        Buckets::Bucket b0(segm_id, 0, &B);
+        CHECK(b0.begin() == 0);
+        CHECK(b0.end() == 2*l);
+        Buckets::Bucket b1(segm_id, 1, &B);
+        CHECK(b1.begin() == l);
+        CHECK(b1.end() == l+2*l);
+        CHECK(!(b0 == b1));
+    }
+    SUBCASE("Add matches to bucket") {
+        B.add_to_bucket(Buckets::Bucket(segm_id, 2, &B), 10);
+        CHECK(B.get_matches(Buckets::Bucket(segm_id, 2, &B)) == 10);
+    }
+    SUBCASE("Add matches to position") {
+        B.add_to_pos(Buckets::Pos(segm_id, 5), 1);
+        CHECK(B.size() == 1);
+        CHECK(B.get_matches(Buckets::Bucket(segm_id, 0, &B)) == 1);
+        B.add_to_pos(Buckets::Pos(0, 15), 1);
+        CHECK(B.size() == 2);
+        CHECK(B.get_matches(Buckets::Bucket(segm_id, 0, &B)) == 2);
+        CHECK(B.get_matches(Buckets::Bucket(segm_id, 1, &B)) == 1);
+    }
+    SUBCASE("Iteration") {
+        vector<int> matches = {1, 2, 3, 4, 5, 6, 5, 4, 2, 2};
+        for (int i = 0; i < (int)matches.size(); i++)
+            B.add_to_bucket(Buckets::Bucket(segm_id, i, &B), matches[i]);
+        int cnt = 0;
+        SUBCASE("Unordered") {
+            for (auto it = B.unordered_begin(); it != B.unordered_end(); ++it) {
+                REQUIRE(it->first.b >= 0);
+                REQUIRE(it->first.b < matches.size());
+                CHECK(it->second > 0);
+                CHECK(matches[it->first.b] == it->second);
+                matches[it->first.b] = -1;
+                ++cnt;
+            }
+        }
+        SUBCASE("Ordered") {
+            int prev_matches = std::numeric_limits<int>::max();
+            for (auto it = B.ordered_begin(); it != B.ordered_end(); ++it) {
+                REQUIRE(it->first.b >= 0);
+                REQUIRE(it->first.b < matches.size());
+                CHECK(it->second > 0);
+                CHECK(matches[it->first.b] == it->second);
+                matches[it->first.b] = -1;
+                ++cnt;
+                // specific to ordered iteration
+                CHECK(prev_matches >= it->second);
+                prev_matches = it->second;
+            }
+        }
+        CHECK(cnt == matches.size());
+    }
 }
 
 TEST_CASE("Mapping a toy read") {
