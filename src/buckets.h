@@ -68,6 +68,7 @@ public:
     }
 
     void add_to_bucket(Bucket b, qpos_t matches) {
+		b.parent = this;
         _B[b] += matches;
     }
 

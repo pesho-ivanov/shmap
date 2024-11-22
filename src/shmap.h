@@ -280,9 +280,13 @@ private:
 
 	Matches collect_matches(const Buckets::Bucket &b, const SketchIndex &tidx, const unordered_map<hash_t, Seed> &p_ht) {
 		Matches M;
+		//cerr << b << endl;
+		assert(b.parent != nullptr);
+		assert(b.segm_id >= 0 && b.segm_id < (rpos_t)tidx.T.size());
 		for (rpos_t i = b.begin(); i < std::min(b.end(), (rpos_t)tidx.T[b.segm_id].kmers.size()); i++) {
-			assert(b.segm_id >= 0 && b.segm_id < (rpos_t)tidx.T.size());
-			const auto &kmer = tidx.T[b.segm_id].kmers[i];
+			assert(i < (rpos_t)tidx.T[b.segm_id].kmers.size());
+			//cerr << "parent" << b.parent << " " << b << " " << i << " " << tidx.T.size() << " " << tidx.T[b.segm_id].kmers.size() << endl;
+			const auto kmer = tidx.T[b.segm_id].kmers[i];
 			const auto seed_it = p_ht.find(kmer.h);
 			if (seed_it != p_ht.end()) {
 				M.push_back(Match(seed_it->second, Hit(kmer, i, b.segm_id)));
@@ -389,54 +393,89 @@ private:
 		return {start, end, segm_id, parsed.segm_id};
 	}
 
+	string vec2str(vector<Buckets::Bucket> buckets, const SketchIndex &tidx) {
+		stringstream res;
+		res << "{";
+		for (auto &b: buckets)
+			res << "(" << tidx.T[b.segm_id].name << "," << b.b << "),";
+		res << "}";
+		return res.str();
+	}
+
  	void PaulsExperiment(const string& query_id, int P_sz, Hist diff_hist, int m, unordered_map<hash_t, Seed> p_ht, const SketchIndex &tidx, const Buckets &B, ofstream &paulout) {
 		int bucket_l = B.get_bucket_len();
+
+		// Ground-truth
 		auto [start, end, segm_id, segm_name] = GT_start_end(query_id, tidx);
-		auto b_l = Buckets::Bucket(segm_id, start/bucket_l, &B);
-		auto b_r = Buckets::Bucket(segm_id, start/bucket_l + 1, &B);
-		auto M_l = collect_matches(b_l,  tidx, p_ht);
-		auto M_r = collect_matches(b_r, tidx, p_ht);
+		auto gt_b_l 		= Buckets::Bucket(segm_id, max(0, start/bucket_l-1), &B);
+		auto gt_b_r 		= Buckets::Bucket(segm_id, start/bucket_l, &B);
+		auto gt_M_l 		= collect_matches(gt_b_l, tidx, p_ht);
+		auto gt_M_r 		= collect_matches(gt_b_r, tidx, p_ht);
+		auto gt_J_l			= bestIncludedJaccard(gt_M_l, P_sz, end-start-2, end-start+2, m, diff_hist);
+		auto gt_J_r			= bestIncludedJaccard(gt_M_r, P_sz, end-start-2, end-start+2, m, diff_hist);
+		auto gt_C_l			= bestFixedLength(gt_M_l, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
+		auto gt_C_r			= bestFixedLength(gt_M_r, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
+		auto gt_C_l_lmax 	= bestFixedLength(gt_M_l, P_sz, bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
+		auto gt_C_r_lmax 	= bestFixedLength(gt_M_r, P_sz, bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
 
-		auto gt_J_l			= bestIncludedJaccard(M_l, P_sz, end-start-2, end-start+2, m, diff_hist);
-		auto gt_J_r			= bestIncludedJaccard(M_r, P_sz, end-start-2, end-start+2, m, diff_hist);
-		auto gt_C_lmax_l 	= bestFixedLength(M_l, P_sz, bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
-		auto gt_C_lmax_r 	= bestFixedLength(M_r, P_sz, bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
-		auto gt_C_2lmax_l	= bestFixedLength(M_l, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
-		auto gt_C_2lmax_r	= bestFixedLength(M_r, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
+		// Buckets with Jaccard and Containment index >= theta
+		vector<Buckets::Bucket> J_buckets;
+		vector<Buckets::Bucket> C_buckets;
+		for (auto it = B.ordered_begin(); it != B.ordered_end(); ++it) {
+		//for (auto it = B.unordered_begin(); it != B.unordered_end(); ++it) {
+			//cerr << it->first << " " << it->first.parent << endl;
+			auto M = collect_matches(it->first, tidx, p_ht);
+			auto mapping_J = bestIncludedJaccard(M, P_sz, end-start-2, end-start+2, m, diff_hist);
+			auto mapping_C = bestFixedLength(M, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
+			mapping_J.bucket = it->first;
+			if (mapping_J.J >= H->params.theta) J_buckets.push_back(it->first);
+			if (mapping_C.J >= H->params.theta) C_buckets.push_back(it->first);
+		}
 
-		//return mapping_J;
-
+		//TODO: make sure these are the same
 		//gt_C_l.bucket.b
 		//gt_C_right.bucket.b
 
 		// open a new file stream
 		static bool is_first_row = true;
 		if (is_first_row) {
-			paulout << "query_id\t"
-			           "theta\t"
-					   "segm\t"
-					   "gt_l_bucket\t"
-					   "gt_r_bucket\t"
-			           "gt_J_l\t"
-					   "gt_J_r\t"
-					   "gt_C_lmax_l\t"
-					   "gt_C_lmax_r\t"
-					   "gt_C_2lmax_l\t"
-					   "gt_C_2lmax_r"
+			paulout << "query_id"
+					   "\tm"
+			           "\ttheta"
+					   "\thl"
+					   "\tsegm"
+					   "\tgt_l_bucket"
+					   "\tgt_r_bucket"
+					   "\tgt_J_l"
+					   "\tgt_J_r"
+					   "\tgt_C_l"
+					   "\tgt_C_r"
+					   "\tgt_C_l_lmax"
+					   "\tgt_C_r_lmax"
+					   "\t#J>theta"
+					   "\t#C>theta"
+					   "\tJ>theta"
+					   "\tC>theta"
 					   << endl;
 			is_first_row = false;
 		}
 		paulout << query_id
-			<< "\t" << H->params.theta // theta threshold
-			<< "\t" << segm_name       // chromosome name
-			<< "\t" << b_l.b
-			<< "\t" << b_r.b
-			<< "\t" << gt_J_l.J
-			<< "\t" << gt_J_r.J 
-			<< "\t" << gt_C_lmax_l.J
-			<< "\t" << gt_C_lmax_r.J
-			<< "\t" << gt_C_2lmax_l.J
-			<< "\t" << gt_C_2lmax_r.J
+			<< "\t" << m						// sketch size of the read
+			<< "\t" << H->params.theta			// theta threshold
+			<< "\t" << bucket_l       			// bucket's half-length
+			<< "\t" << segm_name       			// GT chromosome name
+			<< "\t" << gt_b_l.b					// GT left bucket
+			<< "\t" << gt_b_r.b					// GT right bucket
+			<< "\t" << gt_J_l.J					// GT left bucket: max included Jaccard
+			<< "\t" << gt_J_r.J					// GT right bucket: max included Jaccard
+			<< "\t" << gt_C_l.J					// GT left bucket: max containment index of mapping of bucket length (2*lmax)
+			<< "\t" << gt_C_r.J					// GT right bucket: max containment index of mapping of bucket length (2*lmax)
+			<< "\t" << gt_C_l_lmax.J			// GT left bucket: max containment index of mapping of length lmax
+			<< "\t" << gt_C_r_lmax.J			// GT right bucket: max containment index of mapping of length lmax
+			<< "\t" << J_buckets.size()			// number of buckets that contain a mapping with Jaccard >= theta
+			<< "\t" << C_buckets.size() 		// number of buckets with Containment index >= theta
+			<< "\t" << vec2str(J_buckets, tidx) // buckets that contain a mapping with Jaccard >= theta
+			<< "\t" << vec2str(C_buckets, tidx) // buckets with Containment index >= theta
 			<< endl;	
 		
 	}
