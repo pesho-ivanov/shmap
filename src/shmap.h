@@ -370,41 +370,75 @@ private:
         return res;
     }
 
- 	void gt_Jaccard(const string& query_id, int P_sz, Hist diff_hist, int m, unordered_map<hash_t, Seed> p_ht, const SketchIndex &tidx, int lmax, int bucket_l, Mapping *best_mapping) {
+	tuple<qpos_t, qpos_t, int, string> GT_start_end(const string& query_id, const SketchIndex &tidx) {
 		auto parsed = ParsedQueryId::parse(query_id);
 		assert(parsed.valid);
 		
 		// Find index i where tidx.T[i].seq matches parsed.segm_id
 		int segm_id = -1;
-		for (int i = 0; i < (int)tidx.T.size(); i++) {
+		for (int i = 0; i < (int)tidx.T.size(); i++)
 			if (tidx.T[i].name == parsed.segm_id) {
 				segm_id = i;
 				break;
 			}
-		}
 		assert(segm_id >= 0 && segm_id < (rpos_t)tidx.T.size());
 		
 		const auto &segm = tidx.T[segm_id];
-
 		qpos_t start = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.start_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
 		qpos_t end  = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.end_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
-		int gt_lmin = end - start - 1;
-		int gt_lmax = end - start + 1;
-		//qpos_t lmax = segm.kmers.size();
-		//qpos_t lmin = lmax;
+		return {start, end, segm_id, parsed.segm_id};
+	}
 
-		//int bucket_l = lmax;
-//		assert(bucket_l > gt_lmax);
-//		bucket_t b(segm_id, start/bucket_l);
-		auto b = Buckets::Bucket(segm_id, start/bucket_l, nullptr);
-		auto M = collect_matches(b, tidx, p_ht);
-		//cerr << "lmin: " << lmin << ", lmax: " << lmax << ", start: " << start << ", end: " << end << ", segm.kmers[start].r: " << segm.kmers[start].r << ", segm.kmers[end].r: " << segm.kmers[end].r << ", parsed.start_pos: " << parsed.start_pos << ", parsed.end_pos: " << parsed.end_pos << ", M.front(): " << M.front().hit.tpos << ", M.back(): " << M.back().hit.tpos << endl;	
-		
-		best_mapping->gt_J 			= bestIncludedJaccard(M, P_sz, gt_lmin, gt_lmax, m, diff_hist).J;
-		best_mapping->gt_C 			= bestFixedLength(M, P_sz, lmax, m, diff_hist, Metric::CONTAINMENT_INDEX).J;
-		best_mapping->gt_C_bucket 	= bestFixedLength(M, P_sz, bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX).J;
+ 	void PaulsExperiment(const string& query_id, int P_sz, Hist diff_hist, int m, unordered_map<hash_t, Seed> p_ht, const SketchIndex &tidx, const Buckets &B, ofstream &paulout) {
+		int bucket_l = B.get_bucket_len();
+		auto [start, end, segm_id, segm_name] = GT_start_end(query_id, tidx);
+		auto b_l = Buckets::Bucket(segm_id, start/bucket_l, &B);
+		auto b_r = Buckets::Bucket(segm_id, start/bucket_l + 1, &B);
+		auto M_l = collect_matches(b_l,  tidx, p_ht);
+		auto M_r = collect_matches(b_r, tidx, p_ht);
+
+		auto gt_J_l			= bestIncludedJaccard(M_l, P_sz, end-start-2, end-start+2, m, diff_hist);
+		auto gt_J_r			= bestIncludedJaccard(M_r, P_sz, end-start-2, end-start+2, m, diff_hist);
+		auto gt_C_lmax_l 	= bestFixedLength(M_l, P_sz, bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
+		auto gt_C_lmax_r 	= bestFixedLength(M_r, P_sz, bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
+		auto gt_C_2lmax_l	= bestFixedLength(M_l, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
+		auto gt_C_2lmax_r	= bestFixedLength(M_r, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
 
 		//return mapping_J;
+
+		//gt_C_l.bucket.b
+		//gt_C_right.bucket.b
+
+		// open a new file stream
+		static bool is_first_row = true;
+		if (is_first_row) {
+			paulout << "query_id\t"
+			           "theta\t"
+					   "segm\t"
+					   "gt_l_bucket\t"
+					   "gt_r_bucket\t"
+			           "gt_J_l\t"
+					   "gt_J_r\t"
+					   "gt_C_lmax_l\t"
+					   "gt_C_lmax_r\t"
+					   "gt_C_2lmax_l\t"
+					   "gt_C_2lmax_r"
+					   << endl;
+			is_first_row = false;
+		}
+		paulout << query_id
+			<< "\t" << H->params.theta // theta threshold
+			<< "\t" << segm_name       // chromosome name
+			<< "\t" << b_l.b
+			<< "\t" << b_r.b
+			<< "\t" << gt_J_l.J
+			<< "\t" << gt_J_r.J 
+			<< "\t" << gt_C_lmax_l.J
+			<< "\t" << gt_C_lmax_r.J
+			<< "\t" << gt_C_2lmax_l.J
+			<< "\t" << gt_C_2lmax_r.J
+			<< endl;	
+		
 	}
 
 	std::tuple<int, int, double, double> calc_FDR(vector<Mapping> &maps, double theta, qpos_t lmax, const SketchIndex &tidx, const unordered_map<hash_t, Seed> &p_ht, qpos_t P_sz, qpos_t lmin, qpos_t m, const Hist &diff_hist) {
@@ -446,7 +480,11 @@ private:
 		H->T.start("mapping");
 		H->T.start("query_reading");
 
-		read_fasta_klib(pFile, [this](const string &query_id, const string &P) {
+		string pauls_fn = "pauls_experiment.tsv";
+		ofstream paulout = ofstream(pauls_fn);
+		cerr << "Paul's experiment to " << pauls_fn << endl;
+
+		read_fasta_klib(pFile, [this, &paulout](const string &query_id, const string &P) {
 			H->C.inc("reads");
 			H->T.stop("query_reading");
 			H->T.start("query_mapping");
@@ -487,9 +525,9 @@ private:
 					qpos_t lmax = qpos_t(p.size() / H->params.theta);					// maximum length of a similar mapping
 					//qpos_t bucket_l = lmax;
 
-					double coef = 1.0;// * nonzero / p.size();
+					//double coef = 1.0;// * nonzero / p.size();
 					//cerr << "coef: " << coef << endl;
-					double new_theta = coef * H->params.theta;
+					double new_theta = H->params.theta;
 					//cerr << "theta: " << H->params.theta << " -> " << new_theta << endl;
 
 					qpos_t S = qpos_t((1.0 - new_theta) * m) + 1;			// any similar mapping includes at least 1 seed match
@@ -586,15 +624,8 @@ private:
 				H->C.inc("lost_on_pruning", lost_on_pruning);
 			H->T.stop("query_mapping");
 
-			{
-				//if (best_idx == -1) {
-				//	maps.push_back(Mapping());
-				//	best_idx = maps.size() - 1;
-				//}
-				// TODO: remove this
-				//if (best_idx != -1)
-				//	gt_Jaccard(query_id, P_sz, diff_hist, m, p_ht, tidx, lmax, bucket_l, &maps[best_idx]);
-			}
+			// todo: comment out
+			PaulsExperiment(query_id, P_sz, diff_hist, m, p_ht, tidx, B, paulout);
 
 			H->T.start("output");
 				if (H->params.onlybest && maps.size() >= 1) {
@@ -606,6 +637,7 @@ private:
 						Mapping &m = maps[best_idx];
 
 						const auto &segm = tidx.T[m.segm_id];
+						//cerr << segm.name << " " << query_id << endl;
 						m.seeds = S;
 						m.total_matches = total_matches;
 						m.match_inefficiency = 1.0 * m.total_matches / m.intersection;
