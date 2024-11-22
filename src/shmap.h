@@ -519,9 +519,12 @@ private:
 		H->T.start("mapping");
 		H->T.start("query_reading");
 
-		string pauls_fn = "pauls_experiment.tsv";
-		ofstream paulout = ofstream(pauls_fn);
-		cerr << "Paul's experiment to " << pauls_fn << endl;
+		string pauls_fn = H->params.paramsFile + ".paul.tsv";
+		ofstream paulout;
+		if (!H->params.paramsFile.empty()) {
+			cerr << "Paul's experiment to " << pauls_fn << endl;
+			paulout = ofstream(pauls_fn);
+		}
 
 		read_fasta_klib(pFile, [this, &paulout](const string &query_id, const string &P) {
 			H->C.inc("reads");
@@ -663,8 +666,10 @@ private:
 				H->C.inc("lost_on_pruning", lost_on_pruning);
 			H->T.stop("query_mapping");
 
-			// todo: comment out
-			PaulsExperiment(query_id, P_sz, diff_hist, m, p_ht, tidx, B, paulout);
+			if (!H->params.paramsFile.empty()) {
+				// todo: comment out
+				PaulsExperiment(query_id, P_sz, diff_hist, m, p_ht, tidx, B, paulout);
+			}
 
 			H->T.start("output");
 				if (H->params.onlybest && maps.size() >= 1) {
