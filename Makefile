@@ -43,6 +43,7 @@ R ?= 0.05
 T ?= 0.75
 
 THETAS = 0.95 0.9 0.85 0.8 0.75 0.7 0.65 0.6 0.55 0.5  
+PAUL_THETAS = 1.0 0.9 0.8 0.7 0.6 0.5
 
 Ks = 14 16 18 20 22 24 26
 Rs = 0.01 0.05 0.1 0.15 0.2
@@ -252,6 +253,17 @@ eval_winnowmap_on_datasets:
 	make eval_winnowmap REFNAME=chm13   DEPTH=1
 	make eval_winnowmap REFNAME=t2tChrY DEPTH=10  MEANLEN=24000
 	make eval_winnowmap REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
+
+#SHMAP_PREF         = $(ALLOUT_DIR)/pauls_experiment/$(READS_PREFIX)/
+pauls_experiment: $(SHMAP_BIN) gen_reads
+	@DIR=$(ALLOUT_DIR); \
+	for t in $(PAUL_THETAS); do \
+		pref=$${DIR}/"pauls_experiment/T$${t}"; \
+		make eval_shmap REFNAME=t2tChrY DEPTH=0.1 SHMAP_PREF=$${pref};\
+#		make eval_shmap REFNAME=chm13   DEPTH=0.01; \
+#		make eval_shmap REFNAME=t2tChrY DEPTH=0.1  MEANLEN=24000; \
+#		make eval_shmap REFNAME=chm13   READS_PREFIX=HG002_24kb_10G; \
+	done
 
 #eval_tools_on_SV:
 #	make eval_tools REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1
