@@ -459,7 +459,7 @@ private:
 					   << endl;
 			is_first_row = false;
 		}
-		paulout << query_id
+		paulout 	<< query_id					// read name including the ground-truth
 			<< "\t" << m						// sketch size of the read
 			<< "\t" << H->params.theta			// theta threshold
 			<< "\t" << bucket_l       			// bucket's half-length
@@ -475,9 +475,8 @@ private:
 			<< "\t" << J_buckets.size()			// number of buckets that contain a mapping with Jaccard >= theta
 			<< "\t" << C_buckets.size() 		// number of buckets with Containment index >= theta
 			<< "\t" << vec2str(J_buckets, tidx) // buckets that contain a mapping with Jaccard >= theta
-			<< "\t" << vec2str(C_buckets, tidx) // buckets with Containment index >= theta
+			<< "\t" << vec2str(C_buckets, tidx) // buckets with Containment index >= theta                                     
 			<< endl;	
-		
 	}
 
 	std::tuple<int, int, double, double> calc_FDR(vector<Mapping> &maps, double theta, qpos_t lmax, const SketchIndex &tidx, const unordered_map<hash_t, Seed> &p_ht, qpos_t P_sz, qpos_t lmin, qpos_t m, const Hist &diff_hist) {
