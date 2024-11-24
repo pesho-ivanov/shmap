@@ -439,43 +439,43 @@ private:
 		// open a new file stream
 		static bool is_first_row = true;
 		if (is_first_row) {
-			paulout << "query_id"
-					   "\tm"
-			           "\ttheta"
-					   "\thl"
-					   "\tsegm"
-					   "\tgt_l_bucket"
-					   "\tgt_r_bucket"
-					   "\tgt_J_l"
-					   "\tgt_J_r"
-					   "\tgt_C_l"
-					   "\tgt_C_r"
-					   "\tgt_C_l_lmax"
-					   "\tgt_C_r_lmax"
-					   "\t#J>theta"
-					   "\t#C>theta"
-					   "\tJ>theta"
-					   "\tC>theta"
+			paulout << "query_id"		// read name including the ground-truth
+					   "\tm"			// sketch size of the read
+			           "\ttheta"		// theta threshold
+					   "\thl"           // bucket's half-length
+					   "\tsegm"         // GT chromosome name
+					   "\tgt_l_bucket"  // GT left bucket
+					   "\tgt_r_bucket"  // GT right bucket
+					   "\tgt_J_l"       // GT left bucket: max included Jaccard
+					   "\tgt_J_r"       // GT right bucket: max included Jaccard
+					   "\tgt_C_l"       // GT left bucket: max containment index of mapping of bucket length (2*lmax)
+					   "\tgt_C_r"       // GT right bucket: max containment index of mapping of bucket length (2*lmax)
+					   "\tgt_C_l_lmax"  // GT left bucket: max containment index of mapping of length lmax
+					   "\tgt_C_r_lmax"  // GT right bucket: max containment index of mapping of length lmax
+					   "\t#J>theta"     // number of buckets that contain a mapping with Jaccard >= theta
+					   "\t#C>theta"     // number of buckets with Containment index >= theta
+					   "\tJ>theta"      // buckets that contain a mapping with Jaccard >= theta
+					   "\tC>theta"      // buckets with Containment index >= theta                                     
 					   << endl;
 			is_first_row = false;
 		}
-		paulout 	<< query_id					// read name including the ground-truth
-			<< "\t" << m						// sketch size of the read
-			<< "\t" << H->params.theta			// theta threshold
-			<< "\t" << bucket_l       			// bucket's half-length
-			<< "\t" << segm_name       			// GT chromosome name
-			<< "\t" << gt_b_l.b					// GT left bucket
-			<< "\t" << gt_b_r.b					// GT right bucket
-			<< "\t" << gt_J_l.J					// GT left bucket: max included Jaccard
-			<< "\t" << gt_J_r.J					// GT right bucket: max included Jaccard
-			<< "\t" << gt_C_l.J					// GT left bucket: max containment index of mapping of bucket length (2*lmax)
-			<< "\t" << gt_C_r.J					// GT right bucket: max containment index of mapping of bucket length (2*lmax)
-			<< "\t" << gt_C_l_lmax.J			// GT left bucket: max containment index of mapping of length lmax
-			<< "\t" << gt_C_r_lmax.J			// GT right bucket: max containment index of mapping of length lmax
-			<< "\t" << J_buckets.size()			// number of buckets that contain a mapping with Jaccard >= theta
-			<< "\t" << C_buckets.size() 		// number of buckets with Containment index >= theta
-			<< "\t" << vec2str(J_buckets, tidx) // buckets that contain a mapping with Jaccard >= theta
-			<< "\t" << vec2str(C_buckets, tidx) // buckets with Containment index >= theta                                     
+		paulout 	<< query_id
+			<< "\t" << m						
+			<< "\t" << H->params.theta			
+			<< "\t" << bucket_l       			
+			<< "\t" << segm_name       			
+			<< "\t" << gt_b_l.b					
+			<< "\t" << gt_b_r.b					
+			<< "\t" << gt_J_l.J					
+			<< "\t" << gt_J_r.J					
+			<< "\t" << gt_C_l.J					
+			<< "\t" << gt_C_r.J					
+			<< "\t" << gt_C_l_lmax.J			
+			<< "\t" << gt_C_r_lmax.J			
+			<< "\t" << J_buckets.size()			
+			<< "\t" << C_buckets.size()         
+			<< "\t" << vec2str(J_buckets, tidx)	
+			<< "\t" << vec2str(C_buckets, tidx)                                     
 			<< endl;	
 	}
 
