@@ -9,7 +9,6 @@
 #include "utils.h"
 #include "handler.h"
 #include "mapper.h"
-#include "cmath"
 #include "buckets.h"
 
 #include "edlib.h"
@@ -73,23 +72,6 @@ public:
 		return kmers;
 	}
 
-private:
-
-	bool do_overlap(const Mapping &a, const Mapping &b) {
-		if (a.segm_id != b.segm_id)
-			return false;
-		return a.T_r >= b.T_l && a.T_l <= b.T_r;
-	}
-
-	double overlap(const Mapping &a, const Mapping &b) {
-		if (a.segm_id != b.segm_id)
-			return 0.0;
-		int cap = std::max(0, std::min(a.T_r, b.T_r) - std::max(a.T_l, b.T_l));
-		int cup = std::max(a.T_r, b.T_r) - std::min(a.T_l, b.T_l);
-		assert(cup >= 0 && cap >=0 && cup >= cap);
-		return 1.0 * cap / cup;
-	}
-
 public:
 	static double ContainmentIndex(qpos_t intersection, qpos_t m) {
 		//assert(intersection <= s_sz);
@@ -105,8 +87,7 @@ public:
 		return 1.0*intersection / (m + s_sz - intersection);
 	}
 
-private:
-	Mapping bestIncludedJaccard(const vector<Match> &M, const qpos_t P_sz, qpos_t lmin, qpos_t lmax, const qpos_t m, Hist diff_hist) {
+	static Mapping bestIncludedJaccard(const SketchIndex &tidx, const vector<Match> &M, const qpos_t P_sz, qpos_t lmin, qpos_t lmax, const qpos_t m, Hist diff_hist) {
 		qpos_t intersection = 0;
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 		Mapping best;
@@ -136,10 +117,10 @@ private:
 				
 				assert (l->hit.r <= r->hit.r);
 				if (l < r) {
-					int s_sz = r->hit.tpos - l->hit.tpos + 1;
+					int s_sz = prev(r)->hit.tpos - l->hit.tpos + 1;
 					double J = Jaccard(intersection, m, s_sz);
-					if (J > best.J)
-						best = Mapping(H->params.k, P_sz, m, l->hit.r, r->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, r);
+					best.update(0, P_sz-1, l->hit.r, prev(r)->hit.r, tidx.T[l->hit.segm_id], intersection, J, same_strand_seeds, l, prev(r)); // TODO: should it be prev(r) instead?
+					//best = Mapping(H->params.k, P_sz, m, l->hit.r, r->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, r);
 				}
 			}
 
@@ -195,8 +176,9 @@ private:
 
 			assert(J >= -0.0);
 			assert(J <= 1.0);
-			if (J > best.J)
-				best = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r));
+			if (J > best.score())
+				best.update(0, P_sz-1, l->hit.r, prev(r)->hit.r, tidx.T[l->hit.segm_id], intersection, J, same_strand_seeds, l, prev(r)); // TODO: should it be prev(r) instead?
+				//best = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r));
 
 			assert(diff_hist.contains(l->seed.kmer.h));
 			if (++diff_hist[l->seed.kmer.h] >= 1) {
@@ -235,7 +217,7 @@ private:
 
 		*lowest_sh = 1.0; // should only get lower
 
-		double thr2 = best_idx == -1 ? thr_init : maps[best_idx].J-0.015;
+		double thr2 = best_idx == -1 ? thr_init : maps[best_idx].score()-0.015;  // TODO: add a parameter for 0.015
 
 		if (hseed(m, seeds, seed_matches) < thr2)
 			return false;
@@ -258,26 +240,6 @@ private:
 		return ret;
 	}
 	
-	double sigmas_diff(qpos_t X, qpos_t Y) {
-		if (X==-1) X=0;
-		if (Y==-1) Y=0;
-		return std::abs(X - Y) / std::sqrt(X + Y);
-	}
-
-	int mapq(Mapping m, double new_theta) {
-		// minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
-		assert(m.J >= 0.0);
-		if (m.J2 < new_theta)
-			m.J2 = new_theta;
-		if (m.J - m.J2 > 0.015) {
-			if (abs(m.same_strand_seeds) < m.intersection/2)
-				return 5;
-			return 60;
-		} else {
-			return 0;
-		}
-	}
-
 	Matches collect_matches(const Buckets::Bucket &b, const SketchIndex &tidx, const unordered_map<hash_t, Seed> &p_ht) {
 		Matches M;
 		//cerr << b << endl;
@@ -319,14 +281,14 @@ private:
 				++final_buckets;
 
 				H->T.start("sweep");
-					auto bucket_best = bestFixedLength(M, P_sz, lmax, m, diff_hist, Metric::CONTAINMENT_INDEX);
-					bucket_best.bucket = b_it->first;
-					assert(bucket_best.J <= lowest_sh + 1e-7);
-					if (bucket_best.J >= H->params.theta) {
-						maps.push_back(bucket_best);
-						if (bucket_best.J > best_J) {
-							if (forbidden_idx == -1 || overlap(maps.back(), maps[forbidden_idx]) < 0.5) {
-								best_J = max(best_J, bucket_best.J);
+					auto best_in_bucket = bestFixedLength(M, P_sz, lmax, m, diff_hist, Metric::CONTAINMENT_INDEX);
+					best_in_bucket.set_bucket(b_it->first);
+					assert(best_in_bucket.score() <= lowest_sh + 1e-7);
+					if (best_in_bucket.score() >= H->params.theta) {
+						maps.emplace_back(best_in_bucket);
+						if (best_in_bucket.score() > best_J) {
+							if (forbidden_idx == -1 || Mapping::overlap(maps.back(), maps[forbidden_idx]) < 0.5) {
+								best_J = max(best_J, best_in_bucket.score());
 								best_idx = maps.size()-1;
 							}
 						}
@@ -402,17 +364,17 @@ private:
 		return res.str();
 	}
 
- 	void PaulsExperiment(const string& query_id, int P_sz, Hist diff_hist, int m, unordered_map<hash_t, Seed> p_ht, const SketchIndex &tidx, const Buckets &B, ofstream &paulout) {
+ 	void PaulsExperiment(const string& query_id, const string &P, int P_sz, Hist diff_hist, int m, unordered_map<hash_t, Seed> p_ht, const SketchIndex &tidx, const Buckets &B, ofstream &paulout) {
 		int bucket_l = B.get_bucket_len();
 
 		// Ground-truth
 		auto [start, end, segm_id, segm_name] = GT_start_end(query_id, tidx);
-		auto gt_b_l 		= Buckets::Bucket(segm_id, max(0, start/bucket_l-1), &B);
-		auto gt_b_r 		= Buckets::Bucket(segm_id, start/bucket_l, &B);
+		auto gt_b_l 		= Buckets::Bucket(segm_id, start/bucket_l, &B);
+		auto gt_b_r 		= Buckets::Bucket(segm_id, start/bucket_l+1, &B);
 		auto gt_M_l 		= collect_matches(gt_b_l, tidx, p_ht);
 		auto gt_M_r 		= collect_matches(gt_b_r, tidx, p_ht);
-		auto gt_J_l			= bestIncludedJaccard(gt_M_l, P_sz, end-start-2, end-start+2, m, diff_hist);
-		auto gt_J_r			= bestIncludedJaccard(gt_M_r, P_sz, end-start-2, end-start+2, m, diff_hist);
+		auto gt_J_l			= bestIncludedJaccard(tidx, gt_M_l, P_sz, end-start-2, end-start+2, m, diff_hist);
+		auto gt_J_r			= bestIncludedJaccard(tidx, gt_M_r, P_sz, end-start-2, end-start+2, m, diff_hist);
 		auto gt_C_l			= bestFixedLength(gt_M_l, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
 		auto gt_C_r			= bestFixedLength(gt_M_r, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
 		auto gt_C_l_lmax 	= bestFixedLength(gt_M_l, P_sz, bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
@@ -425,11 +387,11 @@ private:
 		//for (auto it = B.unordered_begin(); it != B.unordered_end(); ++it) {
 			//cerr << it->first << " " << it->first.parent << endl;
 			auto M = collect_matches(it->first, tidx, p_ht);
-			auto mapping_J = bestIncludedJaccard(M, P_sz, end-start-2, end-start+2, m, diff_hist);
+			auto mapping_J = bestIncludedJaccard(tidx, M, P_sz, end-start-2, end-start+2, m, diff_hist);
 			auto mapping_C = bestFixedLength(M, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
-			mapping_J.bucket = it->first;
-			if (mapping_J.J >= H->params.theta) J_buckets.push_back(it->first);
-			if (mapping_C.J >= H->params.theta) C_buckets.push_back(it->first);
+			mapping_J.set_bucket(it->first);
+			if (mapping_J.score() >= H->params.theta) J_buckets.push_back(it->first);
+			if (mapping_C.score() >= H->params.theta) C_buckets.push_back(it->first);
 		}
 
 		//TODO: make sure these are the same
@@ -456,6 +418,7 @@ private:
 					   "\t#C>theta"     // number of buckets with Containment index >= theta
 					   "\tJ>theta"      // buckets that contain a mapping with Jaccard >= theta
 					   "\tC>theta"      // buckets with Containment index >= theta                                     
+					   "\tP"      		// the read sequence
 					   << endl;
 			is_first_row = false;
 		}
@@ -466,26 +429,27 @@ private:
 			<< "\t" << segm_name       			
 			<< "\t" << gt_b_l.b					
 			<< "\t" << gt_b_r.b					
-			<< "\t" << gt_J_l.J					
-			<< "\t" << gt_J_r.J					
-			<< "\t" << gt_C_l.J					
-			<< "\t" << gt_C_r.J					
-			<< "\t" << gt_C_l_lmax.J			
-			<< "\t" << gt_C_r_lmax.J			
+			<< "\t" << gt_J_l.score()					
+			<< "\t" << gt_J_r.score()					
+			<< "\t" << gt_C_l.score()					
+			<< "\t" << gt_C_r.score()					
+			<< "\t" << gt_C_l_lmax.score()			
+			<< "\t" << gt_C_r_lmax.score()			
 			<< "\t" << J_buckets.size()			
 			<< "\t" << C_buckets.size()         
 			<< "\t" << vec2str(J_buckets, tidx)	
 			<< "\t" << vec2str(C_buckets, tidx)                                     
+			<< "\t" << P
 			<< endl;	
 	}
 
 	std::tuple<int, int, double, double> calc_FDR(vector<Mapping> &maps, double theta, qpos_t lmax, const SketchIndex &tidx, const unordered_map<hash_t, Seed> &p_ht, qpos_t P_sz, qpos_t lmin, qpos_t m, const Hist &diff_hist) {
 		int FP = 0;
 		for (auto &mapping: maps) {
-			auto M = collect_matches(mapping.bucket, tidx, p_ht);
-			auto mapping_best_J = bestIncludedJaccard(M, P_sz, lmin, lmax, m, diff_hist);
-			mapping_best_J.bucket = mapping.bucket;
-			if (mapping_best_J.J < H->params.theta)
+			auto M = collect_matches(mapping.bucket(), tidx, p_ht);
+			auto mapping_best_J = bestIncludedJaccard(tidx, M, P_sz, lmin, lmax, m, diff_hist);
+			mapping_best_J.set_bucket(mapping.bucket());
+			if (mapping_best_J.score() < H->params.theta)
 				++FP;
 		}
 
@@ -659,16 +623,16 @@ private:
 
 					if (best_idx != -1) {
 						// find second best mapping for mapq computation
-						match_rest(P_sz, lmax, m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, maps[best_idx].J, best_idx, query_id, &lost_on_pruning);
+						match_rest(P_sz, lmax, m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, maps[best_idx].score(), best_idx, query_id, &lost_on_pruning);
 					}
 				H->T.stop("match_rest");
 				H->C.inc("lost_on_pruning", lost_on_pruning);
 			H->T.stop("query_mapping");
 
-			if (!H->params.paramsFile.empty()) {
-				// todo: comment out
-				PaulsExperiment(query_id, P_sz, diff_hist, m, p_ht, tidx, B, paulout);
-			}
+			//if (!H->params.paramsFile.empty()) {
+			//	// todo: comment out
+			//	PaulsExperiment(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, paulout);
+			//}
 
 			H->T.start("output");
 				if (H->params.onlybest && maps.size() >= 1) {
@@ -679,37 +643,18 @@ private:
 						assert(0 <= best_idx && best_idx < (int)maps.size());
 						Mapping &m = maps[best_idx];
 
-						const auto &segm = tidx.T[m.segm_id];
-						//cerr << segm.name << " " << query_id << endl;
-						m.seeds = S;
-						m.total_matches = total_matches;
-						m.match_inefficiency = 1.0 * m.total_matches / m.intersection;
-						m.max_seed_matches = max_seed_matches;
-						m.seed_matches = seed_matches;
-						m.seeded_buckets = seeded_buckets;
-						m.final_buckets = final_buckets;
-						m.FPTP = FPTP;
-						m.query_id = query_id.c_str();
-						m.segm_name = segm.name.c_str();
-						m.segm_sz = segm.sz;
-						m.map_time = H->T.secs("query_mapping");
+						const auto &segm = tidx.T[m.segm_id()];
+						m.set_global_stats(query_id.c_str(), P_sz, S, total_matches, max_seed_matches, seed_matches, seeded_buckets, final_buckets, FPTP, segm.name, segm.sz, H->T.secs("query_mapping"));  // TODO: disable by flag
 
-						if (best2_idx != -1) {
-							//cerr << "best_idx: " << best_idx << ", best2_idx: " << best2_idx << endl;
-							m.J2 = maps[best2_idx].J;
-							m.bucket2 = maps[best2_idx].bucket;
-							m.intersection2 = maps[best2_idx].intersection;
-							m.sigmas_diff = sigmas_diff(m.intersection2, m.intersection);
-							//assert(m.bucket.segm_id != m.bucket2.segm_id || abs(m.bucket.b - m.bucket2.b) > 1);
-							//m.ed2 = edit_distance(m.bucket, P, P_sz, m, kmers);
-						}
+						if (best2_idx != -1)
+							m.set_second_best(maps[best2_idx]);
 
-						m.mapq = mapq(m, new_theta);
+						m.set_mapq(H->params.theta);
 						m.print_paf();
 
-						if (m.mapq == 60) H->C.inc("mapq60");
-						H->C.inc("matches_in_reported_mappings", m.intersection);
-						H->C.inc("J_best", rpos_t(10000.0*m.J));
+						if (m.mapq() == 60) H->C.inc("mapq60");
+						H->C.inc("matches_in_reported_mappings", m.intersection());
+						H->C.inc("J_best", rpos_t(10000.0*m.score()));
 						H->C.inc("mappings");
 					}
 				}

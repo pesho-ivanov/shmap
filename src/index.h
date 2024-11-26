@@ -139,7 +139,7 @@ public:
 	}
 
 	void add_segment(const string &segm_name, const string &segm_seq, const sketch_t& sketch) {
-		T.push_back(RefSegment(sketch, segm_name, segm_seq, segm_seq.size()));
+		T.push_back(RefSegment(sketch, segm_name, segm_seq, segm_seq.size(), T.size()));
 		H->C.inc("segments");
 		H->C.inc("total_nucls", segm_seq.size());
 		populate_h2pos(sketch, T.size()-1);
