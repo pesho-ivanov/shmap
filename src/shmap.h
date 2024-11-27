@@ -355,12 +355,22 @@ public:
 		return {start, end, segm_id, parsed.segm_id};
 	}
 
-	string vec2str(vector<Buckets::Bucket> buckets, const SketchIndex &tidx) {
+	string vec2str(vector<Buckets::Bucket> buckets, const SketchIndex &tidx, int P_sz, Hist diff_hist, int m, unordered_map<hash_t, Seed> p_ht, int bucket_l) {
 		stringstream res;
+		res << std::fixed << std::setprecision(4);
 		res << "{";
-		for (auto &b: buckets)
-			res << "(" << tidx.T[b.segm_id].name << "," << b.b << "),";
+		double max_J = 0.0, max_C = 0.0;
+		for (auto &b: buckets) {
+			auto M = collect_matches(b, tidx, p_ht);
+			auto best_J_mapping	= bestIncludedJaccard(tidx, M, P_sz, m-2, m+2, m, diff_hist);
+			auto best_C_mapping = bestFixedLength(M, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
+			res << "(" << tidx.T[b.segm_id].name << ", " << b.b << ", " << best_J_mapping.score() << ", " << best_C_mapping.score() << "),";
+
+			max_J = max(max_J, best_J_mapping.score());
+			max_C = max(max_C, best_C_mapping.score());	
+		}
 		res << "}";
+		res << "\tmax_J: " << max_J << "\tmax_C: " << max_C;
 		return res.str();
 	}
 
@@ -369,8 +379,9 @@ public:
 
 		// Ground-truth
 		auto [start, end, segm_id, segm_name] = GT_start_end(query_id, tidx);
-		auto gt_b_l 		= Buckets::Bucket(segm_id, start/bucket_l, &B);
-		auto gt_b_r 		= Buckets::Bucket(segm_id, start/bucket_l+1, &B);
+		auto gt_b_l 		= Buckets::Bucket(segm_id, max(0, start/bucket_l-1), &B);
+		auto gt_b_r 		= Buckets::Bucket(segm_id, start/bucket_l, &B);
+		auto gt_b_next 		= Buckets::Bucket(segm_id, start/bucket_l+1, &B);
 		auto gt_M_l 		= collect_matches(gt_b_l, tidx, p_ht);
 		auto gt_M_r 		= collect_matches(gt_b_r, tidx, p_ht);
 		auto gt_J_l			= bestIncludedJaccard(tidx, gt_M_l, P_sz, end-start-2, end-start+2, m, diff_hist);
@@ -394,6 +405,17 @@ public:
 			if (mapping_C.score() >= H->params.theta) C_buckets.push_back(it->first);
 		}
 
+		//static int not_overlapping_with_gt = 0;
+		//bool J_overlaps_with_gt = false;
+		//for (const auto &b_J: J_buckets)
+		//	if (do_overlap(query_id, b_J, tidx)) {
+		//		J_overlaps_with_gt = true;
+		//		break;
+		//	}
+		//if (!J_overlaps_with_gt)
+		//	++not_overlapping_with_gt;	
+		//cerr << "not_overlapping_with_gt: " << not_overlapping_with_gt << endl;
+
 		//TODO: make sure these are the same
 		//gt_C_l.bucket.b
 		//gt_C_right.bucket.b
@@ -408,6 +430,7 @@ public:
 					   "\tsegm"         // GT chromosome name
 					   "\tgt_l_bucket"  // GT left bucket
 					   "\tgt_r_bucket"  // GT right bucket
+					   "\tgt_next_bucket"  // GT right bucket
 					   "\tgt_J_l"       // GT left bucket: max included Jaccard
 					   "\tgt_J_r"       // GT right bucket: max included Jaccard
 					   "\tgt_C_l"       // GT left bucket: max containment index of mapping of bucket length (2*lmax)
@@ -418,6 +441,8 @@ public:
 					   "\t#C>theta"     // number of buckets with Containment index >= theta
 					   "\tJ>theta"      // buckets that contain a mapping with Jaccard >= theta
 					   "\tC>theta"      // buckets with Containment index >= theta                                     
+					   "\tmaxJ"         // maximal Jaccard of a reported bucket
+					   "\tmaxC"         // maximal Containment index of a reported bucket
 					   "\tP"      		// the read sequence
 					   << endl;
 			is_first_row = false;
@@ -429,6 +454,7 @@ public:
 			<< "\t" << segm_name       			
 			<< "\t" << gt_b_l.b					
 			<< "\t" << gt_b_r.b					
+			<< "\t" << gt_b_next.b					
 			<< "\t" << gt_J_l.score()					
 			<< "\t" << gt_J_r.score()					
 			<< "\t" << gt_C_l.score()					
@@ -437,8 +463,8 @@ public:
 			<< "\t" << gt_C_r_lmax.score()			
 			<< "\t" << J_buckets.size()			
 			<< "\t" << C_buckets.size()         
-			<< "\t" << vec2str(J_buckets, tidx)	
-			<< "\t" << vec2str(C_buckets, tidx)                                     
+			<< "\t" << vec2str(J_buckets, tidx, P_sz, diff_hist, m, p_ht, bucket_l)
+			<< "\t" << vec2str(C_buckets, tidx, P_sz, diff_hist, m, p_ht, bucket_l)
 			<< "\t" << P
 			<< endl;	
 	}
@@ -629,10 +655,10 @@ public:
 				H->C.inc("lost_on_pruning", lost_on_pruning);
 			H->T.stop("query_mapping");
 
-			//if (!H->params.paramsFile.empty()) {
-			//	// todo: comment out
-			//	PaulsExperiment(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, paulout);
-			//}
+			if (!H->params.paramsFile.empty()) {
+				// todo: comment out
+				PaulsExperiment(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, paulout);
+			}
 
 			H->T.start("output");
 				if (H->params.onlybest && maps.size() >= 1) {
