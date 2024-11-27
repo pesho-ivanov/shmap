@@ -10,20 +10,14 @@
 #include "handler.h"
 #include "mapper.h"
 #include "buckets.h"
-
-#include "edlib.h"
-#include <ankerl/unordered_dense.h>
+#include "refine.h"
 
 namespace sweepmap {
-
-enum class Metric {
-	JACCARD,
-	CONTAINMENT_INDEX
-};
 
 class SHMapper : public Mapper {
 	const SketchIndex &tidx;
 	Handler *H;
+	Matcher matcher;
 
 public:
 	//typedef pair<bucket_t, qpos_t> Bucket;
@@ -32,7 +26,6 @@ public:
 	//using Buckets = ankerl::unordered_dense::map<bucket_t, qpos_t>;
 	//using Hist = unordered_map<hash_t, qpos_t>;
 	//using Hist = gtl::flat_hash_map<hash_t, qpos_t>;
-	using Hist = ankerl::unordered_dense::map<hash_t, qpos_t>;
 
 	Seeds select_kmers(sketch_t& p, int &nonzero) {
 		H->T.start("seeding");
@@ -72,131 +65,9 @@ public:
 		return kmers;
 	}
 
-public:
-	static double ContainmentIndex(qpos_t intersection, qpos_t m) {
-		//assert(intersection <= s_sz);
-		assert(intersection <= m);
-		assert(1.0*intersection / m <= 1.0);
-		return 1.0*intersection / m;
-	}
-
-	static double Jaccard(qpos_t intersection, qpos_t m, qpos_t s_sz) {
-		assert(intersection <= s_sz);
-		assert(intersection <= m);
-		assert(1.0*intersection / (m + s_sz - intersection) <= 1.0);
-		return 1.0*intersection / (m + s_sz - intersection);
-	}
-
-	static Mapping bestIncludedJaccard(const SketchIndex &tidx, const vector<Match> &M, const qpos_t P_sz, qpos_t lmin, qpos_t lmax, const qpos_t m, Hist diff_hist) {
-		qpos_t intersection = 0;
-		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
-		Mapping best;
-		
-		for (int i=1; i<(int)M.size(); i++)
-			assert(M[i-1].hit.tpos < M[i].hit.tpos);
-		assert(M.size() == 0 || (int)M.size() <= M.back().hit.tpos - M.front().hit.tpos + 1);
-
-		auto l = M.begin(), r = M.begin();
-		for(; l != M.end(); ++l) {
-			// move r to the left until l+lmin<r
-			for(; l + 1 < r && l->hit.tpos + lmin < r->hit.tpos; ) {
-				--r;
-				if (++diff_hist[r->seed.kmer.h] >= 1) {
-					--intersection;
-					same_strand_seeds -= r->is_same_strand() ? +1 : -1;
-				}
-			}
-
-			// move r to the right until l+lmax<=r
-			for(;  r != M.end() && r->hit.tpos <= l->hit.tpos + lmax; ++r) {
-				assert(diff_hist.contains(r->seed.kmer.h));
-				if (--diff_hist[r->seed.kmer.h] >= 0) {
-					++intersection;
-					same_strand_seeds += r->is_same_strand() ? +1 : -1;
-				}
-				
-				assert (l->hit.r <= r->hit.r);
-				if (l < r) {
-					int s_sz = prev(r)->hit.tpos - l->hit.tpos + 1;
-					double J = Jaccard(intersection, m, s_sz);
-					best.update(0, P_sz-1, l->hit.r, prev(r)->hit.r, tidx.T[l->hit.segm_id], intersection, J, same_strand_seeds, l, prev(r)); // TODO: should it be prev(r) instead?
-					//best = Mapping(H->params.k, P_sz, m, l->hit.r, r->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, r);
-				}
-			}
-
-			assert(diff_hist.contains(l->seed.kmer.h));
-			if (++diff_hist[l->seed.kmer.h] >= 1) {
-				--intersection;
-				same_strand_seeds -= l->is_same_strand() ? +1 : -1;
-			}
-
-			assert(intersection >= 0);
-		}
-		assert(l == M.end());
-		assert(r == M.end());
-		assert(intersection == 0);
-		
-		return best;
-	}
-
-	Mapping bestFixedLength(const vector<Match> &M, const qpos_t P_sz, qpos_t lmax, const qpos_t m, Hist &diff_hist, Metric metric) {
-		qpos_t intersection = 0;
-		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
-		Mapping best;
-		
-		for (int i=1; i<(int)M.size(); i++)
-			assert(M[i-1].hit.tpos < M[i].hit.tpos);
-		assert(M.size() == 0 || (int)M.size() <= M.back().hit.tpos - M.front().hit.tpos + 1);
-
-		auto l = M.begin(), r = M.begin();
-		for(; l != M.end(); ++l) {
-			for(;  r != M.end()  && r->hit.tpos <= l->hit.tpos + lmax; ++r) {
-				//&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
-				//&& r->hit.tpos + H->params.k <= l->hit.tpos + P_sz
-				//&& r->hit.r + H->params.k <= l->hit.r + P_sz
-				assert(diff_hist.contains(r->seed.kmer.h));
-				if (--diff_hist[r->seed.kmer.h] >= 0) {
-					++intersection;
-					same_strand_seeds += r->is_same_strand() ? +1 : -1;
-				}
-				
-				assert (l->hit.r <= r->hit.r);
-			}
-
-			double J;
-			if (metric == Metric::JACCARD) {
-				int s_sz = prev(r)->hit.tpos - l->hit.tpos + 1;
-				J = Jaccard(intersection, m, s_sz);
-			} else if (metric == Metric::CONTAINMENT_INDEX) {
-				J = ContainmentIndex(intersection, m);
-			} else {
-				J = -1.0;
-				assert(false);
-			}
-
-			assert(J >= -0.0);
-			assert(J <= 1.0);
-			if (J > best.score())
-				best.update(0, P_sz-1, l->hit.r, prev(r)->hit.r, tidx.T[l->hit.segm_id], intersection, J, same_strand_seeds, l, prev(r)); // TODO: should it be prev(r) instead?
-				//best = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r));
-
-			assert(diff_hist.contains(l->seed.kmer.h));
-			if (++diff_hist[l->seed.kmer.h] >= 1) {
-				--intersection;
-				same_strand_seeds -= l->is_same_strand() ? +1 : -1;
-			}
-
-			assert(intersection >= 0);
-		}
-		assert(l == M.end());
-		assert(r == M.end());
-		assert(intersection == 0);
-		
-		return best;
-	}
-
   public:
-	SHMapper(const SketchIndex &tidx, Handler *H) : tidx(tidx), H(H) {
+	SHMapper(const SketchIndex &tidx, Handler *H)
+			: tidx(tidx), H(H), matcher(tidx) {
         H->C.inc("seeds_limit_reached", 0);
         H->C.inc("mapped_reads", 0);
         if (H->params.theta < 0.0 || H->params.theta > 1.0) {
@@ -240,24 +111,6 @@ public:
 		return ret;
 	}
 	
-	Matches collect_matches(const Buckets::Bucket &b, const SketchIndex &tidx, const unordered_map<hash_t, Seed> &p_ht) {
-		Matches M;
-		//cerr << b << endl;
-		assert(b.parent != nullptr);
-		assert(b.segm_id >= 0 && b.segm_id < (rpos_t)tidx.T.size());
-		for (rpos_t i = b.begin(); i < std::min(b.end(), (rpos_t)tidx.T[b.segm_id].kmers.size()); i++) {
-			assert(i < (rpos_t)tidx.T[b.segm_id].kmers.size());
-			//cerr << "parent" << b.parent << " " << b << " " << i << " " << tidx.T.size() << " " << tidx.T[b.segm_id].kmers.size() << endl;
-			const auto kmer = tidx.T[b.segm_id].kmers[i];
-			const auto seed_it = p_ht.find(kmer.h);
-			if (seed_it != p_ht.end()) {
-				M.push_back(Match(seed_it->second, Hit(kmer, i, b.segm_id)));
-				assert(M[ M.size()-1 ].hit.tpos == M[ M.size()-1 ].hit.tpos);
-			}
-		}
-		return M;
-	}
-
 	void match_rest(qpos_t P_sz, qpos_t lmax, qpos_t m, const Seeds &kmers, const Buckets &B, Hist &diff_hist, int seeds, int first_kmer_after_seeds, const unordered_map<hash_t, Seed> &p_ht,
 			vector<Mapping> &maps, int &total_matches, int &best_idx, int &final_buckets, double thr_init, int forbidden_idx, const string &query_id, int *lost_on_pruning) {
 		double best_J = -1.0;
@@ -272,16 +125,16 @@ public:
 		for (auto b_it = B.ordered_begin(); b_it != B.ordered_end(); ++b_it) {
 			double lowest_sh;
 			if (seed_heuristic_pass(maps, kmers, m, b_it->first, b_it->second, first_kmer_after_seeds, seeds, best_idx, &lowest_sh, thr_init)) {
-				if (do_overlap(query_id, b_it->first, tidx))
+				if (matcher.do_overlap(query_id, b_it->first))
 					*lost_on_pruning = 0;
 				H->T.start("match_collect");
-					Matches M = collect_matches(b_it->first, tidx, p_ht);
+					Matches M = matcher.collect_matches(b_it->first, p_ht);
 				H->T.stop("match_collect");
 				total_matches += M.size();
 				++final_buckets;
 
 				H->T.start("sweep");
-					auto best_in_bucket = bestFixedLength(M, P_sz, lmax, m, diff_hist, Metric::CONTAINMENT_INDEX);
+					auto best_in_bucket = matcher.bestFixedLength(M, P_sz, lmax, m, Metric::CONTAINMENT_INDEX);
 					best_in_bucket.set_bucket(b_it->first);
 					assert(best_in_bucket.score() <= lowest_sh + 1e-7);
 					if (best_in_bucket.score() >= H->params.theta) {
@@ -303,177 +156,11 @@ public:
 		H->C.inc("total_matches", total_matches);
 	}
 
-    bool do_overlap(const string& query_id, const Buckets::Bucket& b, const SketchIndex &tidx) {
-        auto parsed = ParsedQueryId::parse(query_id);
-        if (!parsed.valid) return false;
-		//cerr << query_id << ", " << b.segm_id << ", " << b.begin() << ", " << b.end() << endl;
-		//cerr << "name: " << tidx.T[b.first.segm_id].name<< ", parsed.segm_id: " << parsed.segm_id << endl;
-		assert(b.segm_id >= 0 && b.segm_id < (rpos_t)tidx.T.size());
-		const auto &segm = tidx.T[b.segm_id];
-		if (segm.name == parsed.segm_id) {
-			//rpos_t bucket_start_t = b.b * bucket_l;
-			//rpos_t bucket_end_t = bucket_start_t + 2 * bucket_l;
-			assert(b.begin() >= 0 && b.begin() < (rpos_t)segm.kmers.size());
-			rpos_t bucket_start_T = segm.kmers[b.begin()].r;
-			//assert(bucket_end_t >= 0 && bucket_end_t < (rpos_t)segm.kmers.size());
-			rpos_t bucket_end_T = b.end() < (rpos_t)segm.kmers.size() ? segm.kmers[b.end()].r : segm.sz;  // b.end() may not be a valid index
-
-//			cerr << "bucket_start_t: " << bucket_start_t << ", bucket_end_t: " << bucket_end_t << ", bucket_start_T: " << bucket_start_T << ", bucket_end_T: " << bucket_end_T << endl;
-			if (bucket_start_T < parsed.end_pos && bucket_end_T >= parsed.start_pos) {  // if overlap
-				return true;
-			}
-		}
-		return false;
-	}
-
-    bool lost_correct_mapping(const string& query_id, const Buckets& B, const SketchIndex &tidx) {
-		bool res = true;
-		for (auto it = B.unordered_begin(); it != B.unordered_end(); ++it)
-				if (do_overlap(query_id, it->first, tidx)) {
-					res = false;
-					break;
-				}
-        return res;
-    }
-
-	tuple<qpos_t, qpos_t, int, string> GT_start_end(const string& query_id, const SketchIndex &tidx) {
-		auto parsed = ParsedQueryId::parse(query_id);
-		assert(parsed.valid);
-		
-		// Find index i where tidx.T[i].seq matches parsed.segm_id
-		int segm_id = -1;
-		for (int i = 0; i < (int)tidx.T.size(); i++)
-			if (tidx.T[i].name == parsed.segm_id) {
-				segm_id = i;
-				break;
-			}
-		assert(segm_id >= 0 && segm_id < (rpos_t)tidx.T.size());
-		
-		const auto &segm = tidx.T[segm_id];
-		qpos_t start = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.start_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
-		qpos_t end  = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.end_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
-		return {start, end, segm_id, parsed.segm_id};
-	}
-
-	string vec2str(vector<Buckets::Bucket> buckets, const SketchIndex &tidx, int P_sz, Hist diff_hist, int m, unordered_map<hash_t, Seed> p_ht, int bucket_l) {
-		stringstream res;
-		res << std::fixed << std::setprecision(4);
-		res << "{";
-		double max_J = 0.0, max_C = 0.0;
-		for (auto &b: buckets) {
-			auto M = collect_matches(b, tidx, p_ht);
-			auto best_J_mapping	= bestIncludedJaccard(tidx, M, P_sz, m-2, m+2, m, diff_hist);
-			auto best_C_mapping = bestFixedLength(M, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
-			res << "(" << tidx.T[b.segm_id].name << ", " << b.b << ", " << best_J_mapping.score() << ", " << best_C_mapping.score() << "),";
-
-			max_J = max(max_J, best_J_mapping.score());
-			max_C = max(max_C, best_C_mapping.score());	
-		}
-		res << "}";
-		res << "\tmax_J: " << max_J << "\tmax_C: " << max_C;
-		return res.str();
-	}
-
- 	void PaulsExperiment(const string& query_id, const string &P, int P_sz, Hist diff_hist, int m, unordered_map<hash_t, Seed> p_ht, const SketchIndex &tidx, const Buckets &B, ofstream &paulout) {
-		int bucket_l = B.get_bucket_len();
-
-		// Ground-truth
-		auto [start, end, segm_id, segm_name] = GT_start_end(query_id, tidx);
-		auto gt_b_l 		= Buckets::Bucket(segm_id, max(0, start/bucket_l-1), &B);
-		auto gt_b_r 		= Buckets::Bucket(segm_id, start/bucket_l, &B);
-		auto gt_b_next 		= Buckets::Bucket(segm_id, start/bucket_l+1, &B);
-		auto gt_M_l 		= collect_matches(gt_b_l, tidx, p_ht);
-		auto gt_M_r 		= collect_matches(gt_b_r, tidx, p_ht);
-		auto gt_J_l			= bestIncludedJaccard(tidx, gt_M_l, P_sz, end-start-2, end-start+2, m, diff_hist);
-		auto gt_J_r			= bestIncludedJaccard(tidx, gt_M_r, P_sz, end-start-2, end-start+2, m, diff_hist);
-		auto gt_C_l			= bestFixedLength(gt_M_l, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
-		auto gt_C_r			= bestFixedLength(gt_M_r, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
-		auto gt_C_l_lmax 	= bestFixedLength(gt_M_l, P_sz, bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
-		auto gt_C_r_lmax 	= bestFixedLength(gt_M_r, P_sz, bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
-
-		// Buckets with Jaccard and Containment index >= theta
-		vector<Buckets::Bucket> J_buckets;
-		vector<Buckets::Bucket> C_buckets;
-		for (auto it = B.ordered_begin(); it != B.ordered_end(); ++it) {
-		//for (auto it = B.unordered_begin(); it != B.unordered_end(); ++it) {
-			//cerr << it->first << " " << it->first.parent << endl;
-			auto M = collect_matches(it->first, tidx, p_ht);
-			auto mapping_J = bestIncludedJaccard(tidx, M, P_sz, end-start-2, end-start+2, m, diff_hist);
-			auto mapping_C = bestFixedLength(M, P_sz, 2*bucket_l, m, diff_hist, Metric::CONTAINMENT_INDEX);
-			mapping_J.set_bucket(it->first);
-			if (mapping_J.score() >= H->params.theta) J_buckets.push_back(it->first);
-			if (mapping_C.score() >= H->params.theta) C_buckets.push_back(it->first);
-		}
-
-		//static int not_overlapping_with_gt = 0;
-		//bool J_overlaps_with_gt = false;
-		//for (const auto &b_J: J_buckets)
-		//	if (do_overlap(query_id, b_J, tidx)) {
-		//		J_overlaps_with_gt = true;
-		//		break;
-		//	}
-		//if (!J_overlaps_with_gt)
-		//	++not_overlapping_with_gt;	
-		//cerr << "not_overlapping_with_gt: " << not_overlapping_with_gt << endl;
-
-		//TODO: make sure these are the same
-		//gt_C_l.bucket.b
-		//gt_C_right.bucket.b
-
-		// open a new file stream
-		static bool is_first_row = true;
-		if (is_first_row) {
-			paulout << "query_id"		// read name including the ground-truth
-					   "\tm"			// sketch size of the read
-			           "\ttheta"		// theta threshold
-					   "\thl"           // bucket's half-length
-					   "\tsegm"         // GT chromosome name
-					   "\tgt_l_bucket"  // GT left bucket
-					   "\tgt_r_bucket"  // GT right bucket
-					   "\tgt_next_bucket"  // GT right bucket
-					   "\tgt_J_l"       // GT left bucket: max included Jaccard
-					   "\tgt_J_r"       // GT right bucket: max included Jaccard
-					   "\tgt_C_l"       // GT left bucket: max containment index of mapping of bucket length (2*lmax)
-					   "\tgt_C_r"       // GT right bucket: max containment index of mapping of bucket length (2*lmax)
-					   "\tgt_C_l_lmax"  // GT left bucket: max containment index of mapping of length lmax
-					   "\tgt_C_r_lmax"  // GT right bucket: max containment index of mapping of length lmax
-					   "\t#J>theta"     // number of buckets that contain a mapping with Jaccard >= theta
-					   "\t#C>theta"     // number of buckets with Containment index >= theta
-					   "\tJ>theta"      // buckets that contain a mapping with Jaccard >= theta
-					   "\tC>theta"      // buckets with Containment index >= theta                                     
-					   "\tmaxJ"         // maximal Jaccard of a reported bucket
-					   "\tmaxC"         // maximal Containment index of a reported bucket
-					   "\tP"      		// the read sequence
-					   << endl;
-			is_first_row = false;
-		}
-		paulout 	<< query_id
-			<< "\t" << m						
-			<< "\t" << H->params.theta			
-			<< "\t" << bucket_l       			
-			<< "\t" << segm_name       			
-			<< "\t" << gt_b_l.b					
-			<< "\t" << gt_b_r.b					
-			<< "\t" << gt_b_next.b					
-			<< "\t" << gt_J_l.score()					
-			<< "\t" << gt_J_r.score()					
-			<< "\t" << gt_C_l.score()					
-			<< "\t" << gt_C_r.score()					
-			<< "\t" << gt_C_l_lmax.score()			
-			<< "\t" << gt_C_r_lmax.score()			
-			<< "\t" << J_buckets.size()			
-			<< "\t" << C_buckets.size()         
-			<< "\t" << vec2str(J_buckets, tidx, P_sz, diff_hist, m, p_ht, bucket_l)
-			<< "\t" << vec2str(C_buckets, tidx, P_sz, diff_hist, m, p_ht, bucket_l)
-			<< "\t" << P
-			<< endl;	
-	}
-
 	std::tuple<int, int, double, double> calc_FDR(vector<Mapping> &maps, double theta, qpos_t lmax, const SketchIndex &tidx, const unordered_map<hash_t, Seed> &p_ht, qpos_t P_sz, qpos_t lmin, qpos_t m, const Hist &diff_hist) {
 		int FP = 0;
 		for (auto &mapping: maps) {
-			auto M = collect_matches(mapping.bucket(), tidx, p_ht);
-			auto mapping_best_J = bestIncludedJaccard(tidx, M, P_sz, lmin, lmax, m, diff_hist);
+			auto M = matcher.collect_matches(mapping.bucket(), p_ht);
+			auto mapping_best_J = matcher.bestIncludedJaccard(M, P_sz, lmin, lmax, m);
 			mapping_best_J.set_bucket(mapping.bucket());
 			if (mapping_best_J.score() < H->params.theta)
 				++FP;
@@ -550,6 +237,7 @@ public:
 						possible_matches += kmer.hits_in_T;
 					}
 					H->C.inc("possible_matches", possible_matches);
+					matcher.update(diff_hist);
 
 					//qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
 					//qpos_t lmin = qpos_t(ceil(p.size() * H->params.theta));					// maximum length of a similar mapping
@@ -630,7 +318,7 @@ public:
 					H->C.inc("seed_matches", seed_matches);
 				H->T.stop("match_seeds");
 
-				int lost_on_seeding = lost_correct_mapping(query_id, B, tidx);
+				int lost_on_seeding = matcher.lost_correct_mapping(query_id, B);
 				H->C.inc("lost_on_seeding", lost_on_seeding);
 
 				int lost_on_pruning = 1;
@@ -655,10 +343,11 @@ public:
 				H->C.inc("lost_on_pruning", lost_on_pruning);
 			H->T.stop("query_mapping");
 
-			if (!H->params.paramsFile.empty()) {
-				// todo: comment out
-				PaulsExperiment(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, paulout);
-			}
+//			if (!H->params.paramsFile.empty()) {
+//				// todo: comment out
+//				AnalyseSimulatedReads sim(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
+//				sim.PaulsExperiment(paulout);
+//			}
 
 			H->T.start("output");
 				if (H->params.onlybest && maps.size() >= 1) {
