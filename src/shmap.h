@@ -20,13 +20,6 @@ class SHMapper : public Mapper {
 	Matcher matcher;
 
 public:
-	//typedef pair<bucket_t, qpos_t> Bucket;
-	//using Buckets = std::unordered_map<bucket_t, qpos_t>;
-	//using Buckets = gtl::flat_hash_map<bucket_t, qpos_t>;
-	//using Buckets = ankerl::unordered_dense::map<bucket_t, qpos_t>;
-	//using Hist = unordered_map<hash_t, qpos_t>;
-	//using Hist = gtl::flat_hash_map<hash_t, qpos_t>;
-
 	Seeds select_kmers(sketch_t& p, int &nonzero) {
 		H->T.start("seeding");
 		H->T.start("collect_kmer_info");
@@ -65,7 +58,6 @@ public:
 		return kmers;
 	}
 
-  public:
 	SHMapper(const SketchIndex &tidx, Handler *H)
 			: tidx(tidx), H(H), matcher(tidx) {
         H->C.inc("seeds_limit_reached", 0);

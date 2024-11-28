@@ -8,6 +8,12 @@
 namespace sweepmap {
 
 using Hist = ankerl::unordered_dense::map<hash_t, qpos_t>;
+//typedef pair<bucket_t, qpos_t> Bucket;
+//using Buckets = std::unordered_map<bucket_t, qpos_t>;
+//using Buckets = gtl::flat_hash_map<bucket_t, qpos_t>;
+//using Buckets = ankerl::unordered_dense::map<bucket_t, qpos_t>;
+//using Hist = unordered_map<hash_t, qpos_t>;
+//using Hist = gtl::flat_hash_map<hash_t, qpos_t>;
 
 enum class Metric {
 	JACCARD,
