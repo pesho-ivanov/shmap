@@ -259,9 +259,9 @@ pauls_experiment: $(SHMAP_BIN) gen_reads
 	@DIR=$(ALLOUT_DIR)/pauls_experiment; \
 	for t in $(PAUL_THETAS); do \
 		pref=$${DIR}/"T$${t}"; \
-		make eval_shmap ALLOUT_DIR=$${pref} T=$${t} REFNAME=t2tChrY DEPTH=0.1; \
-		make eval_shmap ALLOUT_DIR=$${pref} T=$${t} REFNAME=chm13   DEPTH=0.01; \
-		make eval_shmap ALLOUT_DIR=$${pref} T=$${t} REFNAME=t2tChrY DEPTH=0.1  MEANLEN=24000; \
+		make eval_shmap ALLOUT_DIR=$${pref} T=$${t} REFNAME=chm13   DEPTH=0.1; \
+		make eval_shmap ALLOUT_DIR=$${pref} T=$${t} REFNAME=t2tChrY DEPTH=1; \
+		make eval_shmap ALLOUT_DIR=$${pref} T=$${t} REFNAME=t2tChrY DEPTH=1  MEANLEN=24000; \
 	done
 
 #eval_tools_on_SV:
