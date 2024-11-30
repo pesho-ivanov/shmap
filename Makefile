@@ -29,6 +29,7 @@ MAPQUIK_BIN = mapquik
 MERYL_BIN = ~/libs/Winnowmap/bin/meryl
 WINNOWMAP_BIN = ~/libs/Winnowmap/bin/winnowmap
 SURVIVOR_BIN = ~/libs/SURVIVOR/Debug/SURVIVOR
+TSV_APPEND = ~/libs/tsv-utils/bin/tsv-append
 
 INF = 999999
 
@@ -43,7 +44,7 @@ R ?= 0.05
 T ?= 0.75
 
 THETAS = 0.95 0.9 0.85 0.8 0.75 0.7 0.65 0.6 0.55 0.5  
-PAUL_THETAS = 1.0 0.9 0.8 0.7 0.6 0.5 0.4 0.3
+PAUL_THETAS = 1.0 0.9 0.8 0.7 0.6 0.5 0.4
 
 Ks = 14 16 18 20 22 24 26
 Rs = 0.01 0.05 0.1 0.15 0.2
@@ -263,6 +264,14 @@ pauls_experiment: $(SHMAP_BIN) gen_reads
 		make eval_shmap ALLOUT_DIR=$${pref} T=$${t} REFNAME=t2tChrY DEPTH=1; \
 		make eval_shmap ALLOUT_DIR=$${pref} T=$${t} REFNAME=t2tChrY DEPTH=1  MEANLEN=24000; \
 	done
+
+	$(TSV_APPEND) -H $(ALLOUT_DIR)/pauls_experiment/*/shmap/chm13-readschm13-a0.99-d0.1-l10000/shmap.params.paul.tsv >chm13-readschm13-a0.99-d0.1-l10000.tsv
+	$(TSV_APPEND) -H $(ALLOUT_DIR)/pauls_experiment/*/shmap/t2tChrY-readst2tChrY-a0.99-d1-l10000/shmap.params.paul.tsv >t2tChrY-readst2tChrY-a0.99-d1-l10000.tsv
+	$(TSV_APPEND) -H $(ALLOUT_DIR)/pauls_experiment/*/shmap/t2tChrY-readst2tChrY-a0.99-d1-l24000/shmap.params.paul.tsv >t2tChrY-readst2tChrY-a0.99-d1-l24000.tsv
+
+	head -n 3001 chm13-readschm13-a0.99-d0.1-l10000.tsv >chm13-readschm13-a0.99-d0.1-l10000.head.tsv
+	head -n 3001 t2tChrY-readst2tChrY-a0.99-d1-l10000.tsv >t2tChrY-readst2tChrY-a0.99-d1-l10000.head.tsv
+	head -n 3001 t2tChrY-readst2tChrY-a0.99-d1-l24000.tsv >t2tChrY-readst2tChrY-a0.99-d1-l24000.head.tsv
 
 #eval_tools_on_SV:
 #	make eval_tools REFNAME=t2tChrY READSIM_REFNAME=t2tChrY-SVs DEPTH=0.1

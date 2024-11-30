@@ -12,6 +12,8 @@
 #include "buckets.h"
 #include "refine.h"
 
+#include "analyse_simulated.h"
+
 namespace sweepmap {
 
 class SHMapper : public Mapper {
@@ -335,11 +337,11 @@ public:
 				H->C.inc("lost_on_pruning", lost_on_pruning);
 			H->T.stop("query_mapping");
 
-//			if (!H->params.paramsFile.empty()) {
-//				// todo: comment out
-//				AnalyseSimulatedReads sim(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
-//				sim.PaulsExperiment(paulout);
-//			}
+			if (!H->params.paramsFile.empty()) {
+				// todo: comment out
+				AnalyseSimulatedReads sim(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
+				sim.PaulsExperiment(paulout);
+			}
 
 			H->T.start("output");
 				if (H->params.onlybest && maps.size() >= 1) {

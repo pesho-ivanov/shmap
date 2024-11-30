@@ -121,7 +121,7 @@ public:
 					   "\tsegm"         // GT chromosome name
 					   "\tgt_l_bucket"  // GT left bucket
 					   "\tgt_r_bucket"  // GT right bucket
-					   "\tgt_next_bucket"  // GT right bucket
+					   "\tgt_next_bucket"  // GT one after the right bucket (named for reversed-compatibility of l,r)
 					   "\tgt_J_l"       // GT left bucket: max included Jaccard
 					   "\tgt_J_r"       // GT right bucket: max included Jaccard
 					   "\tgt_C_l"       // GT left bucket: max containment index of mapping of bucket length (2*lmax)
