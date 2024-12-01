@@ -253,7 +253,7 @@ class SweepMapper : public Mapper {
 		}
 	}
 
-	void map(const string &pFile) {
+	void map_all_reads(const string &pFile) {
 		cerr << "Mapping reads using SweepMap " << pFile << "..." << endl;
 
 		H->C.inc("kmers", 0);

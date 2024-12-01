@@ -279,7 +279,7 @@ public:
 		}
 	}
 
-	void map(const string &pFile) {
+	void map_all_reads(const string &pFile) {
 		cerr << "Mapping reads using SHmap..." << endl;
 
 		H->C.inc("kmers", 0);
