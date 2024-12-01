@@ -12,6 +12,7 @@
 #include "mapping.h"
 #include "buckets.h"
 #include "refine.h"
+#include "types.h"
 
 #include "analyse_simulated.h"
 
