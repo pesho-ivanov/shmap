@@ -172,7 +172,7 @@ public:
 	}
 	
 	void match_rest(qpos_t P_sz, qpos_t lmax, qpos_t m, const Seeds &kmers, const Buckets &B, Hist &diff_hist, int seeds, int first_kmer_after_seeds, const unordered_map<hash_t, Seed> &p_ht,
-			vector<Mapping> &maps, int &best_idx, double thr_init, int forbidden_idx, const string &query_id, int *lost_on_pruning) {
+			vector<Mapping> &maps, int &best_idx, double thr_init, int forbidden_idx, const string &query_id) {
 		double best_J = -1.0;
 
 		int lost_on_seeding = (0);
@@ -186,7 +186,7 @@ public:
 			double lowest_sh;
 			if (seed_heuristic_pass(maps, kmers, m, b_it->first, b_it->second, first_kmer_after_seeds, seeds, best_idx, &lowest_sh, thr_init)) {
 				if (matcher.do_overlap(query_id, b_it->first))
-					*lost_on_pruning = 0;
+					C["lost_on_pruning"] = 0;
 				H->T.start("match_collect");
 					Matches M = matcher.collect_matches(b_it->first, p_ht);
 				H->T.stop("match_collect");
@@ -211,9 +211,30 @@ public:
 		}
 		//assert(best_idx != -1 || maps.empty());
 
-		H->C.inc("final_mappings", maps.size());
-		H->C["total_matches"] += C["total_matches"];
-		H->C["final_buckets"] += C["final_buckets"];
+        H->C.inc("final_mappings", maps.size());
+        H->C["total_matches"] += C["total_matches"];
+        H->C["final_buckets"] += C["final_buckets"];
+    }
+
+    tuple<vector<Mapping>, int, int, double> match_remaining_kmers_for_best_and_second_best(qpos_t P_sz, qpos_t lmax, qpos_t m, const Seeds &kmers, const Buckets &B, Hist &diff_hist, int seeds, int first_kmer_after_seeds, const unordered_map<hash_t, Seed> &p_ht, const string &query_id) {
+        vector<Mapping> maps;
+        //vector<Bucket> B_vec(B.begin(), B.end());
+        //sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
+        C["total_matcher"] = C["seed_matches"];
+        int best_idx=-1, best2_idx=-1;
+		match_rest(P_sz, lmax, m, kmers, B, diff_hist, seeds, first_kmer_after_seeds, p_ht, maps, best_idx, H->params.theta, -1, query_id);
+		auto [FP, PP, FDR, FPTP] = tuple(-1, -1, -1, -1);
+		//auto [FP, PP, FDR, FPTP] = calc_FDR(maps, H->params.theta, lmax, bucket_l, tidx, p_ht, P_sz, lmin, m, diff_hist);
+		H->C.inc("FP", FP);
+		H->C.inc("PP", PP);
+		H->C.inc("FDR", FDR);
+		H->C.inc("FPTP", FPTP);
+
+		if (best_idx != -1) {
+			// find second best mapping for mapq computation
+			match_rest(P_sz, lmax, m, kmers, B, diff_hist, seeds, first_kmer_after_seeds, p_ht, maps, best2_idx, maps[best_idx].score(), best_idx, query_id);
+		}
+		return {maps, best_idx, best2_idx, FPTP};
 	}
 
 	std::tuple<int, int, double, double> calc_FDR(vector<Mapping> &maps, double theta, qpos_t lmax, const SketchIndex &tidx, const unordered_map<hash_t, Seed> &p_ht, qpos_t P_sz, qpos_t lmin, qpos_t m, const Hist &diff_hist) {
@@ -342,34 +363,18 @@ public:
 				H->T.start("match_seeds");
 					qpos_t S = qpos_t((1.0 - new_theta) * m) + 1;			// any similar mapping includes at least 1 seed match
 					Buckets B(lmax);  			// B[segment][b] -- #matched kmers[0...i] in [bl, (b+2)l)
-					auto [first_unmatched_kmer, seeds] = match_seeds(kmers, B, S);
+					auto [first_kmer_after_seeds, seeds] = match_seeds(kmers, B, S);
 					H->C.inc("kmers_seeds", S);
 				H->T.stop("match_seeds");
 
 				int lost_on_seeding = matcher.lost_correct_mapping(query_id, B);
 				H->C.inc("lost_on_seeding", lost_on_seeding);
 
-				int lost_on_pruning = 1;
+				C["lost_on_pruning"] = 1;
 				H->T.start("match_rest");
-					vector<Mapping> maps;
-					//vector<Bucket> B_vec(B.begin(), B.end());
-					//sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
-					C["total_matcher"] = C["seed_matches"];
-					int best_idx=-1, best2_idx=-1;
-					match_rest(P_sz, lmax, m, kmers, B, diff_hist, seeds, first_unmatched_kmer, p_ht, maps, best_idx, H->params.theta, -1, query_id, &lost_on_pruning);
-					auto [FP, PP, FDR, FPTP] = tuple(-1, -1, -1, -1);
-					//auto [FP, PP, FDR, FPTP] = calc_FDR(maps, H->params.theta, lmax, bucket_l, tidx, p_ht, P_sz, lmin, m, diff_hist);
-					H->C.inc("FP", FP);
-					H->C.inc("PP", PP);
-					H->C.inc("FDR", FDR);
-					H->C.inc("FPTP", FPTP);
-
-					if (best_idx != -1) {
-						// find second best mapping for mapq computation
-						match_rest(P_sz, lmax, m, kmers, B, diff_hist, seeds, first_unmatched_kmer, p_ht, maps, best2_idx, maps[best_idx].score(), best_idx, query_id, &lost_on_pruning);
-					}
+					auto [maps, best_idx, best2_idx, FPTP] = match_remaining_kmers_for_best_and_second_best(P_sz, lmax, m, kmers, B, diff_hist, seeds, first_kmer_after_seeds, p_ht, query_id);
 				H->T.stop("match_rest");
-				H->C.inc("lost_on_pruning", lost_on_pruning);
+				H->C["lost_on_pruning"] += C["lost_on_pruning"];
 			H->T.stop("query_mapping");
 
 			H->T.start("extra");
