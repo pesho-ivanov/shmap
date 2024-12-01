@@ -16,6 +16,59 @@ TEST_SUITE("Counting") {
         c.inc(5);
         CHECK(c.count() == 5);
     }
+
+    TEST_CASE("Counter operator[]") {
+        Counter c;
+        CHECK(c[0] == 0);  // Initial value
+        
+        c[0] = 5;  // Write through operator[]
+        CHECK(c[0] == 5);  // Read through operator[]
+        CHECK(c.count() == 5);  // Verify count() sees the change
+        
+        c.inc(3);  // Modify through inc()
+        CHECK(c[0] == 8);  // Verify operator[] sees the change
+    }
+
+    TEST_CASE("Counter operator+=") {
+        Counter c;
+        CHECK(c.count() == 0);
+
+        // Basic addition
+        c += 5;
+        CHECK(c.count() == 5);
+
+        // Chaining
+        (c += 3) += 2;
+        CHECK(c.count() == 10);
+
+        // Interaction with inc()
+        c.inc(5);
+        CHECK(c.count() == 15);
+        c += 5;
+        CHECK(c.count() == 20);
+
+        // Return value correctness
+        Counter& ref = (c += 1);
+        CHECK(&ref == &c);  // Should return reference to self
+        CHECK(c.count() == 21);
+
+        // Counter += Counter
+        Counter c2;
+        c2.inc(5);
+        c += c2;
+        CHECK(c.count() == 26);  // 21 + 5
+
+        // Chaining with Counter
+        Counter c3;
+        c3.inc(3);
+        (c += c2) += c3;
+        CHECK(c.count() == 34);  // 26 + 5 + 3
+
+        // Original counters unchanged
+        CHECK(c2.count() == 5);
+        CHECK(c3.count() == 3);
+    }
+
     TEST_CASE("Counters") {
         Counters C;
         CHECK_THROWS_AS(C.count("c1"), std::out_of_range);
@@ -30,6 +83,27 @@ TEST_SUITE("Counting") {
         C.inc("c4", 0);
         CHECK(C.frac("c1", "c4") == std::numeric_limits<double>::infinity());
         CHECK(C.perc("c1", "c4") == std::numeric_limits<double>::infinity());
+    }
+
+    TEST_CASE("Counters operator[]") {
+        Counters C;
+        
+        // Auto-creation and initialization
+        CHECK(C["new_counter"][0] == 0);
+        
+        // Write through operator[]
+        C["counter1"][0] = 5;
+        CHECK(C["counter1"][0] == 5);
+        CHECK(C.count("counter1") == 5);
+        
+        // Modify through inc() and verify through operator[]
+        C.inc("counter1", 3);
+        CHECK(C["counter1"][0] == 8);
+        
+        // Multiple counters
+        C["counter2"][0] = 10;
+        CHECK(C["counter2"][0] == 10);
+        CHECK(C.frac("counter1", "counter2") == Approx(0.8));
     }
 }
 
@@ -103,17 +177,6 @@ TEST_CASE("FracMinHash sketching") {
     }
 }
 
-//TEST_CASE("Parameters in handler") {
-//	Handler* H;
-//
-//	params_t params;
-//	params.k = 25;
-//	params.hFrac = 0.05;
-//	params.theta = 0.7;
-//
-//	H = new Handler(params);
-//}
-
 TEST_CASE("Indexing") {
 	Handler* H;
 	SketchIndex* tidx;
@@ -162,14 +225,6 @@ TEST_CASE("Indexing") {
             CHECK(tidx->count(t1[i].h) == cnt[i]);
         CHECK(tidx->H->C.count("indexed_hits") == 10);
         CHECK(tidx->H->C.count("indexed_kmers") == 8);
-    }
-
-    SUBCASE("Get matches") {
-//    Matches matches;
-//    Kmer kmer(0, 0, false);
-//    rpos_t hits_in_t = 1; 
-//    Seed el(kmer, hits_in_t, kmers.size());
-//    tidx->get_matches(&matches, seed);
     }
 }
 
@@ -233,20 +288,6 @@ TEST_CASE("Bucketing") {
     }
 }
 
-TEST_SUITE("Metrics") {
-    qpos_t intersection = 5;
-    qpos_t m = 10;
-    qpos_t s_sz = 15;
-    TEST_CASE("Jaccard") {
-        double ans = 1.0*intersection / (m + s_sz - intersection);
-	    CHECK(SHMapper::Jaccard(intersection, m, s_sz) == Approx(ans));
-    }
-    TEST_CASE("Containment index") {
-        double ans = 1.0*intersection / m;
-	    CHECK(SHMapper::ContainmentIndex(intersection, m) == Approx(ans));
-    }
-}
-
 TEST_CASE("Mapping a toy read") {
 	Handler* H;
 	SketchIndex* tidx;
@@ -279,17 +320,4 @@ TEST_CASE("Mapping a toy read") {
 			" and read kmers[", i, "].hits_in_T=", kmers[i].hits_in_T,
 			" not ordered by increasing hits");
 	}
-	return;
-	
-	CHECK(kmers[0].kmer.h == 1);
-	CHECK(kmers[0].occs_in_p == 2);
-	
-	CHECK(kmers[1].kmer.h == 2);
-	CHECK(kmers[1].occs_in_p == 1);
-	
-	CHECK(kmers[2].kmer.h == 3);
-	CHECK(kmers[2].occs_in_p == 2);
-
-	for (size_t i = 1; i < kmers.size(); i++)
-		CHECK(kmers[i-1].hits_in_T == kmers[i].hits_in_T);
 }

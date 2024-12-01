@@ -112,6 +112,27 @@ public:
     Counter() : count_(0) {}
     void inc(int64_t value = 1) { count_ += value; }
     int64_t count() const { return count_; }
+    
+    // Non-const operator[] that returns reference to count
+    int64_t& operator[](int) { return count_; }
+
+    Counter& operator=(int64_t value) {
+        count_ = value;
+        return *this;
+    }
+
+    Counter& operator+=(int64_t value) {
+        count_ += value;
+        return *this;
+    }
+
+    Counter& operator+=(const Counter& other) {
+        count_ += other.count_;
+        return *this;
+    }
+
+    // Implicit conversion operator to int64_t
+    operator int64_t() const { return count_; }
 };
 
 class Counters {
@@ -142,6 +163,24 @@ public:
     double perc(const std::string& name, const std::string& total) const {
 		return 100.0 * frac(name, total);
 	}
+
+    // Non-const operator[] that returns reference to Counter
+    Counter& operator[](const std::string& name) {
+        auto it = counters_.find(name);
+        if (it == counters_.end()) {
+            counters_[name] = Counter();
+        }
+        return counters_[name];
+    }
+
+    //Const operator[] that returns const int64_t
+    int64_t operator[](const std::string& name) const {
+        auto it = counters_.find(name);
+        if (it == counters_.end()) {
+            return 0;
+        }
+        return it->second.count();
+    }
 };
 
 } // namespace sweepmap

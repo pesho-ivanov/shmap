@@ -317,8 +317,7 @@ public:
 		//m.ed2 = edit_distance(m.bucket, P, P_sz, m, kmers);
 	}
 
-	void set_global_stats(const char* query_id, qpos_t P_sz, qpos_t seeds, rpos_t total_matches, rpos_t max_seed_matches, rpos_t seed_matches,
-			rpos_t seeded_buckets, rpos_t final_buckets, double FPTP, const std::string &segm_name, rpos_t segm_sz, double map_time) {
+	void set_global_stats(const Counters &C, const char* query_id, qpos_t P_sz, qpos_t seeds, double FPTP, const std::string &segm_name, rpos_t segm_sz, double map_time) {
 		paf.query_id = query_id;
 		paf.P_sz = P_sz;
 
@@ -326,16 +325,16 @@ public:
 
 		global_stats = std::make_unique<GlobalMappingStats>();
 		global_stats->seeds = seeds;
-		global_stats->total_matches = total_matches;
-		global_stats->max_seed_matches = max_seed_matches;
-		global_stats->seed_matches = seed_matches;
-		global_stats->seeded_buckets = seeded_buckets;
-		global_stats->final_buckets = final_buckets;
+		global_stats->total_matches = C["total_matches"];
+		global_stats->max_seed_matches = C["max_seed_matches"];
+		global_stats->seed_matches = C["seed_matches"];
+		global_stats->seeded_buckets = C["seeded_buckets"];
+		global_stats->final_buckets = C["final_buckets"];
 		global_stats->FPTP = FPTP;
 		global_stats->gt_J = -1.0;
 		global_stats->gt_C = -1.0;
 		global_stats->gt_C_bucket = -1.0;
-		global_stats->match_inefficiency = 1.0 * total_matches / local_stats.intersection;
+		global_stats->match_inefficiency = 1.0 * C["total_matches"] / local_stats.intersection;
 	}
 
 	static bool do_overlap(const Mapping &a, const Mapping &b) {
