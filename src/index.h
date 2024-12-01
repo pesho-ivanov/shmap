@@ -5,6 +5,7 @@
 
 #include <ankerl/unordered_dense.h>
 
+#include "mapping.h"
 #include "sketch.h"
 #include "utils.h"
 #include "io.h"

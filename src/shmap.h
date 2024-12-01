@@ -9,6 +9,7 @@
 #include "utils.h"
 #include "handler.h"
 #include "mapper.h"
+#include "mapping.h"
 #include "buckets.h"
 #include "refine.h"
 
