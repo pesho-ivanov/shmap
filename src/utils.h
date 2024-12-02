@@ -75,9 +75,13 @@ public:
 
     double secs(const std::string& name) const {
         auto it = timers_.find(name);
-		assert(it != timers_.end());
+        assert(it != timers_.end());
         if (it != timers_.end()) {
-            return it->second.secs();
+            try {
+                return it->second.secs();
+            } catch (const std::runtime_error& e) {
+                throw std::runtime_error("Timer '" + name + "': " + e.what());
+            }
         }
         assert(false);
         return 0.0;

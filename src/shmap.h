@@ -18,13 +18,15 @@
 
 namespace sweepmap {
 
-class SHMapper : public Mapper {
+class SHSingleReadMapper {
 	const SketchIndex &tidx;
 	Handler *H;
-	Matcher matcher;
-	Counters C;  // per mapping counters
+	Matcher &matcher;
+	Counters &C;
+	const string &query_id;
+	const string &P;
+	ofstream &paulout;
 
-public:
 	Seeds select_kmers(sketch_t& p, int &nonzero) {
 		H->T.start("seeding");
 		H->T.start("collect_kmer_info");
@@ -62,17 +64,6 @@ public:
 
 		return kmers;
 	}
-
-	SHMapper(const SketchIndex &tidx, Handler *H)
-			: tidx(tidx), H(H), matcher(tidx) {
-        H->C.inc("seeds_limit_reached", 0);
-        H->C.inc("mapped_reads", 0);
-        if (H->params.theta < 0.0 || H->params.theta > 1.0) {
-            cerr << "tThres = " << H->params.theta << " outside of [0,1]." << endl;
-            exit(1);
-        }
-    }
-	virtual ~SHMapper() = default;
 
 	// Takes at least `S` seeds from `kmers`. Matches each seed to the buckets `B`.  Returns the number of seeds.
 	pair<qpos_t, qpos_t> match_seeds(const Seeds &kmers, Buckets &B, qpos_t S) {
@@ -279,6 +270,109 @@ public:
 		}
 	}
 
+public:
+	SHSingleReadMapper(const SketchIndex &tidx, Handler *H, Matcher &matcher, Counters &C, const string &query_id, const string &P, ofstream &paulout)
+		: tidx(tidx), H(H), matcher(matcher), C(C), query_id(query_id), P(P), paulout(paulout) {}
+
+	void run() {
+		H->T.start("query_mapping");
+
+		H->T.start("sketching");
+			sketch_t p = H->sketcher.sketch(P);
+		H->T.stop("sketching");
+
+		H->T.start("prepare");
+			qpos_t P_sz = P.size();
+
+			H->C.inc("read_len", P_sz);
+
+			int nonzero = 0;
+			Seeds kmers = select_kmers(p, nonzero);
+			qpos_t m = 0;
+			for (const auto kmer: kmers)
+				m += kmer.occs_in_p;
+			assert(m <= (int)p.size());
+			H->C.inc("kmers_notmatched", m - nonzero);
+			//cerr << "notmatched: " << m - nonzero << endl;
+
+			unordered_map<hash_t, Seed> p_ht;
+			Hist diff_hist;
+			rpos_t possible_matches(0);
+			for (const auto kmer: kmers) {
+				p_ht.insert(make_pair(kmer.kmer.h, kmer));
+				//diff_hist[kmer.kmer.h] = 1;
+				diff_hist[kmer.kmer.h] = kmer.occs_in_p;
+				possible_matches += kmer.hits_in_T;
+			}
+			H->C.inc("possible_matches", possible_matches);
+			matcher.update(diff_hist);
+
+			//qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
+			//qpos_t lmin = qpos_t(ceil(p.size() * H->params.theta));					// maximum length of a similar mapping
+			qpos_t lmax = qpos_t(p.size() / H->params.theta);					// maximum length of a similar mapping
+			//qpos_t bucket_l = lmax;
+
+			//double coef = 1.0;// * nonzero / p.size();
+			//cerr << "coef: " << coef << endl;
+			double new_theta = H->params.theta;
+			//cerr << "theta: " << H->params.theta << " -> " << new_theta << endl;
+
+			H->C.inc("kmers_sketched", p.size());
+			H->C.inc("kmers", m);
+			H->C.inc("kmers_unique", kmers.size());
+		H->T.stop("prepare");
+
+		H->T.start("match_seeds");
+			qpos_t S = qpos_t((1.0 - new_theta) * m) + 1;			// any similar mapping includes at least 1 seed match
+			Buckets B(lmax);  			// B[segment][b] -- #matched kmers[0...i] in [bl, (b+2)l)
+			auto [first_kmer_after_seeds, seeds] = match_seeds(kmers, B, S);
+			H->C.inc("kmers_seeds", S);
+		H->T.stop("match_seeds");
+
+		int lost_on_seeding = matcher.lost_correct_mapping(query_id, B);
+		H->C.inc("lost_on_seeding", lost_on_seeding);
+
+		C["lost_on_pruning"] = 1;
+		H->T.start("match_rest");
+			auto [maps, best_idx, best2_idx, FPTP] = match_remaining_kmers_for_best_and_second_best(P_sz, lmax, m, kmers, B, diff_hist, seeds, first_kmer_after_seeds, p_ht, query_id);
+		H->T.stop("match_rest");
+		H->C["lost_on_pruning"] += C["lost_on_pruning"];
+
+		H->T.start("extra");
+		//if (!H->params.paramsFile.empty()) {
+		//	// todo: comment out
+		//	AnalyseSimulatedReads sim(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
+		//	sim.PaulsExperiment(paulout);
+		//}
+		H->T.stop("extra");
+
+		H->T.stop("query_mapping");
+
+		H->T.start("output");
+			// total_matches, max_seed_matches, seed_matches, seeded_buckets
+			output(query_id, P_sz, S, maps, best_idx, best2_idx, FPTP);
+		H->T.stop("output");
+	}
+};
+
+class SHMapper : public Mapper {
+	const SketchIndex &tidx;
+	Handler *H;
+	Matcher matcher;
+	Counters C;  // per mapping counters
+
+public:
+	SHMapper(const SketchIndex &tidx, Handler *H)
+			: tidx(tidx), H(H), matcher(tidx) {
+        H->C.inc("seeds_limit_reached", 0);
+        H->C.inc("mapped_reads", 0);
+        if (H->params.theta < 0.0 || H->params.theta > 1.0) {
+            cerr << "tThres = " << H->params.theta << " outside of [0,1]." << endl;
+            exit(1);
+        }
+    }
+	virtual ~SHMapper() = default;
+
 	void map_all_reads(const string &pFile) {
 		cerr << "Mapping reads using SHmap..." << endl;
 
@@ -314,81 +408,10 @@ public:
 		read_fasta_klib(pFile, [this, &paulout, &C](const string &query_id, const string &P) {
 			H->C.inc("reads");
 			H->T.stop("query_reading");
-			H->T.start("query_mapping");
-				H->T.start("sketching");
-					sketch_t p = H->sketcher.sketch(P);
-				H->T.stop("sketching");
 
-				H->T.start("prepare");
-					qpos_t P_sz = P.size();
+			SHSingleReadMapper mapper(tidx, H, matcher, C, query_id, P, paulout);
+			mapper.run();
 
-					H->C.inc("read_len", P_sz);
-
-					int nonzero = 0;
-					Seeds kmers = select_kmers(p, nonzero);
-					qpos_t m = 0;
-					for (const auto kmer: kmers)
-						m += kmer.occs_in_p;
-					assert(m <= (int)p.size());
-					H->C.inc("kmers_notmatched", m - nonzero);
-					//cerr << "notmatched: " << m - nonzero << endl;
-
-					unordered_map<hash_t, Seed> p_ht;
-					Hist diff_hist;
-					rpos_t possible_matches(0);
-					for (const auto kmer: kmers) {
-						p_ht.insert(make_pair(kmer.kmer.h, kmer));
-						//diff_hist[kmer.kmer.h] = 1;
-						diff_hist[kmer.kmer.h] = kmer.occs_in_p;
-						possible_matches += kmer.hits_in_T;
-					}
-					H->C.inc("possible_matches", possible_matches);
-					matcher.update(diff_hist);
-
-					//qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
-					//qpos_t lmin = qpos_t(ceil(p.size() * H->params.theta));					// maximum length of a similar mapping
-					qpos_t lmax = qpos_t(p.size() / H->params.theta);					// maximum length of a similar mapping
-					//qpos_t bucket_l = lmax;
-
-					//double coef = 1.0;// * nonzero / p.size();
-					//cerr << "coef: " << coef << endl;
-					double new_theta = H->params.theta;
-					//cerr << "theta: " << H->params.theta << " -> " << new_theta << endl;
-
-					H->C.inc("kmers_sketched", p.size());
-					H->C.inc("kmers", m);
-					H->C.inc("kmers_unique", kmers.size());
-				H->T.stop("prepare");
-
-				H->T.start("match_seeds");
-					qpos_t S = qpos_t((1.0 - new_theta) * m) + 1;			// any similar mapping includes at least 1 seed match
-					Buckets B(lmax);  			// B[segment][b] -- #matched kmers[0...i] in [bl, (b+2)l)
-					auto [first_kmer_after_seeds, seeds] = match_seeds(kmers, B, S);
-					H->C.inc("kmers_seeds", S);
-				H->T.stop("match_seeds");
-
-				int lost_on_seeding = matcher.lost_correct_mapping(query_id, B);
-				H->C.inc("lost_on_seeding", lost_on_seeding);
-
-				C["lost_on_pruning"] = 1;
-				H->T.start("match_rest");
-					auto [maps, best_idx, best2_idx, FPTP] = match_remaining_kmers_for_best_and_second_best(P_sz, lmax, m, kmers, B, diff_hist, seeds, first_kmer_after_seeds, p_ht, query_id);
-				H->T.stop("match_rest");
-				H->C["lost_on_pruning"] += C["lost_on_pruning"];
-			H->T.stop("query_mapping");
-
-			H->T.start("extra");
-			//if (!H->params.paramsFile.empty()) {
-			//	// todo: comment out
-			//	AnalyseSimulatedReads sim(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
-			//	sim.PaulsExperiment(paulout);
-			//}
-			H->T.stop("extra");
-
-			H->T.start("output");
-				// total_matches, max_seed_matches, seed_matches, seeded_buckets
-				output(query_id, P_sz, S, maps, best_idx, best2_idx, FPTP);
-			H->T.stop("output");
 			H->T.start("query_reading");
 		});
 		H->T.stop("query_reading");
