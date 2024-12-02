@@ -307,6 +307,9 @@ public:
 
 	// returns true if the read was mapped
 	MapResult map_read(double theta) {
+		assert (theta >= H->params.theta - 1e-7);
+		assert (theta <= 1.0 + 1e-7);
+
 		H->T.start("query_mapping");
 
 		H->T.start("sketching");
@@ -335,12 +338,12 @@ public:
 
 			//qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
 			//qpos_t lmin = qpos_t(ceil(p.size() * H->params.theta));					// maximum length of a similar mapping
-			qpos_t lmax = qpos_t(p.size() / H->params.theta);					// maximum length of a similar mapping
+			qpos_t lmax = qpos_t(p.size() / theta);					// maximum length of a similar mapping
 			//qpos_t bucket_l = lmax;
 
 			//double coef = 1.0;// * nonzero / p.size();
 			//cerr << "coef: " << coef << endl;
-			double new_theta = H->params.theta;
+			//double new_theta = theta;
 			//cerr << "theta: " << H->params.theta << " -> " << new_theta << endl;
 
 			H->C.inc("kmers_sketched", p.size());
@@ -349,7 +352,7 @@ public:
 		H->T.stop("prepare");
 
 		H->T.start("match_seeds");
-			qpos_t S = qpos_t((1.0 - new_theta) * m) + 1;			// any similar mapping includes at least 1 seed match
+			qpos_t S = qpos_t((1.0 - theta) * m) + 1;			// any similar mapping includes at least 1 seed match
 			Buckets B(lmax);  			// B[segment][b] -- #matched kmers[0...i] in [bl, (b+2)l)
 			auto [first_kmer_after_seeds, seeds] = match_seeds(kmers, B, S);
 			H->C.inc("kmers_seeds", S);
@@ -422,9 +425,9 @@ public:
 		H->C.inc("lost_on_seeding", 0);
 		H->C.inc("lost_on_pruning", 0);
 
-		for (int i = 0; i < static_cast<int>(MapResult::_LAST); ++i) {
+		H->C["repeated_mappings"] = 0;
+		for (int i = 0; i < static_cast<int>(MapResult::_LAST); ++i)
 			H->C.inc(str(static_cast<MapResult>(i)), 0);
-		}
 
 		H->T.start("mapping");
 		H->T.start("query_reading");
@@ -441,14 +444,16 @@ public:
 			H->T.stop("query_reading");
 
 			SHSingleReadMapper mapper(tidx, H, matcher, query_id, P, paulout);
-			mapper.map_read(H->params.theta);
+			//mapper.map_read(H->params.theta);
 
 			//for (double theta = 0.85; theta >= H->params.theta; theta -= 1.0)
 			//	if (mapper.map_read(theta) != MapResult::NONE)
 			//		break;
 
-			//if (mapper.map_read(0.95) == MapResult::NONE)
-			//	mapper.map_read(H->params.theta);
+			if (mapper.map_read(0.75) == MapResult::NONE) {
+				H->C["repeated_mappings"] += 1;
+				mapper.map_read(H->params.theta);
+			}
 
 			H->T.start("query_reading");
 		});
@@ -494,6 +499,7 @@ public:
 		for (int i = 0; i < static_cast<int>(MapResult::_LAST); ++i)
 			cerr << str(static_cast<MapResult>(i)) << ": " << H->C.count(str(static_cast<MapResult>(i))) << ", ";
 		cerr << endl;
+		cerr << " | | Repeated mappings:       " << H->C.count("repeated_mappings") << endl;
 
 		//cerr << " | Average edit dist:     " << H->C.frac("total_edit_distance", "mappings") << endl;
 		//print_time_stats();
