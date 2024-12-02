@@ -167,7 +167,7 @@ public: // for testing
 
 		*lowest_sh = 1.0; // should only get lower
 
-		double thr2 = best_idx == -1 ? thr_init : maps[best_idx].score()-0.015;  // TODO: add a parameter for 0.015
+		double thr2 = best_idx == -1 ? thr_init : maps[best_idx].score()-H->params.best_score_delta;  // TODO: add a parameter for 0.015
 
 		if (hseed(m, seeds, seed_matches) < thr2)
 			return false;
@@ -287,7 +287,7 @@ public: // for testing
 				if (best2_idx != -1)
 					m.set_second_best(maps[best2_idx]);
 
-				m.set_mapq(H->params.theta);
+				m.set_mapq(H->params.theta, H->params.best_score_delta);
 				m.print_paf();
 
 				if (m.mapq() == 60) H->C.inc("mapq60");

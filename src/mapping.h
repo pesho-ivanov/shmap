@@ -181,11 +181,11 @@ public:
         return local_stats.intersection;
     }
 
-    int calc_mapq(double theta) {
+    int calc_mapq(double theta, double best_score_delta) {
         assert(score() >= 0.0);
         if (score2() < theta)
             set_score2(theta);
-        if (score() - score2() > 0.015) {
+        if (score() - score2() > best_score_delta) {
             if (abs(local_stats.same_strand_seeds) < local_stats.intersection/2)
                 return 5;
             return 60;
@@ -200,8 +200,8 @@ public:
         return std::abs(X - Y) / std::sqrt(X + Y);
     }
 
-    void set_mapq(double theta) {
-        paf.mapq = calc_mapq(theta);
+    void set_mapq(double theta, double best_score_delta) {
+        paf.mapq = calc_mapq(theta, best_score_delta);
     }
 
     double mapq() const {
