@@ -16,6 +16,22 @@
 
 #include "analyse_simulated.h"
 
+enum class MapResult {
+    UNIQUE,
+    AMBIG,
+    NONE,
+    _LAST // Sentinel value for getting enum size
+};
+
+inline string str(MapResult r) {
+    switch(r) {
+        case MapResult::UNIQUE: return "UNIQUE";
+        case MapResult::AMBIG: return "AMBIG"; 
+        case MapResult::NONE: return "NONE";
+        default: throw std::invalid_argument("Invalid MapResult");
+    }
+}
+
 namespace sweepmap {
 
 class SHSingleReadMapper {
@@ -256,8 +272,8 @@ public: // for testing
 		return {maps, best_idx, best2_idx, FPTP};
 	}
 
-	void output(const string &query_id, qpos_t P_sz, const qpos_t S, vector<Mapping> &maps, int best_idx, int best2_idx, double FPTP) {
-		if (H->params.onlybest && maps.size() >= 1) {
+	MapResult output(const string &query_id, qpos_t P_sz, const qpos_t S, vector<Mapping> &maps, int best_idx, int best2_idx, double FPTP) {
+		if (maps.size() >= 1) {
 			H->C.inc("mapped_reads");
 			if (best_idx != -1) 
 			//if (maps[best_idx].J >= H->params.theta)
@@ -278,15 +294,19 @@ public: // for testing
 				H->C.inc("matches_in_reported_mappings", m.intersection());
 				H->C.inc("J_best", rpos_t(10000.0*m.score()));
 				H->C.inc("mappings");
+
+				return m.mapq() > 0 ? MapResult::UNIQUE : MapResult::AMBIG;
 			}
 		}
+		return MapResult::NONE;
 	}
 
 public:
 	SHSingleReadMapper(const SketchIndex &tidx, Handler *H, Matcher &matcher, const string &query_id, const string &P, ofstream &paulout)
 		: tidx(tidx), H(H), matcher(matcher), query_id(query_id), P(P), paulout(paulout) {}
 
-	void run() {
+	// returns true if the read was mapped
+	MapResult map_read(double theta) {
 		H->T.start("query_mapping");
 
 		H->T.start("sketching");
@@ -356,8 +376,11 @@ public:
 
 		H->T.start("output");
 			// total_matches, max_seed_matches, seed_matches, seeded_buckets
-			output(query_id, P_sz, S, maps, best_idx, best2_idx, FPTP);
+			MapResult map_result = output(query_id, P_sz, S, maps, best_idx, best2_idx, FPTP);
 		H->T.stop("output");
+
+		H->C[str(map_result)] += 1;
+		return map_result;
 	}
 };
 
@@ -399,6 +422,10 @@ public:
 		H->C.inc("lost_on_seeding", 0);
 		H->C.inc("lost_on_pruning", 0);
 
+		for (int i = 0; i < static_cast<int>(MapResult::_LAST); ++i) {
+			H->C.inc(str(static_cast<MapResult>(i)), 0);
+		}
+
 		H->T.start("mapping");
 		H->T.start("query_reading");
 
@@ -414,7 +441,14 @@ public:
 			H->T.stop("query_reading");
 
 			SHSingleReadMapper mapper(tidx, H, matcher, query_id, P, paulout);
-			mapper.run();
+			mapper.map_read(H->params.theta);
+
+			//for (double theta = 0.85; theta >= H->params.theta; theta -= 1.0)
+			//	if (mapper.map_read(theta) != MapResult::NONE)
+			//		break;
+
+			//if (mapper.map_read(0.95) == MapResult::NONE)
+			//	mapper.map_read(H->params.theta);
 
 			H->T.start("query_reading");
 		});
@@ -456,6 +490,10 @@ public:
 		cerr << " | | Average best sim.:       " << std::fixed << std::setprecision(3) << H->C.frac("J_best", "mappings") / 10000.0 << endl;
 		cerr << " | | mapq=60:                 " << H->C.count("mapq60") << " (" << H->C.perc("mapq60", "mappings") << "\% of mappings)" << endl;
 		cerr << " | | FDR:                     " << H->C.perc("FP", "PP") << "%" << " = " << H->C.frac("FP", "reads") << " / " << H->C.frac("PP", "reads") << " per reads" << endl;
+		cerr << " | | Mapped results:          ";
+		for (int i = 0; i < static_cast<int>(MapResult::_LAST); ++i)
+			cerr << str(static_cast<MapResult>(i)) << ": " << H->C.count(str(static_cast<MapResult>(i))) << ", ";
+		cerr << endl;
 
 		//cerr << " | Average edit dist:     " << H->C.frac("total_edit_distance", "mappings") << endl;
 		//print_time_stats();
