@@ -11,7 +11,6 @@
 
 using namespace sweepmap;
 using namespace doctest;
-//using matcher_t = std::function<void(const segm_t&, const pos_t&, const pos_t&)>;
 
 TEST_SUITE("Counting") {
     TEST_CASE("Counter") {
@@ -182,14 +181,11 @@ TEST_CASE("FracMinHash sketching") {
 }
 
 TEST_CASE("Indexing") {
-	Handler* H;
-	SketchIndex* tidx;
-
-	params_t params;
-	params.k = 4;
-	params.hFrac = 1.0; 
-	H = new Handler(params);
-	tidx = new SketchIndex(H);
+    params_t params;
+    params.k = 4;
+    params.hFrac = 1.0;
+    Handler* H = new Handler(params);
+    SketchIndex* tidx = new SketchIndex(H);
 
     SUBCASE("Single segment") {
         string ref_file = "ref.fa";
@@ -230,11 +226,59 @@ TEST_CASE("Indexing") {
         CHECK(tidx->H->C.count("indexed_hits") == 10);
         CHECK(tidx->H->C.count("indexed_kmers") == 8);
     }
+
+    delete tidx;
+    delete H;
+}
+
+TEST_CASE("SHSingleReadMapper::select_kmers selects and sorts kmers correctly") {
+    // Setup test dependencies
+    params_t params;
+    params.k = 4;
+    params.hFrac = 1.0;
+    params.theta = 0.7;
+    Handler* H = new Handler(params);
+    SketchIndex* tidx = new SketchIndex(H);
+    
+    string query_id = "test_read";
+    string sequence = "ACGTACGTACGT";
+    ofstream paulout;
+    Matcher matcher(*tidx);
+    
+    SHSingleReadMapper mapper(*tidx, H, matcher, query_id, sequence, paulout);
+    
+    // Create test sketch
+    sketch_t p;
+    p.emplace_back(0, 0x1234, false);  // pos, hash, rc
+    p.emplace_back(4, 0x1234, false);  // duplicate hash
+    p.emplace_back(2, 0x5678, false);
+    p.emplace_back(6, 0x9ABC, false);
+    
+    // Call select_kmers
+    auto [kmers, m] = mapper.select_kmers(p);
+    
+    // Verify results
+    REQUIRE(m == 4); // Total kmers including duplicates
+    REQUIRE(kmers.size() == 3); // Unique kmers
+    
+    // Verify kmers are sorted by increasing number of hits in tidx
+    for (size_t i = 1; i < kmers.size(); i++) {
+        REQUIRE(kmers[i-1].hits_in_T <= kmers[i].hits_in_T);
+    }
+    
+    // Verify duplicate kmer handling
+    auto first_kmer = std::find_if(kmers.begin(), kmers.end(),
+        [](const Seed& s) { return s.kmer.h == 0x1234; });
+    REQUIRE(first_kmer != kmers.end());
+    REQUIRE(first_kmer->occs_in_p == 2); // Should count duplicates
+
+    delete tidx;
+    delete H;
 }
 
 TEST_CASE("Bucketing") {
     int l = 10;
-	Buckets B(l);
+    Buckets B(l);
     CHECK(B.get_bucket_len() == 10);
     segm_t segm_id = 0;
     SUBCASE("Bucket") {
@@ -317,8 +361,9 @@ TEST_CASE("Mapping a toy read") {
 	p.emplace_back(40, 444444, false);
 	p.emplace_back(50, 555555, false);
 
-	int nonzero = 0;
-	Seeds kmers = mapper->select_kmers(p, nonzero);
+	auto [kmers, m] = mapper->select_kmers(p);
+
+    CHECK(m == 5);
 
 	INFO("Seeding");
 	CHECK_MESSAGE(kmers.size() == 4, "wrong number of read kmers");
@@ -327,5 +372,5 @@ TEST_CASE("Mapping a toy read") {
 			"read kmers[", i-1, "].hits_in_T=", kmers[i-1].hits_in_T,
 			" and read kmers[", i, "].hits_in_T=", kmers[i].hits_in_T,
 			" not ordered by increasing hits");
-	}
+    }
 }

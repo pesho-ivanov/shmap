@@ -29,9 +29,13 @@ class SHSingleReadMapper {
 	Counters C;
 
 public: // for testing
-	Seeds select_kmers(sketch_t& p, int &nonzero) {
+	// Returns (kmers, m), where:
+	// `kmers` is the list of kmers in sketch `p` (without repetitions, sorted by increasing number of hits in `tidx`)
+	// `m` is the total number of kmers in sketch `p` (including multiples)
+	pair<Seeds, qpos_t> select_kmers(sketch_t& p) {
 		H->T.start("seeding");
 		H->T.start("collect_kmer_info");
+			int nonzero = 0;
 			Seeds kmers;
 			sort(p.begin(), p.end(), [](const Kmer &a, const Kmer &b) { return a.h < b.h; });
 			qpos_t strike = 0;
@@ -54,6 +58,12 @@ public: // for testing
 					strike = 0;
 				}
 			}
+
+			qpos_t m = 0;
+			for (const auto kmer: kmers)
+				m += kmer.occs_in_p;
+			assert(m <= (int)p.size());
+			H->C.inc("kmers_notmatched", m - nonzero);
 		H->T.stop("collect_kmer_info");
 
 		H->T.start("sort_kmers");
@@ -64,7 +74,7 @@ public: // for testing
 		H->T.stop("sort_kmers");
 		H->T.stop("seeding");
 
-		return kmers;
+		return std::make_pair(kmers, m);
 	}
 
 	// Takes at least `S` seeds from `kmers`. Matches each seed to the buckets `B`.  Returns the number of seeds.
@@ -288,13 +298,7 @@ public:
 
 			H->C.inc("read_len", P_sz);
 
-			int nonzero = 0;
-			Seeds kmers = select_kmers(p, nonzero);
-			qpos_t m = 0;
-			for (const auto kmer: kmers)
-				m += kmer.occs_in_p;
-			assert(m <= (int)p.size());
-			H->C.inc("kmers_notmatched", m - nonzero);
+			auto [kmers, m] = select_kmers(p);
 			//cerr << "notmatched: " << m - nonzero << endl;
 
 			unordered_map<hash_t, Seed> p_ht;
