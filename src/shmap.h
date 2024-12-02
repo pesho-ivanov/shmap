@@ -22,11 +22,13 @@ class SHSingleReadMapper {
 	const SketchIndex &tidx;
 	Handler *H;
 	Matcher &matcher;
-	Counters &C;
 	const string &query_id;
 	const string &P;
 	ofstream &paulout;
 
+	Counters C;
+
+public: // for testing
 	Seeds select_kmers(sketch_t& p, int &nonzero) {
 		H->T.start("seeding");
 		H->T.start("collect_kmer_info");
@@ -207,6 +209,22 @@ class SHSingleReadMapper {
         H->C["final_buckets"] += C["final_buckets"];
     }
 
+	std::tuple<int, int, double, double> calc_FDR(vector<Mapping> &maps, double theta, qpos_t lmax, const SketchIndex &tidx, const unordered_map<hash_t, Seed> &p_ht, qpos_t P_sz, qpos_t lmin, qpos_t m, const Hist &diff_hist) {
+		int FP = 0;
+		for (auto &mapping: maps) {
+			auto M = matcher.collect_matches(mapping.bucket(), p_ht);
+			auto mapping_best_J = matcher.bestIncludedJaccard(M, P_sz, lmin, lmax, m);
+			mapping_best_J.set_bucket(mapping.bucket());
+			if (mapping_best_J.score() < H->params.theta)
+				++FP;
+		}
+
+		int PP = maps.size();
+		double FDR = 1.0 * FP / PP;
+		double FPTP = (PP - FP > 0) ?  1.0 * FP / (PP - FP) : 0.0;
+		return {PP, FP, FDR, FPTP};
+	}
+
     tuple<vector<Mapping>, int, int, double> match_remaining_kmers_for_best_and_second_best(qpos_t P_sz, qpos_t lmax, qpos_t m, const Seeds &kmers, const Buckets &B, Hist &diff_hist, int seeds, int first_kmer_after_seeds, const unordered_map<hash_t, Seed> &p_ht, const string &query_id) {
         vector<Mapping> maps;
         //vector<Bucket> B_vec(B.begin(), B.end());
@@ -226,22 +244,6 @@ class SHSingleReadMapper {
 			match_rest(P_sz, lmax, m, kmers, B, diff_hist, seeds, first_kmer_after_seeds, p_ht, maps, best2_idx, maps[best_idx].score(), best_idx, query_id);
 		}
 		return {maps, best_idx, best2_idx, FPTP};
-	}
-
-	std::tuple<int, int, double, double> calc_FDR(vector<Mapping> &maps, double theta, qpos_t lmax, const SketchIndex &tidx, const unordered_map<hash_t, Seed> &p_ht, qpos_t P_sz, qpos_t lmin, qpos_t m, const Hist &diff_hist) {
-		int FP = 0;
-		for (auto &mapping: maps) {
-			auto M = matcher.collect_matches(mapping.bucket(), p_ht);
-			auto mapping_best_J = matcher.bestIncludedJaccard(M, P_sz, lmin, lmax, m);
-			mapping_best_J.set_bucket(mapping.bucket());
-			if (mapping_best_J.score() < H->params.theta)
-				++FP;
-		}
-
-		int PP = maps.size();
-		double FDR = 1.0 * FP / PP;
-		double FPTP = (PP - FP > 0) ?  1.0 * FP / (PP - FP) : 0.0;
-		return {PP, FP, FDR, FPTP};
 	}
 
 	void output(const string &query_id, qpos_t P_sz, const qpos_t S, vector<Mapping> &maps, int best_idx, int best2_idx, double FPTP) {
@@ -271,8 +273,8 @@ class SHSingleReadMapper {
 	}
 
 public:
-	SHSingleReadMapper(const SketchIndex &tidx, Handler *H, Matcher &matcher, Counters &C, const string &query_id, const string &P, ofstream &paulout)
-		: tidx(tidx), H(H), matcher(matcher), C(C), query_id(query_id), P(P), paulout(paulout) {}
+	SHSingleReadMapper(const SketchIndex &tidx, Handler *H, Matcher &matcher, const string &query_id, const string &P, ofstream &paulout)
+		: tidx(tidx), H(H), matcher(matcher), query_id(query_id), P(P), paulout(paulout) {}
 
 	void run() {
 		H->T.start("query_mapping");
@@ -396,8 +398,6 @@ public:
 		H->T.start("mapping");
 		H->T.start("query_reading");
 
-		Counters C;
-
 		string pauls_fn = H->params.paramsFile + ".paul.tsv";
 		ofstream paulout;
 		if (!H->params.paramsFile.empty()) {
@@ -405,11 +405,11 @@ public:
 			paulout = ofstream(pauls_fn);
 		}
 
-		read_fasta_klib(pFile, [this, &paulout, &C](const string &query_id, const string &P) {
+		read_fasta_klib(pFile, [this, &paulout](const string &query_id, const string &P) {
 			H->C.inc("reads");
 			H->T.stop("query_reading");
 
-			SHSingleReadMapper mapper(tidx, H, matcher, C, query_id, P, paulout);
+			SHSingleReadMapper mapper(tidx, H, matcher, query_id, P, paulout);
 			mapper.run();
 
 			H->T.start("query_reading");

@@ -3,11 +3,15 @@
 #include "../ext/doctest.h"
 #include <thread>
 #include <chrono>
+#include <functional>
 
+#include "types.h"
 #include "shmap.h"
+#include "io.h"  // For PaulFile and pos_t definitions
 
 using namespace sweepmap;
 using namespace doctest;
+//using matcher_t = std::function<void(const segm_t&, const pos_t&, const pos_t&)>;
 
 TEST_SUITE("Counting") {
     TEST_CASE("Counter") {
@@ -289,18 +293,22 @@ TEST_CASE("Bucketing") {
 }
 
 TEST_CASE("Mapping a toy read") {
-	Handler* H;
-	SketchIndex* tidx;
-	SHMapper* mapper;
-
 	params_t params;
 	params.k = 25;
 	params.hFrac = 0.05;
 	params.theta = 0.7;
 
-	H = new Handler(params);
-	tidx = new SketchIndex(H);
-	mapper = new SHMapper(*tidx, H);
+	Handler *H = new Handler(params);
+	SketchIndex *tidx = new SketchIndex(H);
+	
+	// Define the missing variables
+	string query_id = "NONE";
+	string P = "ACCATCG";
+	std::ofstream paulout;
+
+	Matcher matcher(*tidx);
+
+	auto* mapper = new SHSingleReadMapper(*tidx, H, matcher, query_id, P, paulout);
 
 	sketch_t p;
 	p.emplace_back(10, 111111, false);
