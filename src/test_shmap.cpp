@@ -237,15 +237,15 @@ TEST_CASE("SHSingleReadMapper::select_kmers selects and sorts kmers correctly") 
     params.k = 4;
     params.hFrac = 1.0;
     params.theta = 0.7;
-    Handler* H = new Handler(params);
-    SketchIndex* tidx = new SketchIndex(H);
+    auto H = new Handler(params);
+    auto tidx = new SketchIndex(H);
     
     string query_id = "test_read";
     string sequence = "ACGTACGTACGT";
     ofstream paulout;
-    Matcher matcher(*tidx);
+    auto matcher = new Matcher(*tidx);
     
-    SHSingleReadMapper mapper(*tidx, H, matcher, query_id, sequence, paulout);
+    SHSingleReadMapper mapper(*tidx, H, *matcher, query_id, sequence, paulout);
     
     // Create test sketch
     sketch_t p;
@@ -272,8 +272,10 @@ TEST_CASE("SHSingleReadMapper::select_kmers selects and sorts kmers correctly") 
     REQUIRE(first_kmer != kmers.end());
     REQUIRE(first_kmer->occs_in_p == 2); // Should count duplicates
 
+    delete matcher;
     delete tidx;
     delete H;
+    return;
 }
 
 TEST_CASE("Bucketing") {

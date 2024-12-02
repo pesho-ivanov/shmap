@@ -67,9 +67,13 @@ public:
     }
 
     void stop(const std::string& name) {
-        auto it = timers_.find(name);
-        if (it != timers_.end()) {
-            it->second.stop();
+        try {
+            auto it = timers_.find(name);
+            if (it != timers_.end()) {
+                it->second.stop();
+            }
+        } catch (const std::runtime_error& e) {
+            throw std::runtime_error("Timer '" + name + "': " + e.what());
         }
     }
 
