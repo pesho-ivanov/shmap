@@ -95,7 +95,7 @@ public: // for testing
 
 	// Takes at least `S` seeds from `kmers`. Matches each seed to the buckets `B`.  Returns the number of seeds.
 	pair<qpos_t, qpos_t> match_seeds(const Seeds &kmers, Buckets &B, qpos_t S) {
-		int matches_in_B = 0;
+		//int matches_in_B = 0;
 		C["seed_matches"] = 0;
 		C["max_seed_matches"] = 0;
 		qpos_t i = 0, seeds = 0;
@@ -118,7 +118,7 @@ public: // for testing
 				for (auto it = b2m.unordered_begin(); it != b2m.unordered_end(); ++it) {
 					//B[b] += min(seed.occs_in_p, matches);
 					B.add_to_bucket(it->first, it->second);
-					matches_in_B += it->second;
+					//matches_in_B += it->second;
 				}
 
 				//bucket_t prev_b(-1, -1);
@@ -450,9 +450,9 @@ public:
 			//	if (mapper.map_read(theta) != MapResult::NONE)
 			//		break;
 
-			if (mapper.map_read(0.75) == MapResult::NONE) {
-				H->C["repeated_mappings"] += 1;
+			if (mapper.map_read(0.8) == MapResult::NONE) {
 				mapper.map_read(H->params.theta);
+				H->C["repeated_mappings"] += 1;
 			}
 
 			H->T.start("query_reading");
