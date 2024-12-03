@@ -61,10 +61,10 @@ public:
         if (b>0) _B[ Bucket(p.segm_id, b-1, this) ] += matches;
     }
 
-    void assign_to_pos(const Pos& p, qpos_t matches) {
+    void add_to_pos(const Pos& p) {
         qpos_t b = p.r/len;
-        _B[ Bucket(p.segm_id, b, this) ] = matches;
-        if (b>0) _B[ Bucket(p.segm_id, b-1, this) ] = matches;
+        ++_B[ Bucket(p.segm_id, b, this) ];
+        if (b>0) ++_B[ Bucket(p.segm_id, b-1, this) ];
     }
 
     void add_to_bucket(Bucket b, qpos_t matches) {

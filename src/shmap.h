@@ -112,12 +112,12 @@ public: // for testing
 				Buckets b2m(B.get_bucket_len());
 				for (auto &m: seed_matches) {
 					//rpos_t b(m.hit.tpos / B.get_bucket_len());
-					b2m.assign_to_pos(Buckets::Pos(m.hit.segm_id, m.hit.tpos), seed.occs_in_p);
+					b2m.add_to_pos(Buckets::Pos(m.hit.segm_id, m.hit.tpos));
 					//if (b > 0) b2m.add_to_bucket(bucket_t(m.hit.segm_id, b-1), seed.occs_in_p);
 				}
 				for (auto it = b2m.unordered_begin(); it != b2m.unordered_end(); ++it) {
 					//B[b] += min(seed.occs_in_p, matches);
-					B.add_to_bucket(it->first, it->second);
+					B.add_to_bucket(it->first, min(it->second, seed.occs_in_p));
 					//matches_in_B += it->second;
 				}
 
@@ -177,7 +177,7 @@ public: // for testing
 		for (; i < (qpos_t)kmers.size(); i++) {
 			seeds += kmers[i].occs_in_p;
 			if (tidx.matches_in_bucket(kmers[i], b))
-				seed_matches += kmers[i].occs_in_p;
+				seed_matches += kmers[i].occs_in_p;  // TODO: add exact. could be lower than occs_in_p
 			double sh = hseed(m, seeds, seed_matches);
 			assert(sh <= *lowest_sh);
 			*lowest_sh = min(*lowest_sh, sh);	
