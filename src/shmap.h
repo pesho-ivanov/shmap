@@ -65,9 +65,8 @@ public: // for testing
 						nonzero += strike;
 					}
 						if (H->params.max_matches == -1 || hits_in_t <= H->params.max_matches) {
-							Seed el(p[ppos], hits_in_t, kmers.size());
+							Seed el(p[ppos], hits_in_t, strike, kmers.size());
 							//strike = 1; // comment out for Weighted metric
-							el.occs_in_p = strike;
 							kmers.push_back(el);
 							if (H->params.max_seeds != -1 && (rpos_t)kmers.size() >= H->params.max_seeds)  // TODO maybe account for occs_in_p
 								break;

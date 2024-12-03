@@ -38,13 +38,13 @@ struct RefSegment {
 // Seed -- a kmer with metadata (a position in the query P and number of hits in the reference T)
 struct Seed {
     Kmer kmer;
-    rpos_t hits_in_T;
-    qpos_t occs_in_p;
-    qpos_t seed_num;
-    Seed(const Kmer &kmer, rpos_t hits_in_T, qpos_t seed_num) :
-        kmer(kmer), hits_in_T(hits_in_T), seed_num(seed_num) {}    
+    rpos_t hits_in_T;   // number of hits in the reference sketch
+    qpos_t occs_in_p;   // number of occurrences in the query sketch
+    qpos_t seed_num;    // seed number in the query sketch (unique)
+    Seed(const Kmer &kmer, rpos_t hits_in_T, qpos_t occs_in_p, qpos_t seed_num) :
+        kmer(kmer), hits_in_T(hits_in_T), occs_in_p(occs_in_p), seed_num(seed_num) {}    
     friend std::ostream& operator<<(std::ostream& os, const Seed& seed) {
-        os << "Seed(" << seed.kmer << ", hits_in_T=" << seed.hits_in_T << ", seed_num=" << seed.seed_num << ")";
+        os << "Seed(" << seed.kmer << ", hits_in_T=" << seed.hits_in_T << ", occs_in_p=" << seed.occs_in_p << ", seed_num=" << seed.seed_num << ")";
         return os;
     }
 };
