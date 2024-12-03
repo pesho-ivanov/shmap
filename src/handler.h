@@ -16,7 +16,9 @@ public:
 	params_t params;
     FracMinHash sketcher;
 
-    Handler(const params_t &params) : params(params), sketcher(params.k, params.hFrac, &C, &T) {
+    Handler(const params_t &params)
+            : params(params),
+              sketcher(params.k, params.hFrac, &C, &T) {
         T.start("total");
         if (!params.paramsFile.empty()) {
             cerr << "Writing parameters to " << params.paramsFile << "..." << endl;
@@ -28,16 +30,13 @@ public:
         this->params.print_display(std::cerr);
     }
 
-    ~Handler() {
-        T.stop("total");
-        print_sketching_stats();
+    sketch_t sketch(const std::string& s) {
+        return sketcher.sketch(s);
     }
 
-    //sketch_t sketch(const std::string& s) {
-    //    return sketcher.sketch(s);
-    //}
-
 	void print_sketching_stats() {
+        T.stop("total");
+
 		cerr << std::fixed << std::setprecision(1);
 		cerr << "Sketching:" << endl;
 		cerr << " | Sketched sequences:    " << C.count("sketched_seqs") << " (" << C.count("sketched_len") << " nb)" << endl;

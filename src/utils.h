@@ -184,9 +184,7 @@ public:
     //Const operator[] that returns const int64_t
     int64_t operator[](const std::string& name) const {
         auto it = counters_.find(name);
-        if (it == counters_.end()) {
-            return 0;
-        }
+        assert (it != counters_.end());
         return it->second.count();
     }
 };

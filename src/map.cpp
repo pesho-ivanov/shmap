@@ -17,6 +17,7 @@ int main(int argc, char **argv) {
 	Mapper* mapper = MapperFactory::createMapper(H.params.mapper, tidx, &H);
 	if (mapper == nullptr) return 1;
 	mapper->map_all_reads(H.params.pFile);
+	H.print_sketching_stats();
 
 	return 0;
 }

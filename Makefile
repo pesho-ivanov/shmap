@@ -108,7 +108,7 @@ $(FLAG_FILE):
 clean:
 	rm -f $(OBJS) debug_flag release_flag
 	rm -rf debug release
-	$(MAKE) clean_test
+	make clean_test
 
 simulate_SVs:
 	cd $(REF_DIR);\
@@ -179,7 +179,7 @@ fdr_per_theta: $(SHMAP_BIN) gen_reads
 
 eval_shmap: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_PREF))
-	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -x 2>/dev/null >/dev/null
+#	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -x 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -x     2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
 	$(PAFTOOLS) mapeval -r 0.1 $(SHMAP_PREF).paf 2>/dev/null | tee $(SHMAP_PREF).eval || true
 	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_PREF).paf >$(SHMAP_PREF).wrong 2>/dev/null || true
@@ -344,7 +344,7 @@ TEST_EXEC = ./test_shmap
 # Test target
 test: $(TEST_OBJS)
 	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $(TEST_EXEC) $(TEST_OBJS) $(LIBS)
-	./$(TEST_EXEC) --no-intro --no-version 2>/dev/null
+	$(TEST_EXEC) --no-intro --no-version 2>/dev/null
 
 # Compile test objects with TESTING defined
 src/test_shmap.o: src/test_shmap.cpp

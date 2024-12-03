@@ -237,15 +237,15 @@ TEST_CASE("SHSingleReadMapper::select_kmers selects and sorts kmers correctly") 
     params.k = 4;
     params.hFrac = 1.0;
     params.theta = 0.7;
-    Handler* H = new Handler(params);
-    SketchIndex* tidx = new SketchIndex(H);
+    Handler H(params);
+    SketchIndex tidx(&H);
     
     string query_id = "test_read";
     string sequence = "ACGTACGTACGT";
     ofstream paulout;
-    Matcher matcher(*tidx);
+    Matcher matcher(tidx);
     
-    SHSingleReadMapper mapper(*tidx, H, matcher, query_id, sequence, paulout);
+    SHSingleReadMapper mapper(tidx, &H, matcher, query_id, sequence, paulout);
     
     // Create test sketch
     sketch_t p;
@@ -272,8 +272,8 @@ TEST_CASE("SHSingleReadMapper::select_kmers selects and sorts kmers correctly") 
     REQUIRE(first_kmer != kmers.end());
     REQUIRE(first_kmer->occs_in_p == 2); // Should count duplicates
 
-    delete tidx;
-    delete H;
+    //delete tidx;
+    //delete H;
 }
 
 TEST_CASE("Bucketing") {
@@ -335,6 +335,19 @@ TEST_CASE("Bucketing") {
         CHECK(cnt == matches.size());
     }
 }
+
+//TEST_CASE("choose_seeds") {
+//    Seeds kmers;
+//    kmers.emplace_back(Seed{Kmer{10, 111111}, 1, 1, 0});
+//    kmers.emplace_back(Seed{Kmer{20, 222222}, 1, 2, 0}); 
+//    kmers.emplace_back(Seed{Kmer{30, 333333}, 1, 3, 0});
+//    qpos_t m = 3;
+//    double theta = 0.5;
+//    auto [required, remaining, seeds_with_repeats] = SHSingleReadMapper::choose_seeds(kmers, m, theta);
+//    CHECK(required.size() == 2);
+//    CHECK(remaining.size() == 1);
+//    CHECK(seeds_with_repeats == 0);
+//}
 
 TEST_CASE("Mapping a toy read") {
 	params_t params;
