@@ -111,7 +111,7 @@ public:
 			// move r to the left until l+lmin<r
 			for(; l + 1 < r && l->hit.tpos + lmin < r->hit.tpos; ) {
 				--r;
-				if (++diff_hist[r->seed.kmer.h] >= 1) {
+				if (++diff_hist[r->seed.el.h] >= 1) {
 					--intersection;
 					same_strand_seeds -= r->is_same_strand() ? +1 : -1;
 				}
@@ -119,8 +119,8 @@ public:
 
 			// move r to the right until l+lmax<=r
 			for(;  r != M.end() && r->hit.tpos <= l->hit.tpos + lmax; ++r) {
-				assert(diff_hist.contains(r->seed.kmer.h));
-				if (--diff_hist[r->seed.kmer.h] >= 0) {
+				assert(diff_hist.contains(r->seed.el.h));
+				if (--diff_hist[r->seed.el.h] >= 0) {
 					++intersection;
 					same_strand_seeds += r->is_same_strand() ? +1 : -1;
 				}
@@ -134,8 +134,8 @@ public:
 				}
 			}
 
-			assert(diff_hist.contains(l->seed.kmer.h));
-			if (++diff_hist[l->seed.kmer.h] >= 1) {
+			assert(diff_hist.contains(l->seed.el.h));
+			if (++diff_hist[l->seed.el.h] >= 1) {
 				--intersection;
 				same_strand_seeds -= l->is_same_strand() ? +1 : -1;
 			}
@@ -164,8 +164,8 @@ public:
 				//&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
 				//&& r->hit.tpos + H->params.k <= l->hit.tpos + P_sz
 				//&& r->hit.r + H->params.k <= l->hit.r + P_sz
-				assert(diff_hist.contains(r->seed.kmer.h));
-				if (--diff_hist[r->seed.kmer.h] >= 0) {
+				assert(diff_hist.contains(r->seed.el.h));
+				if (--diff_hist[r->seed.el.h] >= 0) {
 					++intersection;
 					same_strand_seeds += r->is_same_strand() ? +1 : -1;
 				}
@@ -190,8 +190,8 @@ public:
 				best.update(0, P_sz-1, l->hit.r, prev(r)->hit.r, tidx.T[l->hit.segm_id], intersection, J, same_strand_seeds, l, prev(r)); // TODO: should it be prev(r) instead?
 				//best = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r));
 
-			assert(diff_hist.contains(l->seed.kmer.h));
-			if (++diff_hist[l->seed.kmer.h] >= 1) {
+			assert(diff_hist.contains(l->seed.el.h));
+			if (++diff_hist[l->seed.el.h] >= 1) {
 				--intersection;
 				same_strand_seeds -= l->is_same_strand() ? +1 : -1;
 			}

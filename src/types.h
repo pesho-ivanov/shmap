@@ -10,19 +10,19 @@
 namespace sweepmap {
 
 // Kmer -- a kmer with metadata (a position in the sequence, hash, strand)
-struct Kmer {
+struct El {
     rpos_t r;      // kmer resides [l, r), where l+k=r
     hash_t h;
     bool strand;  // false: forward, true: reverse
-    Kmer(rpos_t r, hash_t h, bool strand) : r(r), h(h), strand(strand) {}
-    bool operator==(const Kmer &other) const { return h == other.h; }
-    friend std::ostream& operator<<(std::ostream& os, const Kmer& kmer) {
+    El(rpos_t r, hash_t h, bool strand) : r(r), h(h), strand(strand) {}
+    bool operator==(const El &other) const { return h == other.h; }
+    friend std::ostream& operator<<(std::ostream& os, const El& kmer) {
         os << "Kmer(r=" << kmer.r << ", h=" << kmer.h << ", strand=" << kmer.strand << ")";
         return os;
     }
 };
 
-using sketch_t = std::vector<Kmer>;
+using sketch_t = std::vector<El>;
 
 // Reference segment structure
 struct RefSegment {
@@ -37,14 +37,14 @@ struct RefSegment {
 
 // Seed -- a kmer with metadata (a position in the query P and number of hits in the reference T)
 struct Seed {
-    Kmer kmer;
+    El el;
     rpos_t hits_in_T;   // number of hits in the reference sketch
     qpos_t occs_in_p;   // number of occurrences in the query sketch
     qpos_t seed_num;    // seed number in the query sketch (unique)
-    Seed(const Kmer &kmer, rpos_t hits_in_T, qpos_t occs_in_p, qpos_t seed_num) :
-        kmer(kmer), hits_in_T(hits_in_T), occs_in_p(occs_in_p), seed_num(seed_num) {}    
+    Seed(const El &kmer, rpos_t hits_in_T, qpos_t occs_in_p, qpos_t seed_num) :
+        el(kmer), hits_in_T(hits_in_T), occs_in_p(occs_in_p), seed_num(seed_num) {}    
     friend std::ostream& operator<<(std::ostream& os, const Seed& seed) {
-        os << "Seed(" << seed.kmer << ", hits_in_T=" << seed.hits_in_T << ", occs_in_p=" << seed.occs_in_p << ", seed_num=" << seed.seed_num << ")";
+        os << "Seed(" << seed.el << ", hits_in_T=" << seed.hits_in_T << ", occs_in_p=" << seed.occs_in_p << ", seed_num=" << seed.seed_num << ")";
         return os;
     }
 };
@@ -57,7 +57,7 @@ struct Hit {  // TODO: compress into a 32bit field
     bool strand;
     segm_t segm_id;
     Hit() {}
-    Hit(const Kmer &kmer, rpos_t tpos, segm_t segm_id)
+    Hit(const El &kmer, rpos_t tpos, segm_t segm_id)
         : r(kmer.r), tpos(tpos), strand(kmer.strand), segm_id(segm_id) {}
     friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
         os << "Hit(r=" << hit.r << ", tpos=" << hit.tpos << ", strand=" << hit.strand << ", segm_id=" << hit.segm_id << ")";
@@ -73,7 +73,7 @@ struct Match {
         : seed(seed), hit(hit) {}
     
     inline bool is_same_strand() const {
-        return seed.kmer.strand == hit.strand;
+        return seed.el.strand == hit.strand;
     }
     friend std::ostream& operator<<(std::ostream& os, const Match& match) {
         os << "Match(" << match.seed << ", " << match.hit << ")";

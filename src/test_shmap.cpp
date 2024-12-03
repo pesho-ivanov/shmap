@@ -252,7 +252,7 @@ TEST_CASE("SHSingleReadMapper::select_kmers selects and sorts kmers correctly") 
     p.emplace_back(6, 0x9ABC, false);
     
     // Call select_kmers
-    auto [kmers, m] = mapper.select_kmers(p);
+    auto [kmers, m] = mapper.select_elements(p);
     
     // Verify results
     REQUIRE(m == 4); // Total kmers including duplicates
@@ -265,7 +265,7 @@ TEST_CASE("SHSingleReadMapper::select_kmers selects and sorts kmers correctly") 
     
     // Verify duplicate kmer handling
     auto first_kmer = std::find_if(kmers.begin(), kmers.end(),
-        [](const Seed& s) { return s.kmer.h == 0x1234; });
+        [](const Seed& s) { return s.el.h == 0x1234; });
     REQUIRE(first_kmer != kmers.end());
     REQUIRE(first_kmer->occs_in_p == 2); // Should count duplicates
 }
@@ -332,9 +332,9 @@ TEST_CASE("Bucketing") {
 
 //TEST_CASE("choose_seeds") {
 //    Seeds kmers;
-//    kmers.emplace_back(Seed{Kmer{10, 111111}, 1, 1, 0});
-//    kmers.emplace_back(Seed{Kmer{20, 222222}, 1, 2, 0}); 
-//    kmers.emplace_back(Seed{Kmer{30, 333333}, 1, 3, 0});
+//    kmers.emplace_back(Seed(El(10, 111111, true), 1, 1, 0));
+//    kmers.emplace_back(Seed(El{20, 222222, true}, 1, 2, 0)); 
+//    kmers.emplace_back(Seed(El{30, 333333, true}, 1, 3, 0));
 //    qpos_t m = 3;
 //    double theta = 0.5;
 //    auto [required, remaining, seeds_with_repeats] = SHSingleReadMapper::choose_seeds(kmers, m, theta);
@@ -368,7 +368,7 @@ TEST_CASE("Mapping a toy read") {
 	p.emplace_back(40, 444444, false);
 	p.emplace_back(50, 555555, false);
 
-	auto [kmers, m] = mapper.select_kmers(p);
+	auto [kmers, m] = mapper.select_elements(p);
 
     CHECK(m == 5);
 

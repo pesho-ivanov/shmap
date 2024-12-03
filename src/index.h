@@ -85,10 +85,10 @@ public:
 		if (s.hits_in_T == 0) {
 			return false;
 		} else if (s.hits_in_T == 1) {
-			auto &hit = h2single.at(s.kmer.h);
+			auto &hit = h2single.at(s.el.h);
 			return b.begin() <= hit.tpos && hit.tpos < b.end();
 		} else if (s.hits_in_T > 1) {
-			const vector<Hit> &hits = h2multi.at(s.kmer.h);
+			const vector<Hit> &hits = h2multi.at(s.el.h);
 			//for (int i=1; i<(int)hits.size(); i++) assert(hits[i-1].r <= hits[i].r);
 			auto it = lower_bound(hits.begin(), hits.end(), b.begin(), [&b](const Hit &hit, rpos_t pos) {
 				if (hit.segm_id != b.segm_id)
@@ -106,9 +106,9 @@ public:
 	void get_matches(std::vector<Match> *matches, const Seed &s) const {
 		matches->reserve(matches->size() + s.hits_in_T);
 		if (s.hits_in_T == 1) {
-			matches->push_back(Match(s, h2single.at(s.kmer.h)));
+			matches->push_back(Match(s, h2single.at(s.el.h)));
 		} else if (s.hits_in_T > 1) {
-			for (const auto &hit: h2multi.at(s.kmer.h))
+			for (const auto &hit: h2multi.at(s.el.h))
 				matches->push_back(Match(s, hit));
 		}	
 	}
@@ -130,7 +130,7 @@ public:
 	void populate_h2pos(const sketch_t& sketch, segm_t segm_id) {
 		// TODO: skip creating the sketch structure
 		for (size_t tpos = 0; tpos < sketch.size(); ++tpos) {
-			const Kmer& kmer = sketch[tpos];
+			const El& kmer = sketch[tpos];
 			const auto hit = Hit(kmer, tpos, segm_id);
 			if (!h2single.contains(kmer.h))
 				h2single[kmer.h] = hit; 

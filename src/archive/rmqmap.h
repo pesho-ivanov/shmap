@@ -40,7 +40,7 @@ class RMQMapper : public Mapper {
 		cerr << "> select_seeds: p.size()=" << p.size() << endl;
 #endif
 		H->T.start("unique_kmers");
-		pdqsort_branchless(p.begin(), p.end(), [](const Kmer &a, const Kmer &b) {
+		pdqsort_branchless(p.begin(), p.end(), [](const El &a, const El &b) {
             return a.h < b.h;
 		});
 		p.erase(std::unique(p.begin(), p.end()), p.end());

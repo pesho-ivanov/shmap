@@ -57,7 +57,7 @@ class SweepMapper : public Mapper {
 
 		H->T.start("sort_seeds");
 		pdqsort_branchless(seeds.begin(), seeds.begin() + total_seeds, [](const Seed &a, const Seed &b) {
-			return a.kmer.h < b.kmer.h;
+			return a.el.h < b.el.h;
 		});
 		H->T.stop("sort_seeds");
 
@@ -72,7 +72,7 @@ class SweepMapper : public Mapper {
 			max_r = std::max(max_r, seeds[i].r_last);
 			//++(hist->back());
 			hist->back() = 1;
-			if (i==total_seeds-1 || seeds[i].kmer.h != seeds[i+1].kmer.h) {
+			if (i==total_seeds-1 || seeds[i].el.h != seeds[i+1].el.h) {
 				assert(min_r <= max_r);
 				seeds[i].r_first = min_r;
 				seeds[i].r_last = max_r;
