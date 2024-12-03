@@ -51,7 +51,6 @@ public: // for testing
 	// `matched_kmers` is the list of kmers in sketch `p` (without repetitions, sorted by increasing number of hits in `tidx`)
 	// `m` is the total number of kmers in sketch `p` (including multiples)
 	pair<Seeds, qpos_t> select_elements(sketch_t& p) {
-		H->T.start("seeding");
 		H->T.start("collect_element_info");
 			int nonzero = 0;
 			Seeds matched_elements;
@@ -90,7 +89,6 @@ public: // for testing
 				return a.hits_in_T < b.hits_in_T;
 			});
 		H->T.stop("sort_elements");
-		H->T.stop("seeding");
 
 		return std::make_pair(matched_elements, m);
 	}
@@ -331,12 +329,13 @@ public:
 			sketch_t p = H->sketcher.sketch(P);
 		H->T.stop("sketching");
 
+		H->T.start("select_elements");
+			auto [elements, m] = select_elements(p);
+		H->T.stop("select_elements");
+
 		H->T.start("prepare");
 			qpos_t P_sz = P.size();
-
 			H->C.inc("read_len", P_sz);
-
-			auto [elements, m] = select_elements(p);
 			//cerr << "notmatched: " << m - nonzero << endl;
 
 			unordered_map<hash_t, Seed> p_ht;
@@ -527,13 +526,13 @@ public:
         cerr << std::fixed << std::setprecision(1);
         cerr << " | Runtime:                "    << setw(5) << right << H->T.secs("mapping")       << " sec, " << 1.0 * H->C.count("reads") / H->T.secs("mapping")  << " reads/sec (" << setw(5) << right << H->T.range_ratio("query_mapping") << "x)" << endl; //setw(4) << right << H->C.count("reads") / H->T.secs("total") << " reads p/ sec)" << endl;
         cerr << " |  | load reads:             " << setw(5) << right << H->T.secs("query_reading")     << " (" << setw(4) << right << H->T.perc("query_reading", "mapping")       << "\%, " << setw(6) << right << H->T.range_ratio("query_reading") << "x)" << endl;
-//        cerr << " |  | prepare:                "     << setw(5) << right << H->T.secs("prepare")           << " (" << setw(4) << right << H->T.perc("prepare", "mapping")             << "\%, " << setw(6) << right << H->T.range_ratio("prepare") << "x)" << endl;
         cerr << " |  | sketch reads:           " << setw(5) << right << H->T.secs("sketching")         << " (" << setw(4) << right << H->T.perc("sketching", "mapping")           << "\%, " << setw(6) << right << H->T.range_ratio("sketching") << "x)" << endl;
-        cerr << " |  | seed:                   " << setw(5) << right << H->T.secs("seeding")           << " (" << setw(4) << right << H->T.perc("seeding", "mapping")             << "\%, " << setw(6) << right << H->T.range_ratio("seeding") << "x)" << endl;
+		cerr << " |  | select elements:        " << setw(5) << right << H->T.secs("select_elements")   << " (" << setw(4) << right << H->T.perc("select_elements", "mapping") << "\%, " << setw(6) << right << H->T.range_ratio("select_elements") << "x)" << endl;
         //cerr << " |  |  | collect element info:    " << setw(5) << right << H->T.secs("collect_element_info") << " (" << setw(4) << right << H->T.perc("collect_element_info", "seeding")   << "\%, " << setw(6) << right << H->T.range_ratio("collect_element_info") << "x)" << endl;
         //cerr << " |  |  | sort elements:          " << setw(5) << right << H->T.secs("sort_elements")        << " (" << setw(4) << right << H->T.perc("sort_elements", "seeding")          << "\%, " << setw(6) << right << H->T.range_ratio("sort_elements") << "x)" << endl;
 //        cerr << " |  |  | thin sketch:             " << setw(5) << right << H->T.secs("thin_sketch")       << " (" << setw(4) << right << H->T.perc("thin_sketch", "seeding")         << "\%, " << setw(6) << right << H->T.range_ratio("thin_sketch") << "x)" << endl;
 //        cerr << " |  |  | unique seeds:            " << setw(5) << right << H->T.secs("unique_seeds")      << " (" << setw(4) << right << H->T.perc("unique_seeds", "seeding")        << "\%, " << setw(6) << right << H->T.range_ratio("unique_seeds") << "x)" << endl;
+        cerr << " |  | prepare:                "     << setw(5) << right << H->T.secs("prepare")           << " (" << setw(4) << right << H->T.perc("prepare", "mapping")             << "\%, " << setw(6) << right << H->T.range_ratio("prepare") << "x)" << endl;
         cerr << " |  | match seeds:            " << setw(5) << right << H->T.secs("match_seeds")  << " (" << setw(4) << right << H->T.perc("match_seeds", "mapping")   << "\%, " << setw(6) << right << H->T.range_ratio("match_seeds") << "x)" << endl;
         cerr << " |  | match rest:             " << setw(5) << right << H->T.secs("match_rest")   << " (" << setw(4) << right << H->T.perc("match_rest", "mapping")     << "\%, " << setw(6) << right << H->T.range_ratio("match_rest") << "x)" << endl;
         cerr << " |  |  | seed heuristic:         " << setw(5) << right << H->T.secs("seed_heuristic")    << " (" << setw(4) << right << H->T.perc("seed_heuristic", "match_rest")     << "\%, " << setw(6) << right << H->T.range_ratio("seed_heuristic") << "x)" << endl;
