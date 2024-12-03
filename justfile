@@ -31,6 +31,13 @@ ONE_READ := ALLREADS_DIR + "/" + READS_PREFIX + ".oneread.fa"
 SHMAP_PREF := ALLOUT_DIR + "/shmap/" + READS_PREFIX + "/shmap"
 MINIMAP_PREF := ALLOUT_DIR + "/minimap/" + READS_PREFIX + "/minimap"
 
+# Tool-specific configurations
+shmap:
+    just eval "shmap" {{SHMAP_PREF}} "{{SHMAP_CMD}}" "{{SHMAP_CMD}} -z {{SHMAP_PREF}}.params"
+
+minimap:
+    just eval "minimap2" {{MINIMAP_PREF}} "{{MINIMAP_INDEX_CMD}}" "{{MINIMAP_MAP_CMD}}"
+
 # Generate simulated reads if they don't exist
 gen_reads:
     #!/usr/bin/env sh
@@ -55,20 +62,12 @@ gen_reads:
         head -n 2 {{READS}} >{{ONE_READ}}
     fi
 
-# Evaluate shmap on reads
-eval_shmap: gen_reads
+# Generic evaluation logic
+eval name prefix index_cmd map_cmd: gen_reads
     #!/usr/bin/env bash
-    mkdir -p $(dirname {{SHMAP_PREF}})
-    {{TIME_CMD}} -o {{SHMAP_PREF}}.index.time {{SHMAP_CMD}} 2>/dev/null >/dev/null
-    {{TIME_CMD}} -o {{SHMAP_PREF}}.time {{SHMAP_CMD}} -z {{SHMAP_PREF}}.params 2> >(tee {{SHMAP_PREF}}.log) > {{SHMAP_PREF}}.paf
-    {{PAFTOOLS}} mapeval -r 0.1 {{SHMAP_PREF}}.paf 2>/dev/null | tee {{SHMAP_PREF}}.eval || true
-    {{PAFTOOLS}} mapeval -r 0.1 -Q 0 {{SHMAP_PREF}}.paf >{{SHMAP_PREF}}.wrong 2>/dev/null || true
-
-# Evaluate minimap2 on reads
-eval_minimap: gen_reads
-    #!/usr/bin/env bash
-    mkdir -p $(dirname {{MINIMAP_PREF}})
-    {{TIME_CMD}} -o {{MINIMAP_PREF}}.index.time {{MINIMAP_INDEX_CMD}} 2>/dev/null
-    {{TIME_CMD}} -o {{MINIMAP_PREF}}.time {{MINIMAP_MAP_CMD}} 2> >(tee {{MINIMAP_PREF}}.log) > {{MINIMAP_PREF}}.paf
-    {{PAFTOOLS}} mapeval -r 0.1 {{MINIMAP_PREF}}.paf 2>/dev/null | tee {{MINIMAP_PREF}}.eval || true
-    {{PAFTOOLS}} mapeval -r 0.1 -Q 0 {{MINIMAP_PREF}}.paf >{{MINIMAP_PREF}}.wrong 2>/dev/null || true
+    echo "Evaluating {{name}}..."
+    mkdir -p $(dirname {{prefix}})
+    {{TIME_CMD}} -o {{prefix}}.index.time {{index_cmd}} 2>/dev/null
+    {{TIME_CMD}} -o {{prefix}}.time {{map_cmd}} 2> >(tee {{prefix}}.log) > {{prefix}}.paf
+    {{PAFTOOLS}} mapeval -r 0.1 {{prefix}}.paf 2>/dev/null | tee {{prefix}}.eval || true
+    {{PAFTOOLS}} mapeval -r 0.1 -Q 0 {{prefix}}.paf >{{prefix}}.wrong 2>/dev/null || true
