@@ -184,8 +184,8 @@ TEST_CASE("Indexing") {
     params_t params;
     params.k = 4;
     params.hFrac = 1.0;
-    Handler* H = new Handler(params);
-    SketchIndex* tidx = new SketchIndex(H);
+    Handler H(params);
+    SketchIndex tidx(&H);
 
     SUBCASE("Single segment") {
         string ref_file = "ref.fa";
@@ -195,15 +195,15 @@ TEST_CASE("Indexing") {
         std::ofstream refFile(ref_file);
         refFile << ">ref\n" << T << std::endl;
         refFile.close();
-        tidx->build_index(ref_file);
+        tidx.build_index(ref_file);
         std::remove(ref_file.c_str());
 
-        sketch_t t = H->sketcher.sketch(T);
+        sketch_t t = H.sketcher.sketch(T);
         REQUIRE(t.size() == 7);
         for (int i=0; i<(int)t.size(); i++)
-            CHECK(tidx->count(t[i].h) == cnt[i]);
-        CHECK(tidx->H->C.count("indexed_hits") == 7);
-        CHECK(tidx->H->C.count("indexed_kmers") == 6);
+            CHECK(tidx.count(t[i].h) == cnt[i]);
+        CHECK(tidx.H->C.count("indexed_hits") == 7);
+        CHECK(tidx.H->C.count("indexed_kmers") == 6);
     }
 
     SUBCASE("Two segments") {
@@ -216,19 +216,16 @@ TEST_CASE("Indexing") {
         refFile << ">segm1\n" << segm1 << std::endl;
         refFile << ">segm2\n" << segm2 << std::endl;
         refFile.close();
-        tidx->build_index(ref_file);
+        tidx.build_index(ref_file);
         std::remove(ref_file.c_str());
 
-        sketch_t t1 = H->sketcher.sketch(segm1);
+        sketch_t t1 = H.sketcher.sketch(segm1);
         REQUIRE(t1.size() == 7);
         for (int i=0; i<(int)t1.size(); i++)
-            CHECK(tidx->count(t1[i].h) == cnt[i]);
-        CHECK(tidx->H->C.count("indexed_hits") == 10);
-        CHECK(tidx->H->C.count("indexed_kmers") == 8);
+            CHECK(tidx.count(t1[i].h) == cnt[i]);
+        CHECK(tidx.H->C.count("indexed_hits") == 10);
+        CHECK(tidx.H->C.count("indexed_kmers") == 8);
     }
-
-    delete tidx;
-    delete H;
 }
 
 TEST_CASE("SHSingleReadMapper::select_kmers selects and sorts kmers correctly") {
@@ -271,9 +268,6 @@ TEST_CASE("SHSingleReadMapper::select_kmers selects and sorts kmers correctly") 
         [](const Seed& s) { return s.kmer.h == 0x1234; });
     REQUIRE(first_kmer != kmers.end());
     REQUIRE(first_kmer->occs_in_p == 2); // Should count duplicates
-
-    //delete tidx;
-    //delete H;
 }
 
 TEST_CASE("Bucketing") {
@@ -355,17 +349,17 @@ TEST_CASE("Mapping a toy read") {
 	params.hFrac = 0.05;
 	params.theta = 0.7;
 
-	Handler *H = new Handler(params);
-	SketchIndex *tidx = new SketchIndex(H);
+	Handler H(params);
+	SketchIndex tidx(&H);
 	
 	// Define the missing variables
 	string query_id = "NONE";
 	string P = "ACCATCG";
 	std::ofstream paulout;
 
-	Matcher matcher(*tidx);
+	Matcher matcher(tidx);
 
-	auto* mapper = new SHSingleReadMapper(*tidx, H, matcher, query_id, P, paulout);
+	SHSingleReadMapper mapper(tidx, &H, matcher, query_id, P, paulout);
 
 	sketch_t p;
 	p.emplace_back(10, 111111, false);
@@ -374,7 +368,7 @@ TEST_CASE("Mapping a toy read") {
 	p.emplace_back(40, 444444, false);
 	p.emplace_back(50, 555555, false);
 
-	auto [kmers, m] = mapper->select_kmers(p);
+	auto [kmers, m] = mapper.select_kmers(p);
 
     CHECK(m == 5);
 
