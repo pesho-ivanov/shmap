@@ -178,18 +178,21 @@ public: // for testing
 		if (H->params.no_bucket_pruning)
 			return true;
 
+		H->T.start("seed_heuristic");
 		*lowest_sh = 1.0; // should only get lower
 		double thr2 = best_idx == -1 ? thr_init : maps[best_idx].score()-H->params.best_score_delta;  // TODO: add a parameter for 0.015
 
-		if (hseed(m, seeds, seed_matches) < thr2)
+		if (hseed(m, seeds, seed_matches) < thr2) {
+			H->T.stop("seed_heuristic");
 			return false;
+		}
 
-		H->T.start("seed_heuristic");
 		bool ret = true;
 		for (const auto& el : remainingElemenets) {
 			seeds += el.occs_in_p;
-			if (tidx.matches_in_bucket(el, b))
-				seed_matches += el.occs_in_p;
+			auto hit_cnt = tidx.matches_in_bucket(el, b);
+			if (hit_cnt > 0)
+				seed_matches += min(hit_cnt, el.occs_in_p);
 			double sh = hseed(m, seeds, seed_matches);
 			assert(sh <= *lowest_sh);
 			*lowest_sh = min(*lowest_sh, sh);	
@@ -202,8 +205,8 @@ public: // for testing
 		return ret;
 	}
 	
-	void match_rest(qpos_t lmax, qpos_t m, SeedSpan remainingElemenets, const Buckets &B, Hist &diff_hist, int seeds_with_repeats, const unordered_map<hash_t, Seed> &p_ht,
-			vector<Mapping> &maps, int &best_idx, double thr_init, int forbidden_idx) {
+	void match_rest(qpos_t lmax, qpos_t m, SeedSpan remainingElemenets, const Buckets &B, Hist &diff_hist, int seeds_with_repeats,
+					const unordered_map<hash_t, Seed> &p_ht, vector<Mapping> &maps, int &best_idx, double thr_init, int forbidden_idx) {	
 		double best_J = -1.0;
 
 		int lost_on_seeding = (0);

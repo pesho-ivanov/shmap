@@ -81,13 +81,19 @@ public:
 //		return false;
 //	}
 
-	bool matches_in_bucket(const Seed &s, const Buckets::Bucket b) const {
+	// Returns the number of hits of `s` in the bucket `b`.
+	int matches_in_bucket(const Seed &s, const Buckets::Bucket b) const {
 		if (s.hits_in_T == 0) {
 			return false;
 		} else if (s.hits_in_T == 1) {
 			auto &hit = h2single.at(s.el.h);
 			return b.begin() <= hit.tpos && hit.tpos < b.end();
-		} else if (s.hits_in_T > 1) {
+//		} else if (s.hits_in_T < 30) {
+//			for (auto &hit: h2multi.at(s.el.h))
+//				if (hit.segm_id == b.segm_id && b.begin() <= hit.tpos && hit.tpos < b.end())
+//					return true;
+//			return false;
+		} else {
 			const vector<Hit> &hits = h2multi.at(s.el.h);
 			//for (int i=1; i<(int)hits.size(); i++) assert(hits[i-1].r <= hits[i].r);
 			auto it = lower_bound(hits.begin(), hits.end(), b.begin(), [&b](const Hit &hit, rpos_t pos) {
@@ -95,12 +101,15 @@ public:
 					return hit.segm_id < b.segm_id;
 				return hit.tpos < pos;
 			});
+			int cnt;
+			for (cnt = 0; it != hits.end() && it->segm_id == b.segm_id && it->tpos < b.end(); ++it)
+				++cnt;
+			return cnt;
 			//auto it_prev = it; if (it_prev != hits.begin()) { --it_prev; assert(it_prev->r < from); }
 			//if (it != hits.end()) assert(from <= it->r);
 			//cout << (it != hits.end() && it->r < to) << ", [" << from << ", " << to << ")" << ", it: " << (it != hits.end() ? it->r : -1) << endl;
-			return it != hits.end() && it->tpos < b.end();
+			//return it != hits.end() && it->tpos < b.end();
 		}
-		return false;
 	}
 
 	void get_matches(std::vector<Match> *matches, const Seed &s) const {
