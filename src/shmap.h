@@ -203,7 +203,7 @@ public: // for testing
 	}
 	
 	void match_rest(qpos_t P_sz, qpos_t lmax, qpos_t m, SeedSpan remainingElemenets, const Buckets &B, Hist &diff_hist, int seeds_with_repeats, const unordered_map<hash_t, Seed> &p_ht,
-			vector<Mapping> &maps, int &best_idx, double thr_init, int forbidden_idx, const string &query_id) {
+			vector<Mapping> &maps, int &best_idx, double thr_init, int forbidden_idx) {
 		double best_J = -1.0;
 
 		int lost_on_seeding = (0);
@@ -264,13 +264,13 @@ public: // for testing
 	}
 
     tuple<vector<Mapping>, int, int, double> find_best_and_best2(qpos_t P_sz, qpos_t lmax, qpos_t m, SeedSpan remainingElemenets,
-			const Buckets &B, Hist &diff_hist, int seeds_with_repeats, const unordered_map<hash_t, Seed> &p_ht, const string &query_id) {
+			const Buckets &B, Hist &diff_hist, int seeds_with_repeats, const unordered_map<hash_t, Seed> &p_ht) {
         vector<Mapping> maps;
         //vector<Bucket> B_vec(B.begin(), B.end());
         //sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
         C["total_matcher"] = C["seed_matches"];
         int best_idx=-1, best2_idx=-1;
-		match_rest(P_sz, lmax, m, remainingElemenets, B, diff_hist, seeds_with_repeats, p_ht, maps, best_idx, H->params.theta, -1, query_id);
+		match_rest(P_sz, lmax, m, remainingElemenets, B, diff_hist, seeds_with_repeats, p_ht, maps, best_idx, H->params.theta, -1);
 		auto [FP, PP, FDR, FPTP] = tuple(-1, -1, -1, -1);
 		//auto [FP, PP, FDR, FPTP] = calc_FDR(maps, H->params.theta, lmax, bucket_l, tidx, p_ht, P_sz, lmin, m, diff_hist);
 		H->C.inc("FP", FP);
@@ -280,12 +280,12 @@ public: // for testing
 
 		if (best_idx != -1) {
 			// find second best mapping for mapq computation
-			match_rest(P_sz, lmax, m, remainingElemenets, B, diff_hist, seeds_with_repeats, p_ht, maps, best2_idx, maps[best_idx].score(), best_idx, query_id);
+			match_rest(P_sz, lmax, m, remainingElemenets, B, diff_hist, seeds_with_repeats, p_ht, maps, best2_idx, maps[best_idx].score(), best_idx);
 		}
 		return {maps, best_idx, best2_idx, FPTP};
 	}
 
-	MapResult output(const string &query_id, qpos_t P_sz, const qpos_t seeds_with_repeats, vector<Mapping> &maps, int best_idx, int best2_idx, double FPTP) {
+	MapResult output(qpos_t P_sz, const qpos_t seeds_with_repeats, vector<Mapping> &maps, int best_idx, int best2_idx, double FPTP) {
 		if (maps.size() >= 1) {
 			H->C.inc("mapped_reads");
 			if (best_idx != -1) 
@@ -379,7 +379,7 @@ public:
 
 		C["lost_on_pruning"] = 1;
 		H->T.start("match_rest");
-			auto [maps, best_idx, best2_idx, FPTP] = find_best_and_best2(P_sz, lmax, m, remainingElemenets, B, diff_hist, seeds_with_repeats, p_ht, query_id);
+			auto [maps, best_idx, best2_idx, FPTP] = find_best_and_best2(P_sz, lmax, m, remainingElemenets, B, diff_hist, seeds_with_repeats, p_ht);
 		H->T.stop("match_rest");
 		H->C["lost_on_pruning"] += C["lost_on_pruning"];
 
@@ -395,7 +395,7 @@ public:
 
 		H->T.start("output");
 			// total_matches, max_seed_matches, seed_matches, seeded_buckets
-			MapResult map_result = output(query_id, P_sz, seeds_with_repeats, maps, best_idx, best2_idx, FPTP);
+			MapResult map_result = output(P_sz, seeds_with_repeats, maps, best_idx, best2_idx, FPTP);
 		H->T.stop("output");
 
 		H->C[str(map_result)] += 1;
