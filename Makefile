@@ -30,6 +30,7 @@ MERYL_BIN = ~/libs/Winnowmap/bin/meryl
 WINNOWMAP_BIN = ~/libs/Winnowmap/bin/winnowmap
 SURVIVOR_BIN = ~/libs/SURVIVOR/Debug/SURVIVOR
 TSV_APPEND = ~/libs/tsv-utils/bin/tsv-append
+PBSIM_BIN = ~/libs/pbsim3/src/pbsim
 
 INF = 999999
 
@@ -114,6 +115,14 @@ simulate_SVs:
 	cd $(REF_DIR);\
 	$(SURVIVOR_BIN) simSV $(REFNAME).fa SURVIVOR.params 0 0 $(REFNAME)-SVs;\
 	mv $(REFNAME)-SVs.fasta $(REFNAME)-SVs.fa
+
+simulate_reads_by_sampling:
+	$(PBSIM_BIN) --strategy wgs \
+		--method sample \
+		--sample $(TEMPLATE_READS) \
+		--depth $(DEPTH) \
+		--genome $(REF) \
+		--sample-profile-id pf1
 
 gen_reads:
 ifeq ($(wildcard $(READS)),)
