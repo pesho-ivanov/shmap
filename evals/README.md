@@ -1,3 +1,5 @@
+This is a description of the evaluation of Map-SHmap, needed to reproduce the results in our paper.
+
 ### Generate simulated reads using PBSIM3
 For our simulated experiments, we use PBSIM3 to generated reads from the CHM13 reference: the full reference for S2, and only from the Y chromosome for S3.
 ```bash
