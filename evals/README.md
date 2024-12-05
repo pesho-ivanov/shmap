@@ -9,6 +9,17 @@ pbsim --strategy wgs \
 	--depth 30 \
 	--genome chm13.fa  # or chm13_Y.fa
 ```
+### Datasets
+The R1 dataset was downloaded from
+https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/scratch/HG002/sequencing/hifirevio/m84005_220827_014912_s1.hifi_reads.fastq.gz
+and more information about this read set can be found in 
+https://github.com/marbl/HG002/blob/main/Sequencing_data.md
+
+### Reference
+Details about the CHM13 reference can be found at 
+https://github.com/marbl/CHM13
+and it can be downloaded using the link
+https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/analysis_set/chm13v2.0.fa.gz.
 
 ### Running tools
 The tools produce `.paf` files with mappings results. We measure their running time and memory using the `time` command. In order to separate the indexing time from the mapping time, we run the tools twice for each dataset: once to align only a single read (effectively measuring the time and memory of the indexing), and once on all reads (subtracting the indexing time gives us the mapping time).
