@@ -468,16 +468,16 @@ public:
 			H->T.stop("query_reading");
 
 			SHSingleReadMapper mapper(tidx, H, matcher, query_id, P, paulout);
-			//mapper.map_read(H->params.theta);
+			mapper.map_read(H->params.theta);
 
 			//for (double theta = 0.85; theta >= H->params.theta; theta -= 1.0)
 			//	if (mapper.map_read(theta) != MapResult::NONE)
 			//		break;
 
-			if (mapper.map_read(0.8) == MapResult::NONE) {
-				mapper.map_read(H->params.theta);
-				H->C["repeated_mappings"] += 1;
-			}
+			//if (mapper.map_read(0.8) == MapResult::NONE) {
+			//	mapper.map_read(H->params.theta);
+			//	H->C["repeated_mappings"] += 1;
+			//}
 
 			H->T.start("query_reading");
 		});
