@@ -376,7 +376,10 @@ public:
 			Buckets B = match_seeds(seeds, lmax);
 		H->T.stop("match_seeds");
 
-		int lost_on_seeding = matcher.lost_correct_mapping(query_id, B);
+		int lost_on_seeding = -1;
+#ifdef DEBUG
+		matcher.lost_correct_mapping(query_id, B);
+#endif
 		H->C.inc("lost_on_seeding", lost_on_seeding);
 
 		C["lost_on_pruning"] = 1;
@@ -386,11 +389,12 @@ public:
 		H->C["lost_on_pruning"] += C["lost_on_pruning"];
 
 		H->T.start("extra");
-		//if (!H->params.paramsFile.empty()) {
-		//	// todo: comment out
-		//	AnalyseSimulatedReads sim(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
-		//	sim.PaulsExperiment(paulout);
-		//}
+#ifdef DEBUG
+		if (!H->params.paramsFile.empty()) {
+			AnalyseSimulatedReads sim(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
+			sim.PaulsExperiment(paulout);
+		}
+#endif
 		H->T.stop("extra");
 
 		H->T.stop("query_mapping");
@@ -450,12 +454,14 @@ public:
 		H->T.start("mapping");
 		H->T.start("query_reading");
 
-		string pauls_fn = H->params.paramsFile + ".paul.tsv";
 		ofstream paulout;
+#ifdef DEBUG
+		string pauls_fn = H->params.paramsFile + ".paul.tsv";
 		if (!H->params.paramsFile.empty()) {
 			cerr << "Paul's experiment to " << pauls_fn << endl;
 			paulout = ofstream(pauls_fn);
 		}
+#endif
 
 		read_fasta_klib(pFile, [this, &paulout](const string &query_id, const string &P) {
 			H->C.inc("reads");

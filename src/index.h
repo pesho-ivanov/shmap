@@ -88,11 +88,11 @@ public:
 		} else if (s.hits_in_T == 1) {
 			auto &hit = h2single.at(s.el.h);
 			return b.begin() <= hit.tpos && hit.tpos < b.end();
-//		} else if (s.hits_in_T < 30) {
-//			for (auto &hit: h2multi.at(s.el.h))
-//				if (hit.segm_id == b.segm_id && b.begin() <= hit.tpos && hit.tpos < b.end())
-//					return true;
-//			return false;
+		} else if (s.hits_in_T < 30) {
+			for (auto &hit: h2multi.at(s.el.h))
+				if (hit.segm_id == b.segm_id && b.begin() <= hit.tpos && hit.tpos < b.end())
+					return true;
+			return false;
 		} else {
 			const vector<Hit> &hits = h2multi.at(s.el.h);
 			//for (int i=1; i<(int)hits.size(); i++) assert(hits[i-1].r <= hits[i].r);
