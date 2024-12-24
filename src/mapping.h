@@ -229,10 +229,10 @@ public:
     void set_global_stats(const Counters &C, const char* query_id, qpos_t P_sz, int k, qpos_t seeds, double FPTP, const std::string &segm_name, rpos_t segm_sz, double map_time) {
         paf.query_id = query_id;
         paf.P_sz = P_sz;
-        paf.k = k;
         local_stats.map_time = map_time;
 
         global_stats = std::make_unique<GlobalMappingStats>();
+        global_stats->k = k;
         global_stats->seeds = seeds;
         global_stats->total_matches = C["total_matches"];
         global_stats->max_seed_matches = C["max_seed_matches"];
