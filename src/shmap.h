@@ -288,7 +288,7 @@ public: // for testing
 		return {maps, best_idx, best2_idx, FPTP};
 	}
 
-	MapResult output(const qpos_t seeds_with_repeats, vector<Mapping> &maps, int best_idx, int best2_idx, double FPTP) {
+	MapResult output(const qpos_t seeds_with_repeats, vector<Mapping> &maps, int best_idx, int best2_idx, double FPTP, int p_sz, int k) {
 		if (maps.size() >= 1) {
 			H->C.inc("mapped_reads");
 			if (best_idx != -1) 
@@ -298,18 +298,19 @@ public: // for testing
 				Mapping &m = maps[best_idx];
 
 				const auto &segm = tidx.T[m.segm_id()];
-				m.set_global_stats(C, query_id.c_str(), P.size(), seeds_with_repeats, FPTP, segm.name, segm.sz, H->T.secs("query_mapping"));  // TODO: disable by flag
+				m.set_global_stats(C, query_id.c_str(), P.size(), k, seeds_with_repeats, FPTP, segm.name, segm.sz, H->T.secs("query_mapping"));  // TODO: disable by flag
 
 				if (best2_idx != -1)
 					m.set_second_best(maps[best2_idx]);
 
 				m.set_mapq(H->params.theta, H->params.best_score_delta);
-				m.print_paf();
+				m.local_stats.p_sz = p_sz;
 
 				if (m.mapq() == 60) H->C.inc("mapq60");
 				H->C.inc("matches_in_reported_mappings", m.intersection());
 				H->C.inc("J_best", rpos_t(10000.0*m.score()));
 				H->C.inc("mappings");
+				m.print_paf();
 
 				return m.mapq() > 0 ? MapResult::UNIQUE : MapResult::AMBIG;
 			}
@@ -401,7 +402,7 @@ public:
 
 		H->T.start("output");
 			// total_matches, max_seed_matches, seed_matches, seeded_buckets
-			MapResult map_result = output(seeds_with_repeats, maps, best_idx, best2_idx, FPTP);
+			MapResult map_result = output(seeds_with_repeats, maps, best_idx, best2_idx, FPTP, m, H->params.k);
 		H->T.stop("output");
 
 		H->C[str(map_result)] += 1;

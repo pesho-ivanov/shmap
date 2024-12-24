@@ -226,10 +226,10 @@ public:
         local_stats.sigmas_diff = sigmas_diff(local_stats.intersection2, local_stats.intersection);
     }
 
-    void set_global_stats(const Counters &C, const char* query_id, qpos_t P_sz, qpos_t seeds, double FPTP, const std::string &segm_name, rpos_t segm_sz, double map_time) {
+    void set_global_stats(const Counters &C, const char* query_id, qpos_t P_sz, int k, qpos_t seeds, double FPTP, const std::string &segm_name, rpos_t segm_sz, double map_time) {
         paf.query_id = query_id;
         paf.P_sz = P_sz;
-
+        paf.k = k;
         local_stats.map_time = map_time;
 
         global_stats = std::make_unique<GlobalMappingStats>();
