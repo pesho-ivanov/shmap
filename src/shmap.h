@@ -3,6 +3,7 @@
 #include <set>
 #include <map>
 
+#include "analyse_simulated.h"
 #include "index.h"
 #include "io.h"
 #include "sketch.h"
@@ -39,7 +40,7 @@ public:
 					rpos_t hits_in_t = tidx.count(p[ppos].h);
 					if (hits_in_t > 0) {
 						nonzero += strike;
-					}
+					//}
 						if (H->params.max_matches == -1 || hits_in_t <= H->params.max_matches) {
 							Seed el(p[ppos], hits_in_t, kmers.size());
 							//strike = 1; // comment out for Weighted metric
@@ -48,7 +49,7 @@ public:
 							if (H->params.max_seeds != -1 && (rpos_t)kmers.size() >= H->params.max_seeds)  // TODO maybe account for occs_in_p
 								break;
 						}
-					//}
+					}
 					strike = 0;
 				}
 			}
@@ -140,7 +141,7 @@ public:
 					if (best_in_bucket.score() >= H->params.theta) {
 						maps.emplace_back(best_in_bucket);
 						if (best_in_bucket.score() > best_J) {
-							if (forbidden_idx == -1 || Mapping::overlap(maps.back(), maps[forbidden_idx]) < 0.5) {
+							if (forbidden_idx == -1 || Mapping::overlap(maps.back(), maps[forbidden_idx]) < 0.8) {
 								best_J = max(best_J, best_in_bucket.score());
 								best_idx = maps.size()-1;
 							}
@@ -197,7 +198,7 @@ public:
 
 		string pauls_fn = H->params.paramsFile + ".paul.tsv";
 		ofstream paulout;
-		if (!H->params.paramsFile.empty()) {
+		if (H->params.verbose && !H->params.paramsFile.empty()) {
 			cerr << "Paul's experiment to " << pauls_fn << endl;
 			paulout = ofstream(pauls_fn);
 		}
@@ -343,11 +344,11 @@ public:
 				H->C.inc("lost_on_pruning", lost_on_pruning);
 			H->T.stop("query_mapping");
 
-//			if (!H->params.paramsFile.empty()) {
-//				// todo: comment out
-//				AnalyseSimulatedReads sim(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
-//				sim.PaulsExperiment(paulout);
-//			}
+			if (H->params.verbose && !H->params.paramsFile.empty()) {
+				// todo: comment out
+				AnalyseSimulatedReads sim(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
+				sim.PaulsExperiment(paulout);
+			}
 
 			H->T.start("output");
 				if (H->params.onlybest && maps.size() >= 1) {

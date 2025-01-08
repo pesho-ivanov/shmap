@@ -22,7 +22,7 @@ using std::pair;
 using std::ifstream;
 using std::endl;
 
-#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:z:aonxhbB"
+#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:z:aonxhbBv"
 
 struct params_t {
 	// required
@@ -42,6 +42,7 @@ struct params_t {
 	bool overlaps;			// Permit overlapping mappings 
 	bool normalize; 		// Flag to save that scores are to be normalized
 	bool onlybest;			// Output up to one (best) mapping (if above the threshold)
+	bool verbose;			// Outputs debug information (warning: take time)
 
 	// for degradation evals
 	bool no_bucket_pruning;
@@ -49,7 +50,7 @@ struct params_t {
 
 	params_t() :
 		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), mapper("shmap"),
-		sam(false), overlaps(false), normalize(false), onlybest(false), no_bucket_pruning(false), one_sweep(false) {}
+		sam(false), overlaps(false), normalize(false), onlybest(false), verbose(false), no_bucket_pruning(false), one_sweep(false) {}
 
 	void print(std::ostream& out, bool human) const {
 		std::vector<pair<string, string>> m;
@@ -67,6 +68,7 @@ struct params_t {
 		m.push_back({"overlaps", std::to_string(overlaps)});
 		m.push_back({"normalize", std::to_string(normalize)});
 		m.push_back({"onlybest", std::to_string(onlybest)});
+		m.push_back({"verbose", std::to_string(verbose)});
 		m.push_back({"no-bucket-pruning", std::to_string(no_bucket_pruning)});
 		m.push_back({"one-sweep", std::to_string(one_sweep)});
 
@@ -95,6 +97,7 @@ struct params_t {
 		out << " | sam:                   " << sam << endl;
 		out << " | overlaps:              " << overlaps << endl;
 		out << " | onlybest:              " << onlybest << endl;
+		out << " | verbose:               " << verbose << endl;
 		out << " | no-bucket-pruning:     " << no_bucket_pruning << endl;
 		out << " | one-sweep:             " << one_sweep << endl;
 		out << " | tThres:                " << theta << endl;
@@ -124,6 +127,7 @@ struct params_t {
 		cerr << "   -o   --overlaps          Permit overlapping mappings" << endl;
 		cerr << "   -n   --normalize         Normalize scores by length" << endl;
 		cerr << "   -x   --onlybest          Output the best alignment if above threshold (otherwise none)" << endl;
+		cerr << "   -v   --verbose           Outputs debug information (warning: take time)" << endl;
 		cerr << "   -b   --no-bucket-pruning Disables bucket pruning" << endl;
 		cerr << "   -B   --one-sweep         Disregards the seed heuristic and runs one sweepmap on all matches" << endl;
 		cerr << "   -h   --help              Display this help message" << endl;
@@ -145,6 +149,7 @@ struct params_t {
 			{"overlaps",           no_argument,        0, 'o'},
 			{"normalize",          no_argument,        0, 'n'},
 			{"onlybest",           no_argument,        0, 'x'},
+			{"verbose",            no_argument,        0, 'v'},
 			{"no-bucket-pruning",  no_argument,        0, 'b'},
 			{"help",               no_argument,        0, 'h'},
 			{0,                    0,                  0,  0 }
@@ -211,6 +216,9 @@ struct params_t {
 					break;
 				case 'x':
 					onlybest = true;
+					break;
+				case 'v':
+					verbose = true;
 					break;
 				case 'b':
 					no_bucket_pruning = true;
