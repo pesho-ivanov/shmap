@@ -351,7 +351,7 @@ public:
 			}
 
 			H->T.start("output");
-				if (H->params.onlybest && maps.size() >= 1) {
+				if (maps.size() >= 1) {
 					H->C.inc("mapped_reads");
 					if (best_idx != -1) 
 					//if (maps[best_idx].J >= H->params.theta)
@@ -365,7 +365,7 @@ public:
 						if (best2_idx != -1)
 							m.set_second_best(maps[best2_idx]);
 
-						m.set_mapq(H->params.theta);
+						m.set_local_stats(H->params.theta, p.size());
 						m.print_paf();
 
 						if (m.mapq() == 60) H->C.inc("mapq60");

@@ -288,8 +288,9 @@ public:
 		return std::abs(X - Y) / std::sqrt(X + Y);
 	}
 
-	void set_mapq(double theta) {
+	void set_local_stats(double theta, qpos_t p_sz) {
 		paf.mapq = calc_mapq(theta);
+		local_stats.p_sz = p_sz;
 	}
 
 	double mapq() const {
