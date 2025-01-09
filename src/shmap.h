@@ -82,16 +82,13 @@ public:
 		return 1.0 - double(seeds - matches) / p;
 	}
 
-	bool seed_heuristic_pass(const vector<Mapping> &maps, const Seeds &kmers, qpos_t m, Buckets::Bucket b, rpos_t seed_matches, qpos_t i, qpos_t seeds,
-			int best_idx, double *lowest_sh, double thr_init) {
+	bool seed_heuristic_pass(const Seeds &kmers, qpos_t m, Buckets::Bucket b, rpos_t seed_matches, qpos_t i, qpos_t seeds, int best_idx, double *lowest_sh, double thr) {
 		if (H->params.no_bucket_pruning)
 			return true;
 
 		*lowest_sh = 1.0; // should only get lower
 
-		double thr2 = best_idx == -1 ? thr_init : maps[best_idx].score()-0.015;  // TODO: add a parameter for 0.015
-
-		if (hseed(m, seeds, seed_matches) < thr2)
+		if (hseed(m, seeds, seed_matches) < thr)
 			return false;
 
 		H->T.start("seed_heuristic");
@@ -103,7 +100,7 @@ public:
 			double sh = hseed(m, seeds, seed_matches);
 			assert(sh <= *lowest_sh);
 			*lowest_sh = min(*lowest_sh, sh);	
-			if (sh < thr2) {
+			if (sh < thr) {
 				ret = false;
 				break;
 			}
@@ -113,7 +110,7 @@ public:
 	}
 	
 	void match_rest(qpos_t P_sz, qpos_t lmax, qpos_t m, const Seeds &kmers, const Buckets &B, Hist &diff_hist, int seeds, int first_kmer_after_seeds, const unordered_map<hash_t, Seed> &p_ht,
-			vector<Mapping> &maps, int &total_matches, int &best_idx, int &final_buckets, double thr_init, int forbidden_idx, const string &query_id, int *lost_on_pruning) {
+			vector<Mapping> &maps, int &total_matches, int &best_idx, int &final_buckets, double thr, int forbidden_idx, const string &query_id, int *lost_on_pruning) {
 		double best_J = -1.0;
 
 		int lost_on_seeding = (0);
@@ -125,7 +122,8 @@ public:
 		H->T.start("sweep"); H->T.stop("sweep");
 		for (auto b_it = B.ordered_begin(); b_it != B.ordered_end(); ++b_it) {
 			double lowest_sh;
-			if (seed_heuristic_pass(maps, kmers, m, b_it->first, b_it->second, first_kmer_after_seeds, seeds, best_idx, &lowest_sh, thr_init)) {
+			if (seed_heuristic_pass(kmers, m, b_it->first, b_it->second, first_kmer_after_seeds, seeds, best_idx, &lowest_sh, thr)) {
+				//cerr << forbidden_idx << ", passed SH:" << b_it->first << " " << b_it->second << endl;
 				if (matcher.do_overlap(query_id, b_it->first))
 					*lost_on_pruning = 0;
 				H->T.start("match_collect");
@@ -141,9 +139,10 @@ public:
 					if (best_in_bucket.score() >= H->params.theta) {
 						maps.emplace_back(best_in_bucket);
 						if (best_in_bucket.score() > best_J) {
-							if (forbidden_idx == -1 || Mapping::overlap(maps.back(), maps[forbidden_idx]) < 0.8) {
+							if (forbidden_idx == -1 || Mapping::overlap(maps.back(), maps[forbidden_idx]) < 0.5) {
 								best_J = max(best_J, best_in_bucket.score());
 								best_idx = maps.size()-1;
+								thr = best_in_bucket.score();
 							}
 						}
 					}
@@ -322,6 +321,10 @@ public:
 				int lost_on_seeding = matcher.lost_correct_mapping(query_id, B);
 				H->C.inc("lost_on_seeding", lost_on_seeding);
 
+				//for (auto b_it = B.ordered_begin(); b_it != B.ordered_end(); ++b_it) {
+				//	cerr << "seeded buckets:" << b_it->first << " " << b_it->second << endl;
+				//}
+
 				int lost_on_pruning = 1;
 				H->T.start("match_rest");
 					vector<Mapping> maps;
@@ -336,9 +339,11 @@ public:
 					H->C.inc("FDR", FDR);
 					H->C.inc("FPTP", FPTP);
 
+					//cerr << "best_idx: " << best_idx << " " << maps[best_idx] << endl;
+
 					if (best_idx != -1) {
 						// find second best mapping for mapq computation
-						match_rest(P_sz, lmax, m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, maps[best_idx].score(), best_idx, query_id, &lost_on_pruning);
+						match_rest(P_sz, lmax, m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, maps[best_idx].score()-0.015, best_idx, query_id, &lost_on_pruning);
 					}
 				H->T.stop("match_rest");
 				H->C.inc("lost_on_pruning", lost_on_pruning);
