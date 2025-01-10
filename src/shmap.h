@@ -242,7 +242,8 @@ public:
 
 					//qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
 					//qpos_t lmin = qpos_t(ceil(p.size() * H->params.theta));					// maximum length of a similar mapping
-					qpos_t lmax = qpos_t(p.size() / H->params.theta);					// maximum length of a similar mapping
+					//qpos_t lmax = qpos_t(p.size() / H->params.theta);					// maximum length of a similar mapping
+					qpos_t lmax = p.size();					// maximum length of a similar mapping
 					//qpos_t bucket_l = lmax;
 
 					//double coef = 1.0;// * nonzero / p.size();
