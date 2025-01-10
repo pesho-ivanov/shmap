@@ -28,6 +28,7 @@ public:
 	//using Hist = unordered_map<hash_t, qpos_t>;
 	//using Hist = gtl::flat_hash_map<hash_t, qpos_t>;
 
+	// Returns unique kmers with at least one match in T
 	Seeds select_kmers(sketch_t& p, int &nonzero) {
 		H->T.start("seeding");
 		H->T.start("collect_kmer_info");
@@ -197,7 +198,7 @@ public:
 
 		string pauls_fn = H->params.paramsFile + ".paul.tsv";
 		ofstream paulout;
-		if (H->params.verbose && !H->params.paramsFile.empty()) {
+		if (H->params.verbose >= 2 && !H->params.paramsFile.empty()) {
 			cerr << "Paul's experiment to " << pauls_fn << endl;
 			paulout = ofstream(pauls_fn);
 		}
@@ -349,12 +350,6 @@ public:
 				H->C.inc("lost_on_pruning", lost_on_pruning);
 			H->T.stop("query_mapping");
 
-			if (H->params.verbose && !H->params.paramsFile.empty()) {
-				// todo: comment out
-				AnalyseSimulatedReads sim(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
-				sim.PaulsExperiment(paulout);
-			}
-
 			H->T.start("output");
 				if (maps.size() >= 1) {
 					H->C.inc("mapped_reads");
@@ -379,6 +374,17 @@ public:
 						H->C.inc("mappings");
 					}
 				}
+
+				if (H->params.verbose >= 2) {
+					AnalyseSimulatedReads sim(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
+					if (best_idx != -1)
+						sim.print_paf(cout);
+					if (!H->params.paramsFile.empty())
+						sim.print_tsv(paulout);
+				}
+
+				if (maps.size() >= 1)
+					cout << endl;
 			H->T.stop("output");
 			H->T.start("query_reading");
 		});

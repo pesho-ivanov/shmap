@@ -22,7 +22,7 @@ using std::pair;
 using std::ifstream;
 using std::endl;
 
-#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:z:aonhbBv"
+#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:z:v:aonhbB"
 
 struct params_t {
 	// required
@@ -36,21 +36,21 @@ struct params_t {
 	double theta; 					// The t-homology threshold
 	string paramsFile;
 	string mapper;                  // The name of the mapper
+	int verbose;					// Outputs debug information: 0 for no, 1 for some, 2 for all (warning: take time)
 
 	// no arguments
 	bool sam; 				// Output in SAM format (PAF by default)
 	bool overlaps;			// Permit overlapping mappings 
 	bool normalize; 		// Flag to save that scores are to be normalized
 	//bool onlybest;			// Output up to one (best) mapping (if above the threshold)
-	bool verbose;			// Outputs debug information (warning: take time)
 
 	// for degradation evals
 	bool no_bucket_pruning;
 	bool one_sweep;
 
 	params_t() :
-		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), mapper("shmap"),
-		sam(false), overlaps(false), normalize(false), /*onlybest(false),*/ verbose(false), no_bucket_pruning(false), one_sweep(false) {}
+		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), mapper("shmap"), verbose(0),
+		sam(false), overlaps(false), normalize(false), /*onlybest(false),*/ no_bucket_pruning(false), one_sweep(false) {}
 
 	void print(std::ostream& out, bool human) const {
 		std::vector<pair<string, string>> m;
@@ -121,13 +121,13 @@ struct params_t {
 		cerr << "   -M   --max_matches       Max seed matches in a sketch" << endl;
 		cerr << "   -t   --threshold         Homology percentage threshold [0, 1]" << endl;
 		cerr << "   -z   --params     		 Output file with parameters (tsv)" << endl;
+		cerr << "   -v   --verbose           Outputs debug information: 0 for no, 1 for some, 2 for all (warning: take time)" << endl;
 		cerr << endl;
 		cerr << "Optional parameters without an argument:" << endl;
 		cerr << "   -a                       Output in SAM format (PAF by default)" << endl;
 		cerr << "   -o   --overlaps          Permit overlapping mappings" << endl;
 		cerr << "   -n   --normalize         Normalize scores by length" << endl;
 		//cerr << "   -x   --onlybest          Output the best alignment if above threshold (otherwise none)" << endl;
-		cerr << "   -v   --verbose           Outputs debug information (warning: take time)" << endl;
 		cerr << "   -b   --no-bucket-pruning Disables bucket pruning" << endl;
 		cerr << "   -B   --one-sweep         Disregards the seed heuristic and runs one sweepmap on all matches" << endl;
 		cerr << "   -h   --help              Display this help message" << endl;
@@ -146,10 +146,10 @@ struct params_t {
 			{"params",             required_argument,  0, 'z'},
 			{"mapper",             required_argument,  0, 'm'},
 			{"threshold",          required_argument,  0, 't'},
+			{"verbose",            required_argument,  0, 'v'},
 			{"overlaps",           no_argument,        0, 'o'},
 			{"normalize",          no_argument,        0, 'n'},
 //			{"onlybest",           no_argument,        0, 'x'},
-			{"verbose",            no_argument,        0, 'v'},
 			{"no-bucket-pruning",  no_argument,        0, 'b'},
 			{"help",               no_argument,        0, 'h'},
 			{0,                    0,                  0,  0 }
@@ -202,6 +202,13 @@ struct params_t {
 					}
 					theta = atof(optarg);
 					break;
+				case 'v':
+					verbose = atoi(optarg);
+					if(verbose < 0 || verbose > 2) {
+						cerr << "ERROR: --verbose (-v) should be 0, 1 or 2. " << "You provided " << optarg << "." << endl;
+						return false;
+					}
+					break;
 				case 'z':
 					paramsFile = optarg;
 					break;
@@ -217,9 +224,6 @@ struct params_t {
 //				case 'x':
 //					onlybest = true;
 //					break;
-				case 'v':
-					verbose = true;
-					break;
 				case 'b':
 					no_bucket_pruning = true;
 					break;
@@ -272,7 +276,6 @@ struct ParsedQueryId {
 		return result;
 	}
 };
-	
 
 // seq->name.s, seq->comment.l, seq->comment.s, seq->seq.s, seq->qual.l
 void read_fasta_klib(const std::string& filename, std::function<void(const std::string&, const std::string&)> callback);

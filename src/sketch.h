@@ -256,6 +256,15 @@ public:
 
 	//Mapping& operator=(const Mapping&) = default;
 
+	Mapping& operator=(const Mapping& other) {
+		if (this != &other) {
+			paf = other.paf;
+			local_stats = other.local_stats;
+			global_stats = other.global_stats ? std::make_unique<GlobalMappingStats>(*other.global_stats) : nullptr;
+		}
+		return *this;
+	}
+
 	double score() const { return local_stats.J; }
 	double score2() const { return local_stats.J2; }
 	int segm_id() const { return paf.segm_id; }
@@ -402,7 +411,6 @@ public:
 		os << mapping.paf;
 		os << mapping.local_stats;
 		if (mapping.global_stats != nullptr) os << *mapping.global_stats;
-		os << endl;
 		return os;
 	}
 };
