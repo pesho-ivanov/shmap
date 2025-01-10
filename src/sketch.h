@@ -327,7 +327,7 @@ public:
 		//m.ed2 = edit_distance(m.bucket, P, P_sz, m, kmers);
 	}
 
-	void set_global_stats(const char* query_id, qpos_t P_sz, qpos_t seeds, rpos_t total_matches, rpos_t max_seed_matches, rpos_t seed_matches,
+	void set_global_stats(const char* query_id, qpos_t P_sz, qpos_t k, qpos_t seeds, rpos_t total_matches, rpos_t max_seed_matches, rpos_t seed_matches,
 			rpos_t seeded_buckets, rpos_t final_buckets, double FPTP, const std::string &segm_name, rpos_t segm_sz, double map_time) {
 		paf.query_id = query_id;
 		paf.P_sz = P_sz;
@@ -335,6 +335,7 @@ public:
 		local_stats.map_time = map_time;
 
 		global_stats = std::make_unique<GlobalMappingStats>();
+		global_stats->k = k;
 		global_stats->seeds = seeds;
 		global_stats->total_matches = total_matches;
 		global_stats->max_seed_matches = max_seed_matches;
@@ -356,7 +357,7 @@ public:
 
 	static double overlap(const Mapping &a, const Mapping &b) {
 		if (a.paf.segm_id != b.paf.segm_id)
-			return 0.0;
+			return -0.0;
 		int cap = std::max(0, std::min(a.paf.T_r, b.paf.T_r) - std::max(a.paf.T_l, b.paf.T_l));
 		int cup = std::max(a.paf.T_r, b.paf.T_r) - std::min(a.paf.T_l, b.paf.T_l);
 		assert(cup >= 0 && cap >=0 && cup >= cap);

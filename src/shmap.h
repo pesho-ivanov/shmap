@@ -332,7 +332,7 @@ public:
 					//vector<Bucket> B_vec(B.begin(), B.end());
 					//sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 					int total_matches=seed_matches, best_idx=-1, best2_idx=-1, final_buckets;
-					match_rest(P_sz, lmax, m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, H->params.theta, -1, query_id, &lost_on_pruning);
+					match_rest(P_sz, p.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, H->params.theta, -1, query_id, &lost_on_pruning);
 					auto [FP, PP, FDR, FPTP] = tuple(-1, -1, -1, -1);
 					//auto [FP, PP, FDR, FPTP] = calc_FDR(maps, H->params.theta, lmax, bucket_l, tidx, p_ht, P_sz, lmin, m, diff_hist);
 					H->C.inc("FP", FP);
@@ -344,7 +344,7 @@ public:
 
 					if (best_idx != -1) {
 						// find second best mapping for mapq computation
-						match_rest(P_sz, lmax, m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, maps[best_idx].score()-0.015, best_idx, query_id, &lost_on_pruning);
+						match_rest(P_sz, p.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, maps[best_idx].score()-0.015, best_idx, query_id, &lost_on_pruning);
 					}
 				H->T.stop("match_rest");
 				H->C.inc("lost_on_pruning", lost_on_pruning);
@@ -360,7 +360,7 @@ public:
 						Mapping &m = maps[best_idx];
 
 						const auto &segm = tidx.T[m.segm_id()];
-						m.set_global_stats(query_id.c_str(), P_sz, S, total_matches, max_seed_matches, seed_matches, seeded_buckets, final_buckets, FPTP, segm.name, segm.sz, H->T.secs("query_mapping"));  // TODO: disable by flag
+						m.set_global_stats(query_id.c_str(), P_sz, H->params.k, S, total_matches, max_seed_matches, seed_matches, seeded_buckets, final_buckets, FPTP, segm.name, segm.sz, H->T.secs("query_mapping"));  // TODO: disable by flag
 
 						if (best2_idx != -1)
 							m.set_second_best(maps[best2_idx]);
@@ -376,11 +376,16 @@ public:
 				}
 
 				if (H->params.verbose >= 2) {
-					AnalyseSimulatedReads sim(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
-					if (best_idx != -1)
-						sim.print_paf(cout);
+					AnalyseSimulatedReads gt(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
+					if (best_idx != -1) {
+						gt.print_paf(cout);
+						auto gt_overlap = Mapping::overlap(gt.gt_mapping, maps[best_idx]);
+						cout << "\tgt_mapping_len:" << (gt.gt_mapping.paf.T_r-gt.gt_mapping.paf.T_l)
+						     << "\treported_mapping_len:" << (maps[best_idx].paf.T_r-maps[best_idx].paf.T_l)
+						     << "\tgt_overlap:" << std::fixed << std::setprecision(3) << gt_overlap;
+					}
 					if (!H->params.paramsFile.empty())
-						sim.print_tsv(paulout);
+						gt.print_tsv(paulout);
 				}
 
 				if (maps.size() >= 1)

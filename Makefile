@@ -32,6 +32,8 @@ SURVIVOR_BIN = ~/libs/SURVIVOR/Debug/SURVIVOR
 
 INF = 999999
 
+ARGS_SHMAP ?= 
+
 REFNAME ?= t2tChrY
 ACCURACY ?= 0.99
 DEPTH ?= 1
@@ -178,8 +180,8 @@ fdr_per_theta: $(SHMAP_BIN) gen_reads
 
 eval_shmap: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_PREF))
-	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) 2>/dev/null >/dev/null
-	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T)     2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
+	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) $(ARGS_SHMAP) 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) $(ARGS_SHMAP)    2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
 	$(PAFTOOLS) mapeval -r 0.1 $(SHMAP_PREF).paf 2>/dev/null | tee $(SHMAP_PREF).eval || true
 	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_PREF).paf >$(SHMAP_PREF).wrong 2>/dev/null || true
 

@@ -11,6 +11,7 @@
 namespace sweepmap {
 
 class AnalyseSimulatedReads {
+public:
 	const string &query_id;
 	const string &P;
 	const int P_sz;
@@ -36,6 +37,8 @@ class AnalyseSimulatedReads {
 	Matches gt_M_l;
 	Matches gt_M_r;
 	Matches gt_M_next;
+
+	Mapping gt_mapping;
 	Mapping gt_J_l;
 	Mapping gt_J_r;
 	Mapping gt_J_next;
@@ -89,7 +92,12 @@ public:
 		bucket_l = B.get_bucket_len();
 
 		// Ground-truth
+		auto parsed_orig = ParsedQueryId::parse(query_id);
+		const auto &segm = tidx.get_segment(parsed_orig.segm_id);
+		gt_mapping.paf = MappingPAF(0, P_sz, parsed_orig.strand, segm.name.c_str(), segm.sz, segm.id, parsed_orig.start_pos, parsed_orig.end_pos);
+
 		tie(start, end, segm_id, segm_name) = GT_start_end(query_id);
+		//update(0, P_sz-1, start, end, tidx.T[segm_id], -1, -1, -1, nullptr, nullptr); // TODO: should it be prev(r) instead?
 		gt_b_l 		= Buckets::Bucket(segm_id, max(0, start/bucket_l-1), &B);
 		gt_b_r 		= Buckets::Bucket(segm_id, start/bucket_l, &B);
 		gt_b_next 	= Buckets::Bucket(segm_id, start/bucket_l+1, &B);
@@ -200,8 +208,11 @@ public:
 			<< "\tgt_C_r:f:" << gt_C_r.score()
 			<< "\tgt_C_next:f:" << gt_C_next.score()
 			<< "\tgt_C_l_lmax:f:" << gt_C_l_lmax.score()
-			<< "\tgt_C_r_lmax:f:" << gt_C_r_lmax.score()
-			<< endl;	
+			<< "\tgt_C_r_lmax:f:" << gt_C_r_lmax.score();
+			//<< "\tgt_C_l_overlap:f:" << Mapping::overlap(m, gt_C_l)
+			//<< "\tgt_C_r_overlap:f:" << Mapping::overlap(m, gt_C_r)
+			//<< "\tgt_C_next_overlap:f:" << Mapping::overlap(m, gt_C_next)
+			//<< endl;	
 	}
 
 };
