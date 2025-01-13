@@ -29,28 +29,28 @@ public:
 	//using Hist = gtl::flat_hash_map<hash_t, qpos_t>;
 
 	// Returns unique kmers with at least one match in T
-	Seeds select_kmers(sketch_t& p, int &nonzero) {
+	Seeds select_kmers(sketch_t& p_all, int &nonzero) {
 		H->T.start("seeding");
 		H->T.start("collect_kmer_info");
 			Seeds kmers;
-			sort(p.begin(), p.end(), [](const Kmer &a, const Kmer &b) { return a.h < b.h; });
+			sort(p_all.begin(), p_all.end(), [](const Kmer &a, const Kmer &b) { return a.h < b.h; });
 			qpos_t strike = 0;
-			for (size_t ppos = 0; ppos < p.size(); ++ppos) {
+			for (size_t ppos = 0; ppos < p_all.size(); ++ppos) {
 				++strike;
-				if (ppos == p.size()-1 || p[ppos].h != p[ppos+1].h) {
-					rpos_t hits_in_t = tidx.count(p[ppos].h);
+				if (ppos == p_all.size()-1 || p_all[ppos].h != p_all[ppos+1].h) {
+					rpos_t hits_in_t = tidx.count(p_all[ppos].h);
 					if (hits_in_t > 0) {
 						nonzero += strike;
-					//}
+					}
 						if (H->params.max_matches == -1 || hits_in_t <= H->params.max_matches) {
-							Seed el(p[ppos], hits_in_t, kmers.size());
+							Seed el(p_all[ppos], hits_in_t, kmers.size());
 							//strike = 1; // comment out for Weighted metric
 							el.occs_in_p = strike;
 							kmers.push_back(el);
 							if (H->params.max_seeds != -1 && (rpos_t)kmers.size() >= H->params.max_seeds)  // TODO maybe account for occs_in_p
 								break;
 						}
-					}
+					//}
 					strike = 0;
 				}
 			}
@@ -209,7 +209,7 @@ public:
 			H->T.start("query_mapping");
 				H->T.start("sketching");
 					//const char *P = seq->seq.s;
-					sketch_t p = H->sketcher.sketch(P);
+					sketch_t p_all = H->sketcher.sketch(P);
 					H->T.stop("sketching");
 
 				H->T.start("prepare");
@@ -220,11 +220,11 @@ public:
 					H->C.inc("read_len", P_sz);
 
 					int nonzero = 0;
-					Seeds kmers = select_kmers(p, nonzero);
+					Seeds kmers = select_kmers(p_all, nonzero);
 					qpos_t m = 0;
 					for (const auto kmer: kmers)
 						m += kmer.occs_in_p;
-					assert(m <= (int)p.size());
+					assert(m <= (int)p_all.size());
 					H->C.inc("kmers_notmatched", m - nonzero);
 					//cerr << "notmatched: " << m - nonzero << endl;
 
@@ -243,7 +243,7 @@ public:
 					//qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
 					//qpos_t lmin = qpos_t(ceil(p.size() * H->params.theta));					// maximum length of a similar mapping
 					//qpos_t lmax = qpos_t(p.size() / H->params.theta);					// maximum length of a similar mapping
-					qpos_t lmax = p.size();					// maximum length of a similar mapping
+					qpos_t lmax = p_all.size();					// maximum length of a similar mapping
 					//qpos_t bucket_l = lmax;
 
 					//double coef = 1.0;// * nonzero / p.size();
@@ -255,7 +255,7 @@ public:
 					Buckets B(lmax);  			// B[segment][b] -- #matched kmers[0...i] in [bl, (b+2)l)
 					qpos_t seeds = 0;
 
-					H->C.inc("kmers_sketched", p.size());
+					H->C.inc("kmers_sketched", p_all.size());
 					H->C.inc("kmers", m);
 					H->C.inc("kmers_unique", kmers.size());
 					H->C.inc("kmers_seeds", S);
@@ -333,7 +333,7 @@ public:
 					//vector<Bucket> B_vec(B.begin(), B.end());
 					//sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 					int total_matches=seed_matches, best_idx=-1, best2_idx=-1, final_buckets;
-					match_rest(P_sz, p.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, H->params.theta, -1, query_id, &lost_on_pruning);
+					match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, H->params.theta, -1, query_id, &lost_on_pruning);
 					auto [FP, PP, FDR, FPTP] = tuple(-1, -1, -1, -1);
 					//auto [FP, PP, FDR, FPTP] = calc_FDR(maps, H->params.theta, lmax, bucket_l, tidx, p_ht, P_sz, lmin, m, diff_hist);
 					H->C.inc("FP", FP);
@@ -345,7 +345,7 @@ public:
 
 					if (best_idx != -1) {
 						// find second best mapping for mapq computation
-						match_rest(P_sz, p.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, maps[best_idx].score()-0.015, best_idx, query_id, &lost_on_pruning);
+						match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, maps[best_idx].score()-H->params.min_diff, best_idx, query_id, &lost_on_pruning);
 					}
 				H->T.stop("match_rest");
 				H->C.inc("lost_on_pruning", lost_on_pruning);
@@ -366,7 +366,7 @@ public:
 						if (best2_idx != -1)
 							m.set_second_best(maps[best2_idx]);
 
-						m.set_local_stats(H->params.theta, p.size());
+						m.set_local_stats(H->params.theta, H->params.min_diff, p_all.size());
 						m.print_paf();
 
 						if (m.mapq() == 60) H->C.inc("mapq60");

@@ -277,12 +277,12 @@ public:
 		return local_stats.intersection;
 	}
 
-	int calc_mapq(double theta) {
+	int calc_mapq(double theta, double min_diff) {
 		// minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
 		assert(score() >= 0.0);
 		if (score2() < theta)
 			set_score2(theta);
-		if (score() - score2() > 0.015) {
+		if (score() - score2() > min_diff) {
 			if (abs(local_stats.same_strand_seeds) < local_stats.intersection/2)
 				return 5;
 			return 60;
@@ -297,8 +297,8 @@ public:
 		return std::abs(X - Y) / std::sqrt(X + Y);
 	}
 
-	void set_local_stats(double theta, qpos_t p_sz) {
-		paf.mapq = calc_mapq(theta);
+	void set_local_stats(double theta, double min_diff, qpos_t p_sz) {
+		paf.mapq = calc_mapq(theta, min_diff);
 		local_stats.p_sz = p_sz;
 	}
 

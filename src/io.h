@@ -22,7 +22,7 @@ using std::pair;
 using std::ifstream;
 using std::endl;
 
-#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:z:v:aonhbB"
+#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:d:z:v:aonhbB"
 
 struct params_t {
 	// required
@@ -34,6 +34,8 @@ struct params_t {
 	int max_seeds; 					// Maximum seeds in a sketch
 	int max_matches; 				// Maximum seed matches in a sketch
 	double theta; 					// The t-homology threshold
+	double min_diff;				// The minimum difference between the best and second best mapping
+
 	string paramsFile;
 	string mapper;                  // The name of the mapper
 	int verbose;					// Outputs debug information: 0 for no, 1 for some, 2 for all (warning: take time)
@@ -49,7 +51,7 @@ struct params_t {
 	bool one_sweep;
 
 	params_t() :
-		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), mapper("shmap"), verbose(0),
+		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), min_diff(0.015), mapper("shmap"), verbose(0),
 		sam(false), overlaps(false), normalize(false), /*onlybest(false),*/ no_bucket_pruning(false), one_sweep(false) {}
 
 	void print(std::ostream& out, bool human) const {
@@ -61,6 +63,7 @@ struct params_t {
 		m.push_back({"max_seeds", std::to_string(max_seeds)});
 		m.push_back({"max_matches", std::to_string(max_matches)});
 		m.push_back({"tThres", std::to_string(theta)});
+		m.push_back({"min_diff", std::to_string(min_diff)});
 		m.push_back({"paramsFile", paramsFile});
 		m.push_back({"mapper", mapper});
 
@@ -101,6 +104,7 @@ struct params_t {
 		out << " | no-bucket-pruning:     " << no_bucket_pruning << endl;
 		out << " | one-sweep:             " << one_sweep << endl;
 		out << " | tThres:                " << theta << endl;
+		out << " | min_diff:              " << min_diff << endl;
 	}
 
 	void dsHlp() {
@@ -169,38 +173,45 @@ struct params_t {
 					break;
 				case 'k':
 					if(atoi(optarg) <= 0) {
-						cerr << "ERROR: K-mer length not applicable" << endl;
+						cerr << "ERROR: K-mer length (-k) should be positive." << "You provided " << optarg << "." << endl;
 						return false;
 					}
 					k = atoi(optarg);
 					break;
 				case 'r':
 					if(atof(optarg) <= 0 || atof(optarg) > 1.0) {
-						cerr << "ERROR: Given hash ratio " << optarg << " not applicable" << endl;
+						cerr << "ERROR: Given hash ratio (-r) should be between 0 and 1." << "You provided " << optarg << "." << endl;
 						return false;
 					}
 					hFrac = atof(optarg);
 					break;
 				case 'S':
 					if(atoi(optarg) <= 0) {
-						cerr << "ERROR: The number of seeds should be positive." << endl;
+						cerr << "ERROR: The number of seeds (-S) should be positive." << "You provided " << optarg << "." << endl;
 						return false;
 					}
 					max_seeds = atoi(optarg);
 					break;
 				case 'M':
 					if(atoi(optarg) <= 0) {
-						cerr << "ERROR: The number of seed matches should be positive." << endl;
+						cerr << "ERROR: The number of seed matches (-M) should be positive." << "You provided " << optarg << "." << endl;
 						return false;
 					}
 					max_matches = atoi(optarg);
 					break;
 				case 't':
-					if(atoi(optarg) < 0 || atoi(optarg) > 1.0) {
-						cerr << "ERROR: The threshold t should be between 0 and 1." << endl;
+					theta = atof(optarg);
+					if(theta < 0.0 || theta > 1.0) {
+						cerr << "ERROR: The threshold (-t) should be between 0 and 1." << "You provided " << optarg << "." << endl;
 						return false;
 					}
-					theta = atof(optarg);
+					break;
+				case 'd':
+					min_diff = atof(optarg);
+					if(min_diff < 0.0 || min_diff > 1.0) {
+						cerr << "ERROR: The minimum difference (-d) should be between 0 and 1." << "You provided " << optarg << "." << endl;
+						return false;
+					}
 					break;
 				case 'v':
 					verbose = atoi(optarg);
