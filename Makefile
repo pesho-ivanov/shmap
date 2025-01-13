@@ -80,6 +80,9 @@ ALLOUT_DIR = $(DIR)/out
 OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 
 PAFTOOLS = ./ext/paftools.js
+LIFT_FASTA = $(DIR)/convert_fasta_with_args.py
+CHAIN_FILE = $(DIR)/refs/hg002v1.1_to_CHM13v2.0.chain.gz
+
 SHMAP_PREF         = $(ALLOUT_DIR)/shmap/$(READS_PREFIX)/shmap
 SHMAP_NOPRUNE_PREF = $(ALLOUT_DIR)/shmap-noprune/$(READS_PREFIX)/shmap-noprune
 SHMAP_ONESWEEP_PREF= $(ALLOUT_DIR)/shmap-onesweep/$(READS_PREFIX)/shmap-onesweep # NOT USED
@@ -133,6 +136,14 @@ ifeq ($(wildcard $(READS)),)
 	-paftools.js pbsim2fq $(READSIM_REF).fai "$(READS_PREFIX)"_*.maf >$(READS).unshuf
 	~/miniconda3/bin/seqkit shuffle $(READS).unshuf -o $(READS)
 	rm -f "$(READS_PREFIX)"_*.maf "$(READS_PREFIX)"_*.ref "$(READS_PREFIX)"_*.fastq
+
+	if [ "$(READSIM_REFNAME)" != "$(REFNAME)" ]; then \
+		echo "Lifting over reads from $(READSIM_REFNAME) to $(REFNAME)"; \
+		python $(LIFT_FASTA) -f $(READS) -c $(CHAIN_FILE) -o $(READS).lifted; \
+		mv $(READS).lifted $(READS); \
+	else \
+		echo "READSIM_REFNAME and REFNAME are the same. No liftover required."; \
+	fi
 
 # take only positive strand reads
 #	mv $(READS)_ $(READS)

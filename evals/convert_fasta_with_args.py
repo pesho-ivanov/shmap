@@ -1,97 +1,129 @@
 import re
 import sys
 import argparse
+import subprocess
+import os
 
-#def parse_chain_file(chain_file):
-#    """Parse chain file into a dictionary for fast lookup, skipping extra arguments."""
-#    chain_dict = {}
-#    with open(chain_file) as f:
-#        for line in f:
-#            parts = line.strip().split()
-#            if len(parts) < 12:  # Adjusted to account for the skipped argument
-#                continue
-#            src_chrom, src_start, src_end, _, _, _, _, dest_chrom, _, dest_start, dest_end, _ = parts[:12]
-#            key = (src_chrom, int(src_start), int(src_end))
-#            chain_dict[key] = (dest_chrom, int(dest_start), int(dest_end))
-#            #print(key, ' -> ', chain_dict[key])
-#    return chain_dict
 
-#def liftover_coordinates(chain_dict, chrom, start, end):
-#    """Map v1.1 coordinates to CHM13 using the chain dictionary."""
-#    for (src_chrom, src_start, src_end), (dest_chrom, dest_start, dest_end) in chain_dict.items():
-#        if src_chrom == chrom and src_start <= start < src_end:
-#            new_start = dest_start + (start - src_start)
-#            new_end = dest_start + (end - src_start)
-#            return dest_chrom, new_start, new_end
-#    return None, None, None  # Unmapped
-
-def liftover_coordinates(chain_file, chrom, start, end):
-    """Map coordinates using liftOver tool."""
-    # Create temporary BED file with coordinates
-    with open("temp.bed", "w") as f:
-        f.write(f"{chrom}\t{start}\t{end}\n")
+def create_bed_from_fasta(fasta_file, bed_file):
+    """Create a BED file containing coordinates for all reads in the FASTA file."""
+    total_descriptions = 0
+    sequences = {}  # Store sequences for later reconstruction
     
-    # Run liftOver command
+    with open(fasta_file) as fasta, open(bed_file, "w") as bed:
+        current_id = None
+        for line in fasta:
+            if line.startswith(">"):
+                total_descriptions += 1
+                match = re.match(r">(.*?)!(chr\S+?)_(\S+?)!(\d+?)!(\d+?)!(\S+)", line)
+                if match:
+                    prefix, chrom, haplotype, start, end, strand = match.groups()
+                    current_id = f"{total_descriptions}"  # Use counter as unique ID
+                    # Store original header info for reconstruction
+                    sequences[current_id] = {
+                        'header': line.strip(),
+                        'sequence': '',
+                        'prefix': prefix,
+                        'strand': strand
+                    }
+                    # Write BED entry with unique ID as name
+                    bed.write(f"{chrom}_{haplotype}\t{start}\t{end}\t{current_id}\n")
+            elif current_id is not None:
+                sequences[current_id]['sequence'] += line.strip()
+    
+    return sequences, total_descriptions
+
+
+def run_liftover(input_bed, chain_file, output_bed, unmapped_bed):
+    """Run liftOver on the entire BED file at once."""
     try:
-        import subprocess
-        cmd = ["ext/liftOver", "temp.bed", chain_file, "mapped.bed", "unmapped.bed"]
-        subprocess.run(cmd, check=True, capture_output=False)
-        
-        # Read mapped coordinates
-        with open("mapped.bed") as f:
-            line = f.readline().strip()
-            if line:
-                new_chrom, new_start, new_end = line.split()[:3]
-                return new_chrom, int(new_start), int(new_end)
-                
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        cmd = ["ext/liftOver", input_bed, chain_file, output_bed, unmapped_bed]
+        subprocess.run(cmd, check=True, capture_output=True)
+        return True
+    except subprocess.CalledProcessError as e:
         print(f"Error running liftOver: {e}", file=sys.stderr)
-    finally:
-        # Clean up temp files
-        import os
-        for f in ["temp.bed", "mapped.bed", "unmapped.bed"]:
-            try:
-                os.remove(f)
-            except OSError:
-                pass
-                
-    return None, None, None  # Return None if unmapped or error
+        return False
+
+
+def create_fasta_from_lifted_bed(lifted_bed, unmapped_bed, sequences, output_file):
+    """Convert lifted BED coordinates back to FASTA format."""
+    mapped_ids = set()
+    unmapped_count = 0
+    
+    with open(output_file, "w") as output:
+        # Process successfully lifted coordinates
+        try:
+            with open(lifted_bed) as f:
+                for line in f:
+                    chrom, start, end, read_id = line.strip().split()[:4]
+                    if read_id in sequences:
+                        mapped_ids.add(read_id)
+                        seq_info = sequences[read_id]
+                        # Create new header with lifted coordinates
+                        new_header = f">{seq_info['prefix']}!{chrom}!{start}!{end}!{seq_info['strand']}\n"
+                        output.write(new_header)
+                        output.write(f"{seq_info['sequence']}\n")
+        except FileNotFoundError:
+            pass  # Handle case where no reads were mapped
+        
+        # Process unmapped reads
+        try:
+            with open(unmapped_bed) as f:
+                for line in f:
+                    fields = line.strip().split('\t')
+                    if len(fields) >= 4:
+                        read_id = fields[3]
+                        if read_id in sequences and read_id not in mapped_ids:
+                            unmapped_count += 1
+                            seq_info = sequences[read_id]
+                            output.write(f"{seq_info['header']}\n")
+                            output.write(f"{seq_info['sequence']}\n")
+        except FileNotFoundError:
+            pass  # Handle case where no reads were unmapped
+    
+    return len(mapped_ids), unmapped_count
 
 
 def process_fasta(fasta_file, chain_file, output_file):
     """Convert all FASTA descriptions from v1.1 to CHM13 and report unmapped percentage."""
-    total_descriptions = 0
-    unmapped_descriptions = 0
+    # Create temporary filenames
+    temp_bed = "temp_all.bed"
+    lifted_bed = "lifted_all.bed"
+    unmapped_bed = "unmapped_all.bed"
+    
+    try:
+        # Step 1: Create BED file for all reads
+        print("Creating BED file from FASTA...")
+        sequences, total_descriptions = create_bed_from_fasta(fasta_file, temp_bed)
+        
+        # Step 2: Run liftOver on entire BED file
+        print("Running liftOver on all reads...")
+        if not run_liftover(temp_bed, chain_file, lifted_bed, unmapped_bed):
+            print("LiftOver failed", file=sys.stderr)
+            return
+        
+        # Step 3: Convert lifted BED back to FASTA
+        print("Converting lifted coordinates back to FASTA...")
+        mapped_count, unmapped_count = create_fasta_from_lifted_bed(
+            lifted_bed, unmapped_bed, sequences, output_file
+        )
+        
+        # Report statistics
+        print(f"Total descriptions: {total_descriptions}")
+        print(f"Mapped descriptions: {mapped_count}")
+        print(f"Unmapped descriptions: {unmapped_count}")
+        if total_descriptions > 0:
+            unmapped_percentage = (unmapped_count / total_descriptions) * 100
+            print(f"Percentage unmapped: {unmapped_percentage:.2f}%")
+            
+    finally:
+        # Clean up temporary files
+        for f in [temp_bed, lifted_bed, unmapped_bed]:
+            try:
+                os.remove(f)
+            except OSError:
+                pass
 
-    with open(fasta_file) as fasta, open(output_file, "w") as output:
-        for line in fasta:
-            if line.startswith(">"):
-                total_descriptions += 1
-                # Extract chrom, start, end from description
-                match = re.match(r">(.*?)!(chr\S+?)_(\S+?)!(\d+?)!(\d+?)!(\S+)", line)
-                if match:
-                    prefix, chrom, haplotype, start, end, strand = match.groups()
-                    start, end = int(start), int(end)
-                    # Perform liftover
-                    new_chrom, new_start, new_end = liftover_coordinates(chain_file, f"{chrom}_{haplotype}", start, end)
-                    if new_chrom:
-                        # Write updated description
-                        new_desc = f">{prefix}!{new_chrom}!{new_start}!{new_end}!{strand}\n"
-                        output.write(new_desc)
-                    else:
-                        unmapped_descriptions += 1
-                        #print(f"Unmapped: {line.strip()}")
-                        output.write(line)  # Write original if unmapped
-                else:
-                    output.write(line)  # Write original if no match
-            else:
-                output.write(line)  # Write sequence lines unchanged
-
-    # Report unmapped percentage
-    unmapped_percentage = (unmapped_descriptions / total_descriptions) * 100 if total_descriptions > 0 else 0
-    print(f"Total descriptions: {total_descriptions}")
-    print(f"Unmapped descriptions: {unmapped_descriptions}")
-    print(f"Percentage unmapped: {unmapped_percentage:.2f}%")
 
 def main():
     # Parse command-line arguments
@@ -101,13 +133,10 @@ def main():
     parser.add_argument("-o", "--output", required=True, help="Output FASTA file")
     args = parser.parse_args()
 
-    # Parse chain file and process FASTA
-    print("Parsing chain file...")
-    #chain_dict = parse_chain_file(args.chain)
     print(f"Processing FASTA file: {args.fasta}")
     process_fasta(args.fasta, args.chain, args.output)
     print(f"Conversion complete. Output written to {args.output}")
 
+
 if __name__ == "__main__":
     main()
-

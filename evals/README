@@ -1,0 +1,15 @@
+Evaluation details.
+
+## References
+
+- CHM13v2.0: [repo](https://github.com/marbl/CHM13) [fasta](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/chm13v2.0.fa)
+- hg002v1.1: [repo](https://github.com/marbl/HG002) [fasta](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.1.fasta.gz)
+- hg002v1.1_to_CHM13v2.0: [chain](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/changes/hg002v1.1_to_CHM13v2.0.chain.gz)
+
+## Tools
+
+- [pbsim3](https://github.com/yukiteruono/pbsim3)
+- [liftOver](https://genome.ucsc.edu/goldenPath/help/hgTracksHelp.html#Liftover)
+
+## Commands
+
