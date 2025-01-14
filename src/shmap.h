@@ -125,8 +125,8 @@ public:
 			double lowest_sh;
 			if (seed_heuristic_pass(kmers, m, b_it->first, b_it->second, first_kmer_after_seeds, seeds, best_idx, &lowest_sh, thr)) {
 				//cerr << forbidden_idx << ", passed SH:" << b_it->first << " " << b_it->second << endl;
-				if (matcher.do_overlap(query_id, b_it->first))
-					*lost_on_pruning = 0;
+				//if (matcher.do_overlap(query_id, b_it->first))
+				//	*lost_on_pruning = 0;
 				H->T.start("match_collect");
 					Matches M = matcher.collect_matches(b_it->first, p_ht);
 				H->T.stop("match_collect");
@@ -326,10 +326,9 @@ public:
 					H->C.inc("seed_matches", seed_matches);
 				H->T.stop("match_seeds");
 
-				int lost_on_seeding = matcher.lost_correct_mapping(query_id, B);
-				H->C.inc("lost_on_seeding", lost_on_seeding);
+				//int lost_on_seeding = matcher.lost_correct_mapping(query_id, B);
+				//H->C.inc("lost_on_seeding", lost_on_seeding);
 
-				//for (auto b_it = B.ordered_begin(); b_it != B.ordered_end(); ++b_it) {
 				//	cerr << "seeded buckets:" << b_it->first << " " << b_it->second << endl;
 				//}
 

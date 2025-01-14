@@ -42,9 +42,9 @@ READSIM_REFNAME ?= $(REFNAME)
 
 K ?= 25
 R ?= 0.05
-T ?= 0.75
-MIN_DIFF ?= 0.02
-MAX_OVERLAP ?= 0.5
+T ?= 0.5
+MIN_DIFF ?= 0.15
+MAX_OVERLAP ?= 0.7
 
 THETAS = 0.95 0.9 0.85 0.8 0.75 0.7 0.65 0.6 0.55 0.5  
 PAUL_THETAS = 1.0 0.9 0.8 0.7 0.6 0.5 0.4 0.3
@@ -81,7 +81,11 @@ ALLOUT_DIR = $(DIR)/out
 #OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)/k$(K)-r$(R)-s$(S)-m$(M)-t$(T)
 OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 
+PBSIM    = pbsim
+SAMTOOLS = samtools
 PAFTOOLS = ./ext/paftools.js
+SEQKIT   = ~/miniconda3/bin/seqkit
+
 LIFT_FASTA = $(DIR)/convert_fasta_with_args.py
 CHAIN_FILE = $(DIR)/refs/hg002v1.1_to_CHM13v2.0.chain
 
@@ -125,7 +129,8 @@ gen_reads:
 ifeq ($(wildcard $(READS)),)
 	echo $(READS)
 	mkdir -p $(ALLREADS_DIR)
-	pbsim \
+	sed -i 's/^\(>[^[:space:]]*\).*/\1/' $(READSIM_REF)
+	$(PBSIM) \
 		   $(READSIM_REF) \
 		   --model_qc $(DIR)/model_qc_clr \
 		   --accuracy-mean $(ACCURACY)\
@@ -134,17 +139,18 @@ ifeq ($(wildcard $(READS)),)
 		   --prefix $(READS_PREFIX)\
 		   --length-mean $(MEANLEN)
 
-	samtools faidx $(READSIM_REF)
-	-paftools.js pbsim2fq $(READSIM_REF).fai "$(READS_PREFIX)"_*.maf >$(READS).unshuf
-	~/miniconda3/bin/seqkit shuffle $(READS).unshuf -o $(READS)
+	$(SAMTOOLS) faidx $(READSIM_REF)
+	$(PAFTOOLS) pbsim2fq $(READSIM_REF).fai "$(READS_PREFIX)"_*.maf >$(READS).unshuf
+	$(SEQKIT) shuffle $(READS).unshuf -o $(READS)
 	rm -f "$(READS_PREFIX)"_*.maf "$(READS_PREFIX)"_*.ref "$(READS_PREFIX)"_*.fastq
 
-	if [ "$(READSIM_REFNAME)" != "$(REFNAME)" ]; then \
+	@if [ "$(READSIM_REFNAME)" != "$(REFNAME)" ]; then \
 		echo "Lifting over reads from $(READSIM_REFNAME) to $(REFNAME)"; \
 		python $(LIFT_FASTA) -f $(READS) -c $(CHAIN_FILE) -o $(READS).lifted; \
+		cp $(READS) $(READS).unlifted; \
 		mv $(READS).lifted $(READS); \
 	else \
-		echo "READSIM_REFNAME and REFNAME are the same. No liftover required."; \
+		echo "READSIM_REFNAME and REFNAME are the same: $(REFNAME). No liftover required."; \
 	fi
 
 # take only positive strand reads
@@ -224,10 +230,10 @@ eval_winnowmap: gen_reads
 
 eval_minimap: gen_reads
 	@mkdir -p $(shell dirname $(MINIMAP_PREF))
-	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level -a $(REF) $(ONE_READ) >/dev/null 2>/dev/null
-#	$(TIME_CMD) -o $(MINIMAP_PREF).time       $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level -a $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).bam
+#	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level -a $(REF) $(ONE_READ) >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(MINIMAP_PREF).time       $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).paf
 	-paftools.js mapeval $(MINIMAP_PREF).paf | tee $(MINIMAP_PREF).eval
+	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(MINIMAP_PREF).paf >$(MINIMAP_PREF).wrong 2>/dev/null || true
 
 eval_mm2: gen_reads
 	@mkdir -p $(shell dirname $(MM2_PREF))
@@ -259,9 +265,10 @@ eval_tools_on_datasets:
 
 eval_shmap_on_datasets:
 	make eval_shmap REFNAME=t2tChrY DEPTH=10
-	make eval_shmap REFNAME=chm13   DEPTH=1
+	make eval_shmap REFNAME=chm13v2.0   DEPTH=1
 	make eval_shmap REFNAME=t2tChrY DEPTH=10 	MEANLEN=24000
-	make eval_shmap REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
+	make eval_shmap REFNAME=chm13v2.0   READS_PREFIX=HG002_24kb_10G
+	make eval_shmap REFNAME=chm13v2.0 READSIM_REFNAME=hg002v1.1 DEPTH=10
 
 eval_winnowmap_on_datasets:
 	make eval_winnowmap REFNAME=t2tChrY DEPTH=10

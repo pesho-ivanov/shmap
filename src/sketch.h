@@ -280,12 +280,15 @@ public:
 		assert(score() >= 0.0);
 		if (score2() < theta)
 			set_score2(theta);
-		if (score() - score2() > min_diff) {
-			if (abs(local_stats.same_strand_seeds) < local_stats.intersection/2)
-				return 5;
-			return 60;
-		} else {
+		double diff = score() - score2();
+		int mapq_strand = (abs(local_stats.same_strand_seeds) < local_stats.intersection/2) ? 5 : 60;
+		if (diff > min_diff) {
+			return std::min(60, mapq_strand);
+		} else if (diff < min_diff/2) {
 			return 0;
+		} else {
+			diff -= min_diff/2;
+			return std::min(int(60*diff/(min_diff/2)), mapq_strand);
 		}
 	}
 
@@ -449,7 +452,7 @@ public:
 
 		if (rpos_t(s.size()) < k) return kmers;
 
-		hash_t h, h_fw = 0, h_rc = 0;
+		hash_t h_fw = 0, h_rc = 0;
 		hash_t hThres = hFrac < 1.0 ? hash_t(hFrac * double(std::numeric_limits<hash_t>::max())) : std::numeric_limits<hash_t>::max();
 		rpos_t r;
 
@@ -461,12 +464,12 @@ public:
 		while(true) {
 			// HACK! the lowest differing bit is not expected to correlate much with (h < hThres)
 			// TODO: tie break
-			const auto first_diff_bit = 1 << std::countr_zero(h_fw ^ h_rc);
-			const bool strand         = h_fw & first_diff_bit;
-			h = strand ? h_rc : h_fw;
-
-			if (h <= hThres) // optimize to only look at specific bits
+			auto h = h_rc ^ h_fw;
+			if (h <= hThres) {
+				if (h_fw == h_rc) cerr << "h_fw == h_rc == " << h_fw << endl;
+				const bool strand = h_fw > h_rc;
 				kmers.push_back(Kmer(r-1, h, strand));
+			}
 						
 			if (r >= rpos_t(s.size())) break;
 

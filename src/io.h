@@ -280,11 +280,17 @@ struct ParsedQueryId {
 		// Need 5 parts: read_id, segment, start, end, strand
 		if (parts.size() != 5) return result;
 
-		result.segm_id = parts[1];
-		result.start_pos = stoll(parts[2]);
-		result.end_pos = stoll(parts[3]);
-		result.strand = parts[4][0];
-		result.valid = true;
+		try {
+			result.segm_id = parts[1];
+			result.start_pos = stoll(parts[2]);
+			result.end_pos = stoll(parts[3]);
+			result.strand = parts[4][0];
+			result.valid = true;
+		} catch (const std::exception& e) {
+			cerr << "Error parsing query_id with start_pos " << parts[2] << " and end_pos " << parts[3] << ": " << e.what() << endl;
+			result.valid = false;
+			throw;
+		}
 		
 		return result;
 	}
