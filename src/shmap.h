@@ -111,7 +111,7 @@ public:
 	}
 	
 	void match_rest(qpos_t P_sz, qpos_t lmax, qpos_t m, const Seeds &kmers, const Buckets &B, Hist &diff_hist, int seeds, int first_kmer_after_seeds, const unordered_map<hash_t, Seed> &p_ht,
-			vector<Mapping> &maps, int &total_matches, int &best_idx, int &final_buckets, double thr, int forbidden_idx, const string &query_id, int *lost_on_pruning) {
+			vector<Mapping> &maps, int &total_matches, int &best_idx, int &final_buckets, double thr, int forbidden_idx, const string &query_id, int *lost_on_pruning, double max_overlap) {
 		double best_J = -1.0;
 
 		int lost_on_seeding = (0);
@@ -140,7 +140,7 @@ public:
 					if (best_in_bucket.score() >= thr) {
 						maps.emplace_back(best_in_bucket);
 						if (best_in_bucket.score() > best_J) {
-							if (forbidden_idx == -1 || Mapping::overlap(maps.back(), maps[forbidden_idx]) < 0.5) {
+							if (forbidden_idx == -1 || Mapping::overlap(maps.back(), maps[forbidden_idx]) < max_overlap) {
 								best_J = max(best_J, best_in_bucket.score());
 								best_idx = maps.size()-1;
 								thr = best_in_bucket.score();
@@ -340,7 +340,7 @@ public:
 					//sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 					int total_matches=seed_matches, best_idx=-1, best2_idx=-1, final_buckets;
 					double best_thr = H->params.theta;
-					match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, best_thr, -1, query_id, &lost_on_pruning);
+					match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, best_thr, -1, query_id, &lost_on_pruning, H->params.max_overlap);
 					auto [FP, PP, FDR, FPTP] = tuple(-1, -1, -1, -1);
 					//auto [FP, PP, FDR, FPTP] = calc_FDR(maps, H->params.theta, lmax, bucket_l, tidx, p_ht, P_sz, lmin, m, diff_hist);
 					H->C.inc("FP", FP);
@@ -353,7 +353,7 @@ public:
 					if (best_idx != -1) {
 						// find second best mapping for mapq computation
 						double second_best_thr = maps[best_idx].score() - H->params.min_diff;
-						match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, second_best_thr, best_idx, query_id, &lost_on_pruning);
+						match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, second_best_thr, best_idx, query_id, &lost_on_pruning, H->params.max_overlap);
 					}
 				H->T.stop("match_rest");
 				H->C.inc("lost_on_pruning", lost_on_pruning);

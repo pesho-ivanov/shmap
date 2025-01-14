@@ -22,7 +22,7 @@ using std::pair;
 using std::ifstream;
 using std::endl;
 
-#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:d:z:v:aonhbB"
+#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:d:o:z:v:anhbB"
 
 struct params_t {
 	// required
@@ -35,6 +35,7 @@ struct params_t {
 	int max_matches; 				// Maximum seed matches in a sketch
 	double theta; 					// The t-homology threshold
 	double min_diff;				// The minimum difference between the best and second best mapping
+	double max_overlap;			    // The maximal overlap between the best and second best mapping
 
 	string paramsFile;
 	string mapper;                  // The name of the mapper
@@ -42,7 +43,6 @@ struct params_t {
 
 	// no arguments
 	bool sam; 				// Output in SAM format (PAF by default)
-	bool overlaps;			// Permit overlapping mappings 
 	bool normalize; 		// Flag to save that scores are to be normalized
 	//bool onlybest;			// Output up to one (best) mapping (if above the threshold)
 
@@ -51,8 +51,8 @@ struct params_t {
 	bool one_sweep;
 
 	params_t() :
-		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), min_diff(0.015), mapper("shmap"), verbose(0),
-		sam(false), overlaps(false), normalize(false), /*onlybest(false),*/ no_bucket_pruning(false), one_sweep(false) {}
+		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), min_diff(0.02), max_overlap(0.5), mapper("shmap"), verbose(0),
+		sam(false), normalize(false), /*onlybest(false),*/ no_bucket_pruning(false), one_sweep(false) {}
 
 	void print(std::ostream& out, bool human) const {
 		std::vector<pair<string, string>> m;
@@ -64,11 +64,11 @@ struct params_t {
 		m.push_back({"max_matches", std::to_string(max_matches)});
 		m.push_back({"tThres", std::to_string(theta)});
 		m.push_back({"min_diff", std::to_string(min_diff)});
+		m.push_back({"max_overlap", std::to_string(max_overlap)});
 		m.push_back({"paramsFile", paramsFile});
 		m.push_back({"mapper", mapper});
 
 		m.push_back({"sam", std::to_string(sam)});
-		m.push_back({"overlaps", std::to_string(overlaps)});
 		m.push_back({"normalize", std::to_string(normalize)});
 		//m.push_back({"onlybest", std::to_string(onlybest)});
 		m.push_back({"verbose", std::to_string(verbose)});
@@ -98,13 +98,13 @@ struct params_t {
 		out << " | max_seeds              " << max_seeds << endl;
 		out << " | max_matches:           " << max_matches << endl;
 		out << " | sam:                   " << sam << endl;
-		out << " | overlaps:              " << overlaps << endl;
 		//out << " | onlybest:              " << onlybest << endl;
 		out << " | verbose:               " << verbose << endl;
 		out << " | no-bucket-pruning:     " << no_bucket_pruning << endl;
 		out << " | one-sweep:             " << one_sweep << endl;
 		out << " | tThres:                " << theta << endl;
 		out << " | min_diff:              " << min_diff << endl;
+		out << " | max_overlap:           " << max_overlap << endl;
 	}
 
 	void dsHlp() {
@@ -129,7 +129,6 @@ struct params_t {
 		cerr << endl;
 		cerr << "Optional parameters without an argument:" << endl;
 		cerr << "   -a                       Output in SAM format (PAF by default)" << endl;
-		cerr << "   -o   --overlaps          Permit overlapping mappings" << endl;
 		cerr << "   -n   --normalize         Normalize scores by length" << endl;
 		//cerr << "   -x   --onlybest          Output the best alignment if above threshold (otherwise none)" << endl;
 		cerr << "   -b   --no-bucket-pruning Disables bucket pruning" << endl;
@@ -151,7 +150,6 @@ struct params_t {
 			{"mapper",             required_argument,  0, 'm'},
 			{"threshold",          required_argument,  0, 't'},
 			{"verbose",            required_argument,  0, 'v'},
-			{"overlaps",           no_argument,        0, 'o'},
 			{"normalize",          no_argument,        0, 'n'},
 //			{"onlybest",           no_argument,        0, 'x'},
 			{"no-bucket-pruning",  no_argument,        0, 'b'},
@@ -213,6 +211,13 @@ struct params_t {
 						return false;
 					}
 					break;
+				case 'o':
+					max_overlap = atof(optarg);
+					if(max_overlap < 0.0 || max_overlap > 1.0) {
+						cerr << "ERROR: The maximum overlap (-o) should be between 0 and 1." << "You provided " << optarg << "." << endl;
+						return false;
+					}
+					break;
 				case 'v':
 					verbose = atoi(optarg);
 					if(verbose < 0 || verbose > 2) {
@@ -225,9 +230,6 @@ struct params_t {
 					break;
 				case 'a':
 					sam = true;
-					break;
-				case 'o':
-					overlaps = true;
 					break;
 				case 'n':
 					normalize = true;
