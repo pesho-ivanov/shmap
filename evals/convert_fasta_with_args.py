@@ -27,7 +27,7 @@ def create_bed_from_fasta(fasta_file, bed_file):
                         'strand': strand
                     }
                     # Write BED entry with unique ID as name
-                    bed.write(f"{chrom}_{haplotype}\t{start}\t{end}\t{current_id}\n")
+                    bed.write(f"{chrom}_{haplotype}\t{start}\t{end}\t{current_id}\t0\t{strand}\n")
             elif current_id is not None:
                 sequences[current_id]['sequence'] += line.strip()
     
@@ -55,12 +55,12 @@ def create_fasta_from_lifted_bed(lifted_bed, unmapped_bed, sequences, output_fil
         try:
             with open(lifted_bed) as f:
                 for line in f:
-                    chrom, start, end, read_id = line.strip().split()[:4]
+                    chrom, start, end, read_id, _, strand = line.strip().split()[:6]
                     if read_id in sequences:
                         mapped_ids.add(read_id)
                         seq_info = sequences[read_id]
                         # Create new header with lifted coordinates
-                        new_header = f">{seq_info['prefix']}!{chrom}!{start}!{end}!{seq_info['strand']}\n"
+                        new_header = f">{seq_info['prefix']}!{chrom}!{start}!{end}!{strand}\n"
                         output.write(new_header)
                         output.write(f"{seq_info['sequence']}\n")
         except FileNotFoundError:
