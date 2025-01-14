@@ -207,20 +207,18 @@ struct GlobalMappingStats {
 
 	friend std::ostream& operator<<(std::ostream& os, const GlobalMappingStats& stats) {
 		os << std::fixed << std::setprecision(3);
-		os  << "\t" << "k:i:" 			<< stats.k
-			<< "\t" << "gt_J:f:"		<< stats.gt_J
-			<< "\t" << "gt_C:f:"		<< stats.gt_C
-			<< "\t" << "gt_C_bucket:f:"	<< stats.gt_C_bucket
-//			<< "\t" << "ed:i:"			<< mapping.ed
-//			<< "\t" << "ed2:i:"			<< mapping.ed2
-			<< "\t" << "Seeds:i:"		<< stats.seeds
-			<< "\t" << "MSeedmax:i:"	<< stats.max_seed_matches
-			<< "\t" << "MSeed:i:"		<< stats.seed_matches
-			<< "\t" << "M:i:"			<< stats.total_matches
-			<< "\t" << "Mineff:f:"		<< stats.match_inefficiency
-			<< "\t" << "Bmax:i:"		<< stats.seeded_buckets
-			<< "\t" << "Bfinal:i:"		<< stats.final_buckets
-			<< "\t" << "FPTP:f:"		<< stats.FPTP;
+		os  << "\t" << "k:i:" 					<< stats.k
+			<< "\t" << "gt_J:f:"				<< stats.gt_J
+			<< "\t" << "gt_C:f:"				<< stats.gt_C
+			<< "\t" << "gt_C_bucket:f:"			<< stats.gt_C_bucket
+			<< "\t" << "seeds:i:"				<< stats.seeds
+			<< "\t" << "max_seed_matches:i:"	<< stats.max_seed_matches
+			<< "\t" << "seed_matches:i:"		<< stats.seed_matches
+			<< "\t" << "total_matches:i:"		<< stats.total_matches
+			<< "\t" << "match_inefficiency:f:"	<< stats.match_inefficiency
+			<< "\t" << "seeded_buckets:i:"		<< stats.seeded_buckets
+			<< "\t" << "final_buckets:i:"		<< stats.final_buckets
+			<< "\t" << "FPTP:f:"				<< stats.FPTP;
 		return os;
 	}
 };
@@ -297,9 +295,9 @@ public:
 		return std::abs(X - Y) / std::sqrt(X + Y);
 	}
 
-	void set_local_stats(double theta, double min_diff, qpos_t p_sz) {
-		paf.mapq = calc_mapq(theta, min_diff);
-		local_stats.p_sz = p_sz;
+	void set_local_stats(const RefSegment &segm) {
+		//local_stats.s_sz = segm.sz;
+		//local_stats.segm_name = segm.name;
 	}
 
 	double mapq() const {
@@ -327,11 +325,15 @@ public:
 		//m.ed2 = edit_distance(m.bucket, P, P_sz, m, kmers);
 	}
 
-	void set_global_stats(const char* query_id, qpos_t P_sz, qpos_t k, qpos_t seeds, rpos_t total_matches, rpos_t max_seed_matches, rpos_t seed_matches,
-			rpos_t seeded_buckets, rpos_t final_buckets, double FPTP, const std::string &segm_name, rpos_t segm_sz, double map_time) {
+	void set_global_stats(
+			double theta, double min_diff, qpos_t p_sz,
+			const char* query_id, qpos_t P_sz, qpos_t k, qpos_t seeds, rpos_t total_matches, rpos_t max_seed_matches, rpos_t seed_matches,
+			rpos_t seeded_buckets, rpos_t final_buckets, double FPTP, double map_time) {
 		paf.query_id = query_id;
 		paf.P_sz = P_sz;
+		paf.mapq = calc_mapq(theta, min_diff);
 
+		local_stats.p_sz = p_sz;
 		local_stats.map_time = map_time;
 
 		global_stats = std::make_unique<GlobalMappingStats>();
@@ -379,8 +381,8 @@ public:
 	//}
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
-    void print_paf() const {
-		std::cout << *this;
+    void print_paf(std::ostream& os) const {
+		os << *this;
 	}
 
 	static std::string reverseComplement(const std::string& seq) {

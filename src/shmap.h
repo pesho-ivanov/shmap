@@ -137,7 +137,7 @@ public:
 					auto best_in_bucket = matcher.bestFixedLength(M, P_sz, lmax, m, Metric::CONTAINMENT_INDEX);
 					best_in_bucket.set_bucket(b_it->first);
 					assert(best_in_bucket.score() <= lowest_sh + 1e-7);
-					if (best_in_bucket.score() >= H->params.theta) {
+					if (best_in_bucket.score() >= thr) {
 						maps.emplace_back(best_in_bucket);
 						if (best_in_bucket.score() > best_J) {
 							if (forbidden_idx == -1 || Mapping::overlap(maps.back(), maps[forbidden_idx]) < 0.5) {
@@ -197,13 +197,19 @@ public:
 		H->T.start("query_reading");
 
 		string pauls_fn = H->params.paramsFile + ".paul.tsv";
+		string unmapped_fn = H->params.paramsFile + ".unmapped.paf";
 		ofstream paulout;
-		if (H->params.verbose >= 2 && !H->params.paramsFile.empty()) {
-			cerr << "Paul's experiment to " << pauls_fn << endl;
-			paulout = ofstream(pauls_fn);
+		ofstream unmapped_out;
+		if (!H->params.paramsFile.empty()) {
+			cerr << "Unmapped reads to " << unmapped_fn << endl;
+			unmapped_out = ofstream(unmapped_fn);
+			if (H->params.verbose >= 2) {
+				cerr << "Paul's experiment to " << pauls_fn << endl;
+				paulout = ofstream(pauls_fn);
+			}
 		}
 
-		read_fasta_klib(pFile, [this, &paulout](const string &query_id, const string &P) {
+		read_fasta_klib(pFile, [this, &paulout, &unmapped_out](const string &query_id, const string &P) {
 			H->C.inc("reads");
 			H->T.stop("query_reading");
 			H->T.start("query_mapping");
@@ -333,7 +339,8 @@ public:
 					//vector<Bucket> B_vec(B.begin(), B.end());
 					//sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 					int total_matches=seed_matches, best_idx=-1, best2_idx=-1, final_buckets;
-					match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, H->params.theta, -1, query_id, &lost_on_pruning);
+					double best_thr = H->params.theta;
+					match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, best_thr, -1, query_id, &lost_on_pruning);
 					auto [FP, PP, FDR, FPTP] = tuple(-1, -1, -1, -1);
 					//auto [FP, PP, FDR, FPTP] = calc_FDR(maps, H->params.theta, lmax, bucket_l, tidx, p_ht, P_sz, lmin, m, diff_hist);
 					H->C.inc("FP", FP);
@@ -345,52 +352,49 @@ public:
 
 					if (best_idx != -1) {
 						// find second best mapping for mapq computation
-						match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, maps[best_idx].score()-H->params.min_diff, best_idx, query_id, &lost_on_pruning);
+						double second_best_thr = maps[best_idx].score() - H->params.min_diff;
+						match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, second_best_thr, best_idx, query_id, &lost_on_pruning);
 					}
 				H->T.stop("match_rest");
 				H->C.inc("lost_on_pruning", lost_on_pruning);
 			H->T.stop("query_mapping");
 
 			H->T.start("output");
-				if (maps.size() >= 1) {
+				std::ostream* os;
+				Mapping best;
+				if (best_idx != -1) {
+					best = maps[best_idx];
+					//const auto &segm = tidx.T[m.segm_id()];
+					//m.set_local_stats(segm);
+					if (best2_idx != -1)
+						best.set_second_best(maps[best2_idx]);
+
+					if (best.mapq() == 60) H->C.inc("mapq60");
+					H->C.inc("matches_in_reported_mappings", best.intersection());
+					H->C.inc("J_best", rpos_t(10000.0*best.score()));
+					H->C.inc("mappings");
 					H->C.inc("mapped_reads");
-					if (best_idx != -1) 
-					//if (maps[best_idx].J >= H->params.theta)
-					{
-						assert(0 <= best_idx && best_idx < (int)maps.size());
-						Mapping &m = maps[best_idx];
-
-						const auto &segm = tidx.T[m.segm_id()];
-						m.set_global_stats(query_id.c_str(), P_sz, H->params.k, S, total_matches, max_seed_matches, seed_matches, seeded_buckets, final_buckets, FPTP, segm.name, segm.sz, H->T.secs("query_mapping"));  // TODO: disable by flag
-
-						if (best2_idx != -1)
-							m.set_second_best(maps[best2_idx]);
-
-						m.set_local_stats(H->params.theta, H->params.min_diff, p_all.size());
-						m.print_paf();
-
-						if (m.mapq() == 60) H->C.inc("mapq60");
-						H->C.inc("matches_in_reported_mappings", m.intersection());
-						H->C.inc("J_best", rpos_t(10000.0*m.score()));
-						H->C.inc("mappings");
-					}
+					os = &cout;
+				} else {
+					os = &unmapped_out;
 				}
+				best.set_global_stats(H->params.theta, H->params.min_diff, p_all.size(), query_id.c_str(), P_sz, H->params.k, S, total_matches, max_seed_matches, seed_matches, seeded_buckets, final_buckets, FPTP, H->T.secs("query_mapping"));  // TODO: disable by flag
+				best.print_paf(*os);
 
 				if (H->params.verbose >= 2) {
 					AnalyseSimulatedReads gt(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
 					if (best_idx != -1) {
 						gt.print_paf(cout);
 						auto gt_overlap = Mapping::overlap(gt.gt_mapping, maps[best_idx]);
-						cout << "\tgt_mapping_len:" << (gt.gt_mapping.paf.T_r-gt.gt_mapping.paf.T_l)
-						     << "\treported_mapping_len:" << (maps[best_idx].paf.T_r-maps[best_idx].paf.T_l)
-						     << "\tgt_overlap:" << std::fixed << std::setprecision(3) << gt_overlap;
+						*os << "\tgt_mapping_len:" << (gt.gt_mapping.paf.T_r-gt.gt_mapping.paf.T_l)
+						   << "\treported_mapping_len:" << (maps[best_idx].paf.T_r-maps[best_idx].paf.T_l)
+						   << "\tgt_overlap:" << std::fixed << std::setprecision(3) << gt_overlap;
 					}
 					if (!H->params.paramsFile.empty())
 						gt.print_tsv(paulout);
 				}
 
-				if (maps.size() >= 1)
-					cout << endl;
+				*os << endl;
 			H->T.stop("output");
 			H->T.start("query_reading");
 		});
