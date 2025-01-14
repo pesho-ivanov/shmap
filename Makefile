@@ -83,7 +83,7 @@ OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 
 PAFTOOLS = ./ext/paftools.js
 LIFT_FASTA = $(DIR)/convert_fasta_with_args.py
-CHAIN_FILE = $(DIR)/refs/hg002v1.1_to_CHM13v2.0.chain.gz
+CHAIN_FILE = $(DIR)/refs/hg002v1.1_to_CHM13v2.0.chain
 
 SHMAP_PREF         = $(ALLOUT_DIR)/shmap/$(READS_PREFIX)/shmap
 SHMAP_NOPRUNE_PREF = $(ALLOUT_DIR)/shmap-noprune/$(READS_PREFIX)/shmap-noprune

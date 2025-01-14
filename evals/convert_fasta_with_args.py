@@ -75,9 +75,9 @@ def create_fasta_from_lifted_bed(lifted_bed, unmapped_bed, sequences, output_fil
                         read_id = fields[3]
                         if read_id in sequences and read_id not in mapped_ids:
                             unmapped_count += 1
-                            seq_info = sequences[read_id]
-                            output.write(f"{seq_info['header']}\n")
-                            output.write(f"{seq_info['sequence']}\n")
+                            #seq_info = sequences[read_id]
+                            #output.write(f"{seq_info['header']}\n")
+                            #output.write(f"{seq_info['sequence']}\n")
         except FileNotFoundError:
             pass  # Handle case where no reads were unmapped
     
