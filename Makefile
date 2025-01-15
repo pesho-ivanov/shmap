@@ -22,7 +22,7 @@ SRCS = src/map.cpp src/mapper.cpp src/io.cpp ext/edlib.cpp
 OBJS = $(SRCS:.cpp=.o)
 DEPS = $(OBJS:.o=.d)
 
-MINIMAP_BIN = ~/libs/minimap2-2.26_x64-linux/minimap2
+MINIMAP_BIN = ~/libs/minimap2/minimap2
 MM2_BIN = ~/libs/mm2-fast/minimap2
 BLEND_BIN = ~/libs/blend/bin/blend
 MAPQUIK_BIN = ~/libs/mapquik/target/release/mapquik
@@ -70,8 +70,6 @@ READS_PREFIX ?= $(REFNAME)-reads$(READSIM_REFNAME)-a$(ACCURACY)-d$(DEPTH)-l$(MEA
 ALLREADS_DIR = $(DIR)/reads
 READS = $(ALLREADS_DIR)/$(READS_PREFIX).fa
 #ifeq ($(wildcard $(READS)),)
-#	READS = $(foreach ext,fasta fq fastq,$(if $(wildcard $(ALLREADS_DIR)/$(READS_PREFIX).$(ext)),$(ALLREADS_DIR)/$(READS_PREFIX).$(ext),))
-#endif
 #READS = $(ALLREADS_DIR)/$(READS_PREFIX).fa
 #ifeq ($(wildcard $(READS)),)
 #    READS = $(ALLREADS_DIR)/$(READS_PREFIX).fq
@@ -81,7 +79,7 @@ ALLOUT_DIR = $(DIR)/out
 #OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)/k$(K)-r$(R)-s$(S)-m$(M)-t$(T)
 OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 
-REAL_READS = $(ALLREADS_DIR)/HG002_24kb.fastq
+REAL_READS = $(ALLREADS_DIR)/HG002.fq
 PBSIM3     = ~/libs/pbsim3/src/pbsim
 #PBSIM1     = pbsim
 #SAMTOOLS   = samtools
@@ -89,6 +87,7 @@ PAFTOOLS   = ./ext/paftools.js
 SEQKIT     = ~/miniconda3/bin/seqkit
 
 LIFT_FASTA = $(DIR)/convert_fasta_with_args.py
+STREAM_LIFT_FASTA = $(DIR)/stream_fasta.py
 CHAIN_FILE = $(DIR)/refs/hg002v1.1_to_CHM13v2.0.chain
 
 SHMAP_PREF         = $(ALLOUT_DIR)/shmap/$(READS_PREFIX)/shmap
@@ -129,11 +128,12 @@ simulate_SVs:
 
 gen_reads:
 ifeq ($(wildcard $(READS)),)
-#	echo $(READS)
-#	mkdir -p $(ALLREADS_DIR)
-#	sed -i 's/^\(>[^[:space:]]*\).*/\1/' $(READSIM_REF)
-#
-#	$(PBSIM3) --strategy wgs --method sample --sample $(REAL_READS) --genome $(READSIM_REF) --depth $(DEPTH) --prefix $(READS_PREFIX) --no-fastq 1
+	echo $(READS)
+	mkdir -p $(ALLREADS_DIR)
+	sed -i 's/^\(>[^[:space:]]*\).*/\1/' $(READSIM_REF)
+
+	head -n 400000 $(REAL_READS) >$(REAL_READS).tmp
+	$(PBSIM3) --strategy wgs --method sample --sample $(REAL_READS).tmp --genome $(READSIM_REF) --depth $(DEPTH) --prefix $(READS_PREFIX) --no-fastq 1
 
 #	$(PBSIM1) \
 #		   $(READSIM_REF) \
@@ -148,12 +148,11 @@ ifeq ($(wildcard $(READS)),)
 	$(SEQKIT) faidx $(READSIM_REF)
 	$(PAFTOOLS) pbsim2fq $(READSIM_REF).fai "$(READS_PREFIX)"_*.maf >$(READS).unshuf
 	$(SEQKIT) shuffle -2 $(READS).unshuf -o $(READS)
-	rm -f "$(READS_PREFIX)"_*.maf "$(READS_PREFIX)"_*.ref "$(READS_PREFIX)"_*.fastq
+	rm -f "$(READS_PREFIX)"_*.maf "$(READS_PREFIX)"_*.ref "$(READS_PREFIX)"_*.fastq $(REAL_READS).tmp
 
 	@if [ "$(READSIM_REFNAME)" != "$(REFNAME)" ]; then \
 		echo "Lifting over reads from $(READSIM_REFNAME) to $(REFNAME)"; \
-		python $(LIFT_FASTA) -f $(READS) -c $(CHAIN_FILE) -o $(READS).lifted; \
-		cp $(READS) $(READS).unlifted; \
+		python $(STREAM_LIFT_FASTA) $(READS) $(CHAIN_FILE) >$(READS).lifted; \
 		mv $(READS).lifted $(READS); \
 	else \
 		echo "READSIM_REFNAME and REFNAME are the same: $(REFNAME). No liftover required."; \
@@ -236,7 +235,7 @@ eval_winnowmap: gen_reads
 
 eval_minimap: gen_reads
 	@mkdir -p $(shell dirname $(MINIMAP_PREF))
-#	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level -a $(REF) $(ONE_READ) >/dev/null 2>/dev/null
+	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level -a $(REF) $(ONE_READ) >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(MINIMAP_PREF).time       $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).paf
 	-paftools.js mapeval $(MINIMAP_PREF).paf | tee $(MINIMAP_PREF).eval
 	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(MINIMAP_PREF).paf >$(MINIMAP_PREF).wrong 2>/dev/null || true
@@ -263,22 +262,20 @@ eval_mapquik: gen_reads
 eval_tools: eval_minimap eval_mapquik eval_blend #eval_winnowmap # eval_shmap
 
 eval_tools_on_datasets:
-#	make eval_tools REFNAME=chm13v2.0 READS_PREFIX=HG002_24kb_10G
-#	make eval_tools REFNAME=t2tChrY DEPTH=20
-	make eval_tools REFNAME=chm13v2.0 READSIM_REFNAME=hg002v1.1 DEPTH=10
+#	make eval_tools REFNAME=chm13v2.0     READS_PREFIX=HG002
+#	make eval_tools REFNAME=chm13v2.0chrY READSIM_REFNAME=chm13v2.0chrY DEPTH=20
+	make eval_tools REFNAME=chm13v2.0     READSIM_REFNAME=hg002v1.1     DEPTH=10
 
 eval_shmap_on_datasets:
-	make eval_shmap REFNAME=t2tChrY   DEPTH=10
-	make eval_shmap REFNAME=chm13v2.0 DEPTH=1
-	make eval_shmap REFNAME=t2tChrY   DEPTH=10 	MEANLEN=24000
-	make eval_shmap REFNAME=chm13v2.0 READS_PREFIX=HG002_24kb_10G
-	make eval_shmap REFNAME=chm13v2.0 READSIM_REFNAME=hg002v1.1 DEPTH=10
+#	make eval_shmap REFNAME=chm13v2.0     READS_PREFIX=HG002
+	make eval_shmap REFNAME=chm13v2.0chrY READSIM_REFNAME=chm13v2.0chrY DEPTH=20
+#	make eval_shmap REFNAME=chm13v2.0     READSIM_REFNAME=hg002v1.1     DEPTH=10
 
-eval_winnowmap_on_datasets:
-	make eval_winnowmap REFNAME=t2tChrY DEPTH=10
-	make eval_winnowmap REFNAME=chm13   DEPTH=1
-	make eval_winnowmap REFNAME=t2tChrY DEPTH=10  MEANLEN=24000
-	make eval_winnowmap REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
+#eval_winnowmap_on_datasets:
+#	make eval_winnowmap REFNAME=t2tChrY DEPTH=10
+#	make eval_winnowmap REFNAME=chm13   DEPTH=1
+#	make eval_winnowmap REFNAME=t2tChrY DEPTH=10  MEANLEN=24000
+#	make eval_winnowmap REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
 
 #SHMAP_PREF         = $(ALLOUT_DIR)/pauls_experiment/$(READS_PREFIX)/
 pauls_experiment: $(SHMAP_BIN) gen_reads
@@ -296,16 +293,6 @@ pauls_experiment: $(SHMAP_BIN) gen_reads
 clean_evals:
 	rm -r $(ALLREADS_DIR)
 	rm -r $(ALLOUT_DIR)
-
-# 10GB reads: (10737418240 bytes):
-# curl -r 0-10737418239  https://storage.googleapis.com/brain-genomics-public/research/deepconsensus/publication/deepconsensus_predictions/hg002_24kb/two_smrt_cells/HG002_24kb_132517_061936_2fl_DC_hifi_reads.fastq >HG002_24kb_132517_061936_2fl_DC_hifi_reads.10GB.fastq
-
-# TODO: add curl -r 0-1073741823 https://storage.googleapis.com/brain-genomics-public/research/deepconsensus/publication/deepconsensus_predictions/hg002_24kb/two_smrt_cells/HG002_24kb_132517_061936_2fl_DC_hifi_reads.fastq >HG002_24kb_132517_061936_2fl_DC_hifi_reads.1GB.fastq
-# TODO: `seqtk seq -AU` for mapquik
-# TODO: `seqtk seq -A HG002_24kb.fastq >HG002_24kb.fa`
-
-# new HG002 dataset
-# https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/scratch/HG002/sequencing/hifirevio/m84005_220827_014912_s1.hifi_reads.fastq.gz
 
 #EDLIB_BIN = ~/libs/edlib/build/bin/edlib-aligner
 #VERITYMAP_BIN = ~/libs/VerityMap/veritymap/main.py

@@ -1,17 +1,19 @@
 # Evaluations technical details
 
+We ran all tools on a single thread of a mainstream laptop with a 13th Gen Intel
+Core i5-1335U x 12 processor, 40 GB memory, running Pop!_OS 22.04 LTS.
+
 ## References
 - **CHM13v2.0.fa** [3GB] ([repo](https://github.com/marbl/CHM13), [url](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/chm13v2.0.fa)) -- 
 - **CHM13v2.0chrY.fa** [61MB]: ChrY extracted from **CHM13v2.0.fa**
 - **hg002v1.1.fa** [5.7G] ([repo](https://github.com/marbl/HG002), [url](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.1.fasta.gz)) -- diploid with X, Y and mitochondria
 
 ## Real reads                        
-- **HG002_24kb.fa** [60GB] (**HG002-rep1** from [repo](https://github.com/marbl/HG002/blob/main/Sequencing_data.md)) -- convert fastq.gz to fasta with only upper case letters (`mapquik` requires upper case):
+- **HG002.fa** [84GB, 28x coverage of CHM13v2.0] (**HG002-rep1** from [repo](https://github.com/marbl/HG002/blob/main/Sequencing_data.md)):
 ```bash
-wget https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/scratch/HG002/sequencing/hifirevio/m84005_220827_014912_s1.hifi_reads.fastq.gz
-#> curl -r 0-64424509440 https://storage.googleapis.com/brain-genomics-public/research/deepconsensus/publication/deepconsensus_predictions/hg002_24kb/two_smrt_cells/HG002_24kb_132517_061936_2fl_DC_hifi_reads.fastq
-seqtk seq -AU
-seqtk seq -A HG002_24kb.fastq >HG002_24kb.fa
+wget -O HG002.fq.gz https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/scratch/HG002/sequencing/hifirevio/m84005_220827_014912_s1.hifi_reads.fastq.gz
+gunzip HG002.fq.gz
+seqtk seq -AU HG002.fq >HG002.fa  # convert to fasta with all capital letters
 ```
 
 ## Read simulation
@@ -21,20 +23,20 @@ seqtk seq -A HG002_24kb.fastq >HG002_24kb.fa
 
 Simulate reads from **ChrY** of **CHM13** and map them on the same chromosome.
 ```bash
-pbsim --strategy wgs --method sample --sample hg002_24kb.fa --genome CHM13v2.0chrY.fa --depth 20 --prefix HG002-readschm13-a0.99-d0.1-l10000
+pbsim --strategy wgs --method sample --sample HG002.fa --genome CHM13v2.0chrY.fa --depth 20 --prefix HG002-readschm13-a0.99-d0.1-l10000
 ```
 
-Simulate reads from **HG002** and map them on **CHM13** (note that the 10x depth is
-calculated based on the diploid **HG002** genome, which is roughtly 20x on
-**CHM13**):
+Simulate reads from **hg002v1.1** and map them on **CHM13v2.0** (note that the
+10x depth is calculated based on the diploid **hg002v1.1** genome, which is
+roughtly 20x on **CHM13v2.0**):
 ```bash
-pbsim --strategy wgs --method sample --sample HG002_24kb.fa --genome hg002v1.1.fa --depth 10 --prefix $(READS)
+pbsim --strategy wgs --method sample --sample HG002.fa --genome hg002v1.1.fa --depth 10 --prefix $(READS)
 python convert_fasta_with_args.py -f $(READS) -c hg002v1.1_to_CHM13v2.0.chain -o $(READS).lifted; \
 ```
 where
 - `convert_fasta_with_args.py`: script that takes fasta with pbsim ground-truth coordinates in the descriptions, and lifts them using a chain file 
 - [liftOver](https://genome.ucsc.edu/goldenPath/help/hgTracksHelp.html#Liftover)
-- [hg002v1.1_to_CHM13v2.0.chain](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/changes/hg002v1.1_to_CHM13v2.0.chain.gz) [12M] -- chain file to lift read coordinates from **HG002** to **CHM13**; reads that cannot be lifted are discarded (<5% of the reads)
+- [hg002v1.1_to_CHM13v2.0.chain](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/changes/hg002v1.1_to_CHM13v2.0.chain.gz) [12M] -- chain file to lift read coordinates from **HG002** to **CHM13**; reads that cannot be lifted are discarded (~5.3% of the reads)
 
 ## Compared mappers
 - [minimap2](https://github.com/lh3/minimap2) (commit [618d335](https://github.com/lh3/minimap2/commit/618d335))
@@ -43,3 +45,19 @@ where
 - [BLEND](https://github.com/CMU-SAFARI/BLEND) (commit [6f19e37](https://github.com/CMU-SAFARI/BLEND/commit/6f19e37))
 - [shmap](https://github.com/pesho-ivanov/shmap) (commit **TODO**)
 
+The reference $(REF) and the reads $(READS) are in fasta format:
+```
+minimap2 -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) >out.paf
+meryl count k=15 output merylDB $(REF)
+meryl print greater-than distinct=0.9998 merylDB >repetitive_k15.txt
+winnowmap -W repetitive_k15.txt -x map-pb -t 1 --secondary=no --sv-off -M 0 --hard-mask-level $(REF) $(READS) >out.paf 
+mapquik $(READS) --reference $(REF) --threads 1 -p out
+blend -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) >out.paf 
+shmap -s $(REF) -p $(READS) -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) >out.paf
+```
+
+## Measurements
+- `time`: We measure the runtime and memory usage of each tool using the linux
+  `time` command. To measure only the indexing time, we first run each tool on a
+  single read (assuming that most time is spent on indexing). To measure the
+  mapping time, we run each tool on the entire dataset, and substract the indexing time.
