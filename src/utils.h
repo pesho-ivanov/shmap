@@ -144,4 +144,14 @@ public:
 	}
 };
 
+#define PBSTR "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||"
+#define PBWIDTH 60
+
+inline void printProgress(std::ostream& os, double progress, const std::string& msg) {
+    int val = (int) (progress * 100);
+    int lpad = (int) (progress * PBWIDTH);
+    int rpad = PBWIDTH - lpad;
+    os << "\r" << std::setw(3) << val << "% [" << std::string(lpad, '|') << std::string(rpad, ' ') << "] " << msg << std::flush;
+}
+
 } // namespace sweepmap

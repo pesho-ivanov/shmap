@@ -209,7 +209,7 @@ public:
 			}
 		}
 
-		read_fasta_klib(pFile, [this, &paulout, &unmapped_out](const string &query_id, const string &P) {
+		read_fasta_klib(pFile, [this, &paulout, &unmapped_out](const string &query_id, const string &P, float progress) {
 			H->C.inc("reads");
 			H->T.stop("query_reading");
 			H->T.start("query_mapping");
@@ -395,10 +395,14 @@ public:
 
 				*os << endl;
 			H->T.stop("output");
+			string msg = std::to_string(H->C.count("mapped_reads")) + " mapped reads";
+			printProgress(std::cerr, progress, msg);
+
 			H->T.start("query_reading");
 		});
 		H->T.stop("query_reading");
 		H->T.stop("mapping");
+		std::cerr << std::endl;  // for the progress bar
 
 		print_stats();
 		print_time_stats();

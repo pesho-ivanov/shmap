@@ -158,7 +158,7 @@ public:
 		H->T.start("indexing");
 		cerr << "Indexing " << tFile << "..." << endl;
 		H->T.start("index_reading");
-		read_fasta_klib(tFile, [this](const string &segm_name, const string &T) {
+		read_fasta_klib(tFile, [this](const string &segm_name, const string &T, float progress) {
 			H->T.stop("index_reading");
 			H->T.start("index_sketching");
 			sketch_t t = H->sketcher.sketch(T);
@@ -168,8 +168,12 @@ public:
 			add_segment(segm_name, T, t);
 			H->T.stop("index_initializing");
 
+			string msg = std::to_string(H->C.count("segments")) + " indexed segment" + (H->C.count("segments") == 1 ? "" : "s");
+			printProgress(std::cerr, progress, msg);
+
 			H->T.start("index_reading");
 		});
+		cerr << std::endl;
 
 		// if a kmer is present in both single and multi, we move it out of single to multi
 		for (auto &[h, hits] : h2multi) {
