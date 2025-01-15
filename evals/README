@@ -16,12 +16,30 @@ gunzip HG002.fq.gz
 seqtk seq -AU HG002.fq >HG002.fa  # convert to fasta with all capital letters
 ```
 
+## Statistics
+
+Statistics reported by `seqkit stats`:
+
+References:
+
+    file                                      num_seqs        sum_len     min_len        avg_len      max_len
+    refs/chm13v2.0chrY.fa                            1     62,460,029  62,460,029     62,460,029   62,460,029
+    refs/chm13v2.0.fa                               25  3,117,292,070      16,569  124,691,682.8  248,387,328
+    refs/hg002v1.1.fa                               47  5,999,424,718      16,570  127,647,334.4  252,060,741
+
+Reads:
+
+    file                                      num_seqs         sum_len  min_len   avg_len  max_len
+    chm13v2.0chrY-readschm13v2.0chrY-d20.fa     82,723   1,249,206,486      782  15,101.1   40,905
+    chm13v2.0-readshg002v1.1-d10.fa          2,336,574  56,528,396,844      897  24,192.9   49,220
+    HG002.fa                                 5,531,855  84,284,194,579      225  15,236.2   56,840
+
 ## Read simulation
 - [pbsim3](https://github.com/yukiteruono/pbsim3) (commit [8429f91](https://github.com/yukiteruono/pbsim3/commit/8429f91)) -- for simulating reads
 - [seqkit](https://github.com/shenwei356/seqkit) (v2.9.0) -- for indexing the reference and shuffling simulated reads
 - [paftools](https://github.com/lh3/minimap2/blob/master/misc/paftools.js) (v2.26-r1175) -- for generating read descriptions with ground truth locations (requires [k8](https://github.com/attractivechaos/k8))
 
-Simulate reads from **ChrY** of **CHM13** and map them on the same chromosome.
+Simulate reads from **ChrY** of **CHM13** and map them on the same chromosome. The simulation is done by `pbsim3` by using the error profiles of **HG002.fq** (AvgQual=23.15, 96.01% reads with >= Q20, 90.52% reads with >= Q30)
 ```bash
 pbsim --strategy wgs --method sample --sample HG002.fa --genome CHM13v2.0chrY.fa --depth 20 --prefix HG002-readschm13-a0.99-d0.1-l10000
 ```
@@ -57,7 +75,8 @@ shmap -s $(REF) -p $(READS) -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVER
 ```
 
 ## Measurements
-- `time`: We measure the runtime and memory usage of each tool using the linux
-  `time` command. To measure only the indexing time, we first run each tool on a
-  single read (assuming that most time is spent on indexing). To measure the
-  mapping time, we run each tool on the entire dataset, and substract the indexing time.
+- `time -f "%U\t%M"`: We measure the runtime (total number of CPU-seconds) and
+  memory usage (maximum resident set size) of each tool. To measure only the
+  indexing time, we first run each tool on a single read (assuming that most
+  time is spent on indexing). To measure the mapping time, we run each tool on
+  the entire dataset, and substract the indexing time.
