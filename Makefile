@@ -22,10 +22,10 @@ SRCS = src/map.cpp src/mapper.cpp src/io.cpp ext/edlib.cpp
 OBJS = $(SRCS:.cpp=.o)
 DEPS = $(OBJS:.o=.d)
 
-MINIMAP_BIN = minimap2
+MINIMAP_BIN = ~/libs/minimap2-2.26_x64-linux/minimap2
 MM2_BIN = ~/libs/mm2-fast/minimap2
 BLEND_BIN = ~/libs/blend/bin/blend
-MAPQUIK_BIN = mapquik
+MAPQUIK_BIN = ~/libs/mapquik/target/release/mapquik
 MERYL_BIN = ~/libs/Winnowmap/bin/meryl
 WINNOWMAP_BIN = ~/libs/Winnowmap/bin/winnowmap
 SURVIVOR_BIN = ~/libs/SURVIVOR/Debug/SURVIVOR
@@ -81,10 +81,12 @@ ALLOUT_DIR = $(DIR)/out
 #OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)/k$(K)-r$(R)-s$(S)-m$(M)-t$(T)
 OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 
-PBSIM    = pbsim
-SAMTOOLS = samtools
-PAFTOOLS = ./ext/paftools.js
-SEQKIT   = ~/miniconda3/bin/seqkit
+REAL_READS = $(ALLREADS_DIR)/HG002_24kb.fastq
+PBSIM3     = ~/libs/pbsim3/src/pbsim
+#PBSIM1     = pbsim
+#SAMTOOLS   = samtools
+PAFTOOLS   = ./ext/paftools.js
+SEQKIT     = ~/miniconda3/bin/seqkit
 
 LIFT_FASTA = $(DIR)/convert_fasta_with_args.py
 CHAIN_FILE = $(DIR)/refs/hg002v1.1_to_CHM13v2.0.chain
@@ -127,21 +129,25 @@ simulate_SVs:
 
 gen_reads:
 ifeq ($(wildcard $(READS)),)
-	echo $(READS)
-	mkdir -p $(ALLREADS_DIR)
-	sed -i 's/^\(>[^[:space:]]*\).*/\1/' $(READSIM_REF)
-	$(PBSIM) \
-		   $(READSIM_REF) \
-		   --model_qc $(DIR)/model_qc_clr \
-		   --accuracy-mean $(ACCURACY)\
-		   --accuracy-sd 0\
-		   --depth $(DEPTH)\
-		   --prefix $(READS_PREFIX)\
-		   --length-mean $(MEANLEN)
+#	echo $(READS)
+#	mkdir -p $(ALLREADS_DIR)
+#	sed -i 's/^\(>[^[:space:]]*\).*/\1/' $(READSIM_REF)
+#
+#	$(PBSIM3) --strategy wgs --method sample --sample $(REAL_READS) --genome $(READSIM_REF) --depth $(DEPTH) --prefix $(READS_PREFIX) --no-fastq 1
 
-	$(SAMTOOLS) faidx $(READSIM_REF)
+#	$(PBSIM1) \
+#		   $(READSIM_REF) \
+#		   --model_qc $(DIR)/model_qc_clr \
+#		   --accuracy-mean $(ACCURACY)\
+#		   --accuracy-sd 0\
+#		   --depth $(DEPTH)\
+#		   --prefix $(READS_PREFIX)\
+#		   --length-mean $(MEANLEN)
+
+#	$(SAMTOOLS) faidx $(READSIM_REF)
+	$(SEQKIT) faidx $(READSIM_REF)
 	$(PAFTOOLS) pbsim2fq $(READSIM_REF).fai "$(READS_PREFIX)"_*.maf >$(READS).unshuf
-	$(SEQKIT) shuffle $(READS).unshuf -o $(READS)
+	$(SEQKIT) shuffle -2 $(READS).unshuf -o $(READS)
 	rm -f "$(READS_PREFIX)"_*.maf "$(READS_PREFIX)"_*.ref "$(READS_PREFIX)"_*.fastq
 
 	@if [ "$(READSIM_REFNAME)" != "$(REFNAME)" ]; then \
@@ -254,20 +260,18 @@ eval_mapquik: gen_reads
 	-paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
 #eval_tools: eval_shmap eval_shmap_noprune eval_minimap eval_mapquik eval_blend #eval_winnowmap #eval_shmap_onesweep #eval_mm2 
-eval_tools: eval_minimap eval_mapquik eval_blend eval_winnowmap # eval_shmap
+eval_tools: eval_minimap eval_mapquik eval_blend #eval_winnowmap # eval_shmap
 
 eval_tools_on_datasets:
-#	make eval_tools REFNAME=t2tChrY DEPTH=10
-#	make eval_tools REFNAME=chm13   DEPTH=1
-#	make eval_tools REFNAME=t2tChrY DEPTH=10  MEANLEN=24000
-#	make eval_tools REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
-	make eval_tools REFNAME=chm13   READS_PREFIX=hg002_hifi_10000
+#	make eval_tools REFNAME=chm13v2.0 READS_PREFIX=HG002_24kb_10G
+#	make eval_tools REFNAME=t2tChrY DEPTH=20
+	make eval_tools REFNAME=chm13v2.0 READSIM_REFNAME=hg002v1.1 DEPTH=10
 
 eval_shmap_on_datasets:
-	make eval_shmap REFNAME=t2tChrY DEPTH=10
-	make eval_shmap REFNAME=chm13v2.0   DEPTH=1
-	make eval_shmap REFNAME=t2tChrY DEPTH=10 	MEANLEN=24000
-	make eval_shmap REFNAME=chm13v2.0   READS_PREFIX=HG002_24kb_10G
+	make eval_shmap REFNAME=t2tChrY   DEPTH=10
+	make eval_shmap REFNAME=chm13v2.0 DEPTH=1
+	make eval_shmap REFNAME=t2tChrY   DEPTH=10 	MEANLEN=24000
+	make eval_shmap REFNAME=chm13v2.0 READS_PREFIX=HG002_24kb_10G
 	make eval_shmap REFNAME=chm13v2.0 READSIM_REFNAME=hg002v1.1 DEPTH=10
 
 eval_winnowmap_on_datasets:
