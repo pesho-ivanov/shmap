@@ -41,4 +41,5 @@ evals/simple_test_gt.paf
 debug_flag
 src/fa2tsv
 *.tsv
+*.paf
 *.zip

@@ -3,6 +3,7 @@
 #include <set>
 #include <map>
 
+#include "analyse_simulated.h"
 #include "index.h"
 #include "io.h"
 #include "sketch.h"
@@ -37,35 +38,32 @@ namespace sweepmap {
 class SHSingleReadMapper {
 	const SketchIndex &tidx;
 	Handler *H;
-	Matcher &matcher;
-	const string &query_id;
-	const string &P;
-	ofstream &paulout;
+	Matcher matcher;
 
-	Counters C;
+public:
+	//typedef pair<bucket_t, qpos_t> Bucket;
+	//using Buckets = std::unordered_map<bucket_t, qpos_t>;
+	//using Buckets = gtl::flat_hash_map<bucket_t, qpos_t>;
+	//using Buckets = ankerl::unordered_dense::map<bucket_t, qpos_t>;
+	//using Hist = unordered_map<hash_t, qpos_t>;
+	//using Hist = gtl::flat_hash_map<hash_t, qpos_t>;
 
-	using SeedSpan = span<const Seed>;
-
-public: // for testing
-	// Returns (matched_kmers, m), where:
-	// `matched_kmers` is the list of kmers in sketch `p` (without repetitions, sorted by increasing number of hits in `tidx`)
-	// `m` is the total number of kmers in sketch `p` (including multiples)
-	pair<Seeds, qpos_t> select_elements(sketch_t& p) {
-		H->T.start("collect_element_info");
-			int nonzero = 0;
-			Seeds matched_elements;
-			// After sorting, repetitive elements are next to each other.
-			sort(p.begin(), p.end(), [](const El &a, const El &b) { return a.h < b.h; }); 
+	// Returns unique kmers with at least one match in T
+	Seeds select_kmers(sketch_t& p_all, int &nonzero) {
+		H->T.start("seeding");
+		H->T.start("collect_kmer_info");
+			Seeds kmers;
+			sort(p_all.begin(), p_all.end(), [](const Kmer &a, const Kmer &b) { return a.h < b.h; });
 			qpos_t strike = 0;
-			for (size_t ppos = 0; ppos < p.size(); ++ppos) {
+			for (size_t ppos = 0; ppos < p_all.size(); ++ppos) {
 				++strike;
-				if (ppos == p.size()-1 || p[ppos].h != p[ppos+1].h) {
-					rpos_t hits_in_t = tidx.count(p[ppos].h);
+				if (ppos == p_all.size()-1 || p_all[ppos].h != p_all[ppos+1].h) {
+					rpos_t hits_in_t = tidx.count(p_all[ppos].h);
 					if (hits_in_t > 0) {
 						nonzero += strike;
 					}
 						if (H->params.max_matches == -1 || hits_in_t <= H->params.max_matches) {
-							Seed el(p[ppos], hits_in_t, strike, matched_elements.size());
+							Seed el(p_all[ppos], hits_in_t, kmers.size());
 							//strike = 1; // comment out for Weighted metric
 							matched_elements.push_back(el);
 							if (H->params.max_seeds != -1 && (rpos_t)matched_elements.size() >= H->params.max_seeds)  // TODO maybe account for occs_in_p
@@ -173,8 +171,7 @@ public: // for testing
 		return 1.0 - double(seeds - matches) / p;
 	}
 
-	bool seed_heuristic_pass(const vector<Mapping> &maps, SeedSpan remainingElemenets, qpos_t m, Buckets::Bucket b, rpos_t seed_matches,
-							 qpos_t seeds, int best_idx, double *lowest_sh, double thr_init) {
+	bool seed_heuristic_pass(const Seeds &kmers, qpos_t m, Buckets::Bucket b, rpos_t seed_matches, qpos_t i, qpos_t seeds, int best_idx, double *lowest_sh, double thr) {
 		if (H->params.no_bucket_pruning)
 			return true;
 
@@ -182,8 +179,7 @@ public: // for testing
 		*lowest_sh = 1.0; // should only get lower
 		double thr2 = best_idx == -1 ? thr_init : maps[best_idx].score()-H->params.best_score_delta;  // TODO: add a parameter for 0.015
 
-		if (hseed(m, seeds, seed_matches) < thr2) {
-			H->T.stop("seed_heuristic");
+		if (hseed(m, seeds, seed_matches) < thr)
 			return false;
 		}
 
@@ -196,7 +192,7 @@ public: // for testing
 			double sh = hseed(m, seeds, seed_matches);
 			assert(sh <= *lowest_sh);
 			*lowest_sh = min(*lowest_sh, sh);	
-			if (sh < thr2) {
+			if (sh < thr) {
 				ret = false;
 				break;
 			}
@@ -205,8 +201,8 @@ public: // for testing
 		return ret;
 	}
 	
-	void match_rest(qpos_t lmax, qpos_t m, SeedSpan remainingElemenets, const Buckets &B, Hist &diff_hist, int seeds_with_repeats,
-					const unordered_map<hash_t, Seed> &p_ht, vector<Mapping> &maps, int &best_idx, double thr_init, int forbidden_idx) {	
+	void match_rest(qpos_t P_sz, qpos_t lmax, qpos_t m, const Seeds &kmers, const Buckets &B, Hist &diff_hist, int seeds, int first_kmer_after_seeds, const unordered_map<hash_t, Seed> &p_ht,
+			vector<Mapping> &maps, int &total_matches, int &best_idx, int &final_buckets, double thr, int forbidden_idx, const string &query_id, int *lost_on_pruning, double max_overlap) {
 		double best_J = -1.0;
 
 		int lost_on_seeding = (0);
@@ -218,9 +214,10 @@ public: // for testing
 		H->T.start("sweep"); H->T.stop("sweep");
 		for (auto b_it = B.ordered_begin(); b_it != B.ordered_end(); ++b_it) {
 			double lowest_sh;
-			if (seed_heuristic_pass(maps, remainingElemenets, m, b_it->first, b_it->second, seeds_with_repeats, best_idx, &lowest_sh, thr_init)) {
-				if (matcher.do_overlap(query_id, b_it->first))
-					C["lost_on_pruning"] = 0;
+			if (seed_heuristic_pass(kmers, m, b_it->first, b_it->second, first_kmer_after_seeds, seeds, best_idx, &lowest_sh, thr)) {
+				//cerr << forbidden_idx << ", passed SH:" << b_it->first << " " << b_it->second << endl;
+				//if (matcher.do_overlap(query_id, b_it->first))
+				//	*lost_on_pruning = 0;
 				H->T.start("match_collect");
 					Matches M = matcher.collect_matches(b_it->first, p_ht);
 				H->T.stop("match_collect");
@@ -231,12 +228,13 @@ public: // for testing
 					auto best_in_bucket = matcher.bestFixedLength(M, P.size(), lmax, m, Metric::CONTAINMENT_INDEX);
 					best_in_bucket.set_bucket(b_it->first);
 					assert(best_in_bucket.score() <= lowest_sh + 1e-7);
-					if (best_in_bucket.score() >= H->params.theta) {
+					if (best_in_bucket.score() >= thr) {
 						maps.emplace_back(best_in_bucket);
 						if (best_in_bucket.score() > best_J) {
-							if (forbidden_idx == -1 || Mapping::overlap(maps.back(), maps[forbidden_idx]) < 0.5) {
+							if (forbidden_idx == -1 || Mapping::overlap(maps.back(), maps[forbidden_idx]) < max_overlap) {
 								best_J = max(best_J, best_in_bucket.score());
 								best_idx = maps.size()-1;
+								thr = best_in_bucket.score();
 							}
 						}
 					}
@@ -458,28 +456,204 @@ public:
 		ofstream paulout;
 #ifdef DEBUG
 		string pauls_fn = H->params.paramsFile + ".paul.tsv";
+		string unmapped_fn = H->params.paramsFile + ".unmapped.paf";
+		ofstream paulout;
+		ofstream unmapped_out;
 		if (!H->params.paramsFile.empty()) {
-			cerr << "Paul's experiment to " << pauls_fn << endl;
-			paulout = ofstream(pauls_fn);
+			cerr << "Unmapped reads to " << unmapped_fn << endl;
+			unmapped_out = ofstream(unmapped_fn);
+			if (H->params.verbose >= 2) {
+				cerr << "Paul's experiment to " << pauls_fn << endl;
+				paulout = ofstream(pauls_fn);
+			}
 		}
-#endif
 
-		read_fasta_klib(pFile, [this, &paulout](const string &query_id, const string &P) {
+		read_fasta_klib(pFile, [this, &paulout, &unmapped_out](const string &query_id, const string &P) {
 			H->C.inc("reads");
 			H->T.stop("query_reading");
+			H->T.start("query_mapping");
+				H->T.start("sketching");
+					//const char *P = seq->seq.s;
+					sketch_t p_all = H->sketcher.sketch(P);
+					H->T.stop("sketching");
 
-			SHSingleReadMapper mapper(tidx, H, matcher, query_id, P, paulout);
-			mapper.map_read(H->params.theta);
+				H->T.start("prepare");
+					//char *query_id = seq->name.s;
+					//qpos_t P_sz = (qpos_t)seq->seq.l;
+					qpos_t P_sz = P.size();
 
-			//for (double theta = 0.85; theta >= H->params.theta; theta -= 1.0)
-			//	if (mapper.map_read(theta) != MapResult::NONE)
-			//		break;
+					H->C.inc("read_len", P_sz);
 
-			//if (mapper.map_read(0.8) == MapResult::NONE) {
-			//	mapper.map_read(H->params.theta);
-			//	H->C["repeated_mappings"] += 1;
-			//}
+					int nonzero = 0;
+					Seeds kmers = select_kmers(p_all, nonzero);
+					qpos_t m = 0;
+					for (const auto kmer: kmers)
+						m += kmer.occs_in_p;
+					assert(m <= (int)p_all.size());
+					H->C.inc("kmers_notmatched", m - nonzero);
+					//cerr << "notmatched: " << m - nonzero << endl;
 
+					unordered_map<hash_t, Seed> p_ht;
+					Hist diff_hist;
+					rpos_t possible_matches(0);
+					for (const auto kmer: kmers) {
+						p_ht.insert(make_pair(kmer.kmer.h, kmer));
+						//diff_hist[kmer.kmer.h] = 1;
+						diff_hist[kmer.kmer.h] = kmer.occs_in_p;
+						possible_matches += kmer.hits_in_T;
+					}
+					H->C.inc("possible_matches", possible_matches);
+					matcher.update(diff_hist);
+
+					//qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
+					//qpos_t lmin = qpos_t(ceil(p.size() * H->params.theta));					// maximum length of a similar mapping
+					//qpos_t lmax = qpos_t(p.size() / H->params.theta);					// maximum length of a similar mapping
+					qpos_t lmax = p_all.size();					// maximum length of a similar mapping
+					//qpos_t bucket_l = lmax;
+
+					//double coef = 1.0;// * nonzero / p.size();
+					//cerr << "coef: " << coef << endl;
+					double new_theta = H->params.theta;
+					//cerr << "theta: " << H->params.theta << " -> " << new_theta << endl;
+
+					qpos_t S = qpos_t((1.0 - new_theta) * m) + 1;			// any similar mapping includes at least 1 seed match
+					Buckets B(lmax);  			// B[segment][b] -- #matched kmers[0...i] in [bl, (b+2)l)
+					qpos_t seeds = 0;
+
+					H->C.inc("kmers_sketched", p_all.size());
+					H->C.inc("kmers", m);
+					H->C.inc("kmers_unique", kmers.size());
+					H->C.inc("kmers_seeds", S);
+				H->T.stop("prepare");
+
+				H->T.start("match_seeds");
+					int matches_in_B = 0;
+					rpos_t seed_matches(0), max_seed_matches(0), seeded_buckets(0);  // stats
+					qpos_t i = 0;
+					for (; i < (qpos_t)kmers.size() && seeds < S; i++) {
+						Seed seed = kmers[i];
+						if (seed.hits_in_T > 0) {
+							seed_matches += seed.hits_in_T;
+							max_seed_matches = max(max_seed_matches, seed.hits_in_T);
+							Matches seed_matches;
+							tidx.get_matches(&seed_matches, seed);
+
+							//auto B2 = B;	
+							//////////////// correct B
+							Buckets b2m(B.get_bucket_len());
+							for (auto &m: seed_matches) {
+								//rpos_t b(m.hit.tpos / B.get_bucket_len());
+								b2m.assign_to_pos(Buckets::Pos(m.hit.segm_id, m.hit.tpos), seed.occs_in_p);
+								//if (b > 0) b2m.add_to_bucket(bucket_t(m.hit.segm_id, b-1), seed.occs_in_p);
+							}
+							for (auto it = b2m.unordered_begin(); it != b2m.unordered_end(); ++it) {
+								//B[b] += min(seed.occs_in_p, matches);
+								B.add_to_bucket(it->first, it->second);
+								matches_in_B += it->second;
+							}
+
+							//bucket_t prev_b(-1, -1);
+							//int matches_in_prev_bucket = 0;
+							//for (int i=0; i < (int)seed_matches.size();) {
+							//	bucket_t curr_b(seed_matches[i].hit.segm_id, seed_matches[i].hit.tpos / bucket_l);
+							//	
+							//	if (prev_b.segm_id != -1 && (curr_b.segm_id != prev_b.segm_id || curr_b.b != prev_b.b + 1)) {
+							//		B2[prev_b] += min(matches_in_prev_bucket, seed.occs_in_p);
+							//		matches_in_prev_bucket = 0;
+							//	}
+
+							//	int matches_in_curr_bucket = 1;
+							//	while (++i < (int)seed_matches.size()
+							//			&& seed_matches[i].hit.tpos / lmax == curr_b.b
+							//			&& seed_matches[i].hit.segm_id == curr_b.segm_id) {
+							//		++matches_in_curr_bucket;
+							//	}
+							//	prev_b = curr_b;
+							//	if (--curr_b.b >= 0) {
+							//		B2[curr_b] += min(matches_in_prev_bucket + matches_in_curr_bucket, seed.occs_in_p);
+							//	}
+
+							//	matches_in_prev_bucket = matches_in_curr_bucket;
+							//}
+							//if (prev_b.segm_id != -1)
+							//	B2[prev_b] += min(matches_in_prev_bucket, seed.occs_in_p);
+						}
+						seeds += seed.occs_in_p;
+					}
+					seeded_buckets = B.size();
+					H->C.inc("seeded_buckets", seeded_buckets);
+					H->C.inc("seed_matches", seed_matches);
+				H->T.stop("match_seeds");
+
+				//int lost_on_seeding = matcher.lost_correct_mapping(query_id, B);
+				//H->C.inc("lost_on_seeding", lost_on_seeding);
+
+				//	cerr << "seeded buckets:" << b_it->first << " " << b_it->second << endl;
+				//}
+
+				int lost_on_pruning = 1;
+				H->T.start("match_rest");
+					vector<Mapping> maps;
+					//vector<Bucket> B_vec(B.begin(), B.end());
+					//sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
+					int total_matches=seed_matches, best_idx=-1, best2_idx=-1, final_buckets;
+					double best_thr = H->params.theta;
+					match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, best_thr, -1, query_id, &lost_on_pruning, H->params.max_overlap);
+					auto [FP, PP, FDR, FPTP] = tuple(-1, -1, -1, -1);
+					//auto [FP, PP, FDR, FPTP] = calc_FDR(maps, H->params.theta, lmax, bucket_l, tidx, p_ht, P_sz, lmin, m, diff_hist);
+					H->C.inc("FP", FP);
+					H->C.inc("PP", PP);
+					H->C.inc("FDR", FDR);
+					H->C.inc("FPTP", FPTP);
+
+					//cerr << "best_idx: " << best_idx << " " << maps[best_idx] << endl;
+
+					if (best_idx != -1) {
+						// find second best mapping for mapq computation
+						double second_best_thr = maps[best_idx].score() - H->params.min_diff;
+						match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, second_best_thr, best_idx, query_id, &lost_on_pruning, H->params.max_overlap);
+					}
+				H->T.stop("match_rest");
+				H->C.inc("lost_on_pruning", lost_on_pruning);
+			H->T.stop("query_mapping");
+
+			H->T.start("output");
+				std::ostream* os;
+				Mapping best;
+				if (best_idx != -1) {
+					best = maps[best_idx];
+					//const auto &segm = tidx.T[m.segm_id()];
+					//m.set_local_stats(segm);
+					if (best2_idx != -1)
+						best.set_second_best(maps[best2_idx]);
+
+					if (best.mapq() == 60) H->C.inc("mapq60");
+					H->C.inc("matches_in_reported_mappings", best.intersection());
+					H->C.inc("J_best", rpos_t(10000.0*best.score()));
+					H->C.inc("mappings");
+					H->C.inc("mapped_reads");
+					os = &cout;
+				} else {
+					os = &unmapped_out;
+				}
+				best.set_global_stats(H->params.theta, H->params.min_diff, p_all.size(), query_id.c_str(), P_sz, H->params.k, S, total_matches, max_seed_matches, seed_matches, seeded_buckets, final_buckets, FPTP, H->T.secs("query_mapping"));  // TODO: disable by flag
+				best.print_paf(*os);
+
+				if (H->params.verbose >= 2) {
+					AnalyseSimulatedReads gt(query_id, P, P_sz, diff_hist, m, p_ht, tidx, B, H->params.theta);
+					if (best_idx != -1) {
+						gt.print_paf(cout);
+						auto gt_overlap = Mapping::overlap(gt.gt_mapping, maps[best_idx]);
+						*os << "\tgt_mapping_len:" << (gt.gt_mapping.paf.T_r-gt.gt_mapping.paf.T_l)
+						   << "\treported_mapping_len:" << (maps[best_idx].paf.T_r-maps[best_idx].paf.T_l)
+						   << "\tgt_overlap:" << std::fixed << std::setprecision(3) << gt_overlap;
+					}
+					if (!H->params.paramsFile.empty())
+						gt.print_tsv(paulout);
+				}
+
+				*os << endl;
+			H->T.stop("output");
 			H->T.start("query_reading");
 		});
 		H->T.stop("query_reading");

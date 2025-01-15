@@ -11,6 +11,7 @@
 namespace sweepmap {
 
 class AnalyseSimulatedReads {
+public:
 	const string &query_id;
 	const string &P;
 	const int P_sz;
@@ -22,6 +23,30 @@ class AnalyseSimulatedReads {
 	const double theta;
 
 	Matcher matcher;
+
+	// calculated
+	int bucket_l;
+	qpos_t start, end;
+	int segm_id;
+	string segm_name;
+	vector<Buckets::Bucket> J_buckets;
+	vector<Buckets::Bucket> C_buckets;
+	Buckets::Bucket gt_b_l;
+	Buckets::Bucket gt_b_r; 
+	Buckets::Bucket gt_b_next;
+	Matches gt_M_l;
+	Matches gt_M_r;
+	Matches gt_M_next;
+
+	Mapping gt_mapping;
+	Mapping gt_J_l;
+	Mapping gt_J_r;
+	Mapping gt_J_next;
+	Mapping gt_C_l;
+	Mapping gt_C_r;
+	Mapping gt_C_next;
+	Mapping gt_C_l_lmax;
+	Mapping gt_C_r_lmax;
 
 	tuple<qpos_t, qpos_t, int, string> GT_start_end(const string& query_id) {
 		auto parsed = ParsedQueryId::parse(query_id);
@@ -63,25 +88,30 @@ class AnalyseSimulatedReads {
 
 public:
 	AnalyseSimulatedReads(const string& query_id, const string &P, int P_sz, const Hist &diff_hist, int m, unordered_map<hash_t, Seed> p_ht, const SketchIndex &tidx, const Buckets &B, const double theta)
-	 : query_id(query_id), P(P), P_sz(P_sz), diff_hist(diff_hist), m(m), p_ht(p_ht), tidx(tidx), B(B), theta(theta), matcher(tidx, diff_hist) {}
-
- 	void PaulsExperiment(ofstream &paulout) {
-		int bucket_l = B.get_bucket_len();
+	 : query_id(query_id), P(P), P_sz(P_sz), diff_hist(diff_hist), m(m), p_ht(p_ht), tidx(tidx), B(B), theta(theta), matcher(tidx, diff_hist) {
+		bucket_l = B.get_bucket_len();
 
 		// Ground-truth
-		auto [start, end, segm_id, segm_name] = GT_start_end(query_id);
-		auto gt_b_l 		= Buckets::Bucket(segm_id, max(0, start/bucket_l-1), &B);
-		auto gt_b_r 		= Buckets::Bucket(segm_id, start/bucket_l, &B);
-		auto gt_b_next 		= Buckets::Bucket(segm_id, start/bucket_l+1, &B);
-		auto gt_M_l 		= matcher.collect_matches(gt_b_l, p_ht);
-		auto gt_M_r 		= matcher.collect_matches(gt_b_r, p_ht);
-		auto gt_J_l			= matcher.bestIncludedJaccard(gt_M_l, P_sz, end-start-2, end-start+2, m);
-		auto gt_J_r			= matcher.bestIncludedJaccard(gt_M_r, P_sz, end-start-2, end-start+2, m);
-		auto gt_C_l			= matcher.bestFixedLength(gt_M_l, P_sz, 2*bucket_l, m, Metric::CONTAINMENT_INDEX);
-		auto gt_C_r			= matcher.bestFixedLength(gt_M_r, P_sz, 2*bucket_l, m, Metric::CONTAINMENT_INDEX);
-		auto gt_C_l_lmax 	= matcher.bestFixedLength(gt_M_l, P_sz, bucket_l, m, Metric::CONTAINMENT_INDEX);
-		auto gt_C_r_lmax 	= matcher.bestFixedLength(gt_M_r, P_sz, bucket_l, m, Metric::CONTAINMENT_INDEX);
+		auto parsed_orig = ParsedQueryId::parse(query_id);
+		const auto &segm = tidx.get_segment(parsed_orig.segm_id);
+		gt_mapping.paf = MappingPAF(0, P_sz, parsed_orig.strand, segm.name.c_str(), segm.sz, segm.id, parsed_orig.start_pos, parsed_orig.end_pos);
 
+		tie(start, end, segm_id, segm_name) = GT_start_end(query_id);
+		//update(0, P_sz-1, start, end, tidx.T[segm_id], -1, -1, -1, nullptr, nullptr); // TODO: should it be prev(r) instead?
+		gt_b_l 		= Buckets::Bucket(segm_id, max(0, start/bucket_l-1), &B);
+		gt_b_r 		= Buckets::Bucket(segm_id, start/bucket_l, &B);
+		gt_b_next 	= Buckets::Bucket(segm_id, start/bucket_l+1, &B);
+		gt_M_l 		= matcher.collect_matches(gt_b_l, p_ht);
+		gt_M_r 		= matcher.collect_matches(gt_b_r, p_ht);
+		gt_M_next 	= matcher.collect_matches(gt_b_next, p_ht);
+		gt_J_l 		= matcher.bestIncludedJaccard(gt_M_l, P_sz, end-start-2, end-start+2, m);
+		gt_J_r 		= matcher.bestIncludedJaccard(gt_M_r, P_sz, end-start-2, end-start+2, m);
+		gt_J_next 	= matcher.bestIncludedJaccard(gt_M_next, P_sz, end-start-2, end-start+2, m);
+		gt_C_l 		= matcher.bestFixedLength(gt_M_l, P_sz, 2*bucket_l, m, Metric::CONTAINMENT_INDEX);
+		gt_C_r 		= matcher.bestFixedLength(gt_M_r, P_sz, 2*bucket_l, m, Metric::CONTAINMENT_INDEX);
+		gt_C_next 	= matcher.bestFixedLength(gt_M_next, P_sz, 2*bucket_l, m, Metric::CONTAINMENT_INDEX);
+		gt_C_l_lmax = matcher.bestFixedLength(gt_M_l, P_sz, bucket_l, m, Metric::CONTAINMENT_INDEX);
+		
 		// Buckets with Jaccard and Containment index >= theta
 		vector<Buckets::Bucket> J_buckets;
 		vector<Buckets::Bucket> C_buckets;
@@ -111,6 +141,9 @@ public:
 		//gt_C_l.bucket.b
 		//gt_C_right.bucket.b
 
+	}
+
+ 	void print_tsv(ostream &paulout) {
 		// open a new file stream
 		static bool is_first_row = true;
 		if (is_first_row) {
@@ -124,8 +157,10 @@ public:
 					   "\tgt_next_bucket"  // GT one after the right bucket (named for reversed-compatibility of l,r)
 					   "\tgt_J_l"       // GT left bucket: max included Jaccard
 					   "\tgt_J_r"       // GT right bucket: max included Jaccard
+					   "\tgt_J_next"    // GT next bucket: max included Jaccard
 					   "\tgt_C_l"       // GT left bucket: max containment index of mapping of bucket length (2*lmax)
 					   "\tgt_C_r"       // GT right bucket: max containment index of mapping of bucket length (2*lmax)
+					   "\tgt_C_next"    // GT next bucket: max containment index of mapping of bucket length (2*lmax)
 					   "\tgt_C_l_lmax"  // GT left bucket: max containment index of mapping of length lmax
 					   "\tgt_C_r_lmax"  // GT right bucket: max containment index of mapping of length lmax
 					   "\t#J>theta"     // number of buckets that contain a mapping with Jaccard >= theta
@@ -148,8 +183,10 @@ public:
 			<< "\t" << gt_b_next.b					
 			<< "\t" << gt_J_l.score()					
 			<< "\t" << gt_J_r.score()					
+			<< "\t" << gt_J_next.score()					
 			<< "\t" << gt_C_l.score()					
 			<< "\t" << gt_C_r.score()					
+			<< "\t" << gt_C_next.score()					
 			<< "\t" << gt_C_l_lmax.score()			
 			<< "\t" << gt_C_r_lmax.score()			
 			<< "\t" << J_buckets.size()			
@@ -158,6 +195,24 @@ public:
 			<< "\t" << vec2str(C_buckets, bucket_l)
 			<< "\t" << P
 			<< endl;	
+	}
+
+	void print_paf(ostream &out) {
+		out << "\tgt_b_l:i:" << gt_b_l.b
+			<< "\tgt_b_r:i:" << gt_b_r.b
+			<< "\tgt_b_next:i:" << gt_b_next.b
+			<< "\tgt_J_l:f:" << gt_J_l.score()
+			<< "\tgt_J_r:f:" << gt_J_r.score()
+			<< "\tgt_J_next:f:" << gt_J_next.score()
+			<< "\tgt_C_l:f:" << gt_C_l.score()
+			<< "\tgt_C_r:f:" << gt_C_r.score()
+			<< "\tgt_C_next:f:" << gt_C_next.score()
+			<< "\tgt_C_l_lmax:f:" << gt_C_l_lmax.score()
+			<< "\tgt_C_r_lmax:f:" << gt_C_r_lmax.score();
+			//<< "\tgt_C_l_overlap:f:" << Mapping::overlap(m, gt_C_l)
+			//<< "\tgt_C_r_overlap:f:" << Mapping::overlap(m, gt_C_r)
+			//<< "\tgt_C_next_overlap:f:" << Mapping::overlap(m, gt_C_next)
+			//<< endl;	
 	}
 
 };

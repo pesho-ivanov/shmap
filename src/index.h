@@ -23,6 +23,13 @@ public:
 
 	Handler *H;
 
+	const RefSegment& get_segment(const string &segm_id) const {
+		for (const auto &segm: T)
+			if (segm.name == segm_id)
+				return segm;
+		throw std::runtime_error("Segment not found: " + segm_id);
+	}
+
 	void get_kmer_stats() const {
 		std::vector<rpos_t> hist(10, 0);
 		rpos_t max_occ = 0;
