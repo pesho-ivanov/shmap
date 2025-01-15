@@ -4,41 +4,39 @@
 - **CHM13v2.0.fa** [3GB] ([repo](https://github.com/marbl/CHM13), [url](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/chm13v2.0.fa)) -- 
 - **CHM13v2.0chrY.fa** [61MB]: ChrY extracted from **CHM13v2.0.fa**
 - **hg002v1.1.fa** [5.7G] ([repo](https://github.com/marbl/HG002), [url](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.1.fasta.gz)) -- diploid with X, Y and mitochondria
-- **hg002v1.1_to_CHM13v2.0.chain** [12M] ([url](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/changes/hg002v1.1_to_CHM13v2.0.chain.gz)) -- chain file used for 
 
 ## Real reads                        
 - **HG002_24kb.fa** [60GB] (**HG002-rep1** from [repo](https://github.com/marbl/HG002/blob/main/Sequencing_data.md)) -- convert fastq.gz to fasta with only upper case letters (`mapquik` requires upper case):
 ```bash
-> wget https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/scratch/HG002/sequencing/hifirevio/m84005_220827_014912_s1.hifi_reads.fastq.gz
+wget https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/scratch/HG002/sequencing/hifirevio/m84005_220827_014912_s1.hifi_reads.fastq.gz
 #> curl -r 0-64424509440 https://storage.googleapis.com/brain-genomics-public/research/deepconsensus/publication/deepconsensus_predictions/hg002_24kb/two_smrt_cells/HG002_24kb_132517_061936_2fl_DC_hifi_reads.fastq
-> seqtk seq -AU
-> seqtk seq -A HG002_24kb.fastq >HG002_24kb.fa
+seqtk seq -AU
+seqtk seq -A HG002_24kb.fastq >HG002_24kb.fa
 ```
 
 ## Read simulation
-
 - [pbsim3](https://github.com/yukiteruono/pbsim3) (commit [8429f91](https://github.com/yukiteruono/pbsim3/commit/8429f91)) -- for simulating reads
 - [seqkit](https://github.com/shenwei356/seqkit) (v2.9.0) -- for indexing the reference and shuffling simulated reads
 - [paftools](https://github.com/lh3/minimap2/blob/master/misc/paftools.js) (v2.26-r1175) -- for generating read descriptions with ground truth locations (requires [k8](https://github.com/attractivechaos/k8))
 
 Simulate reads from **ChrY** of **CHM13** and map them on the same chromosome.
-
 ```bash
-> pbsim --strategy wgs --method sample --sample HG002_24kb.fa --genome CHM13v2.0chrY.fa --depth 20 --prefix $(READS_PREFIX)
+pbsim --strategy wgs --method sample --sample hg002_24kb.fa --genome CHM13v2.0chrY.fa --depth 20 --prefix HG002-readschm13-a0.99-d0.1-l10000
 ```
 
 Simulate reads from **HG002** and map them on **CHM13** (note that the 10x depth is
 calculated based on the diploid **HG002** genome, which is roughtly 20x on
 **CHM13**):
-
 ```bash
-> pbsim --strategy wgs --method sample --sample HG002_24kb.fa --genome hg002v1.1.fa --depth 10 --prefix $(READS_PREFIX)
+pbsim --strategy wgs --method sample --sample HG002_24kb.fa --genome hg002v1.1.fa --depth 10 --prefix $(READS)
+python convert_fasta_with_args.py -f $(READS) -c hg002v1.1_to_CHM13v2.0.chain -o $(READS).lifted; \
 ```
-
+where
+- `convert_fasta_with_args.py`: script that takes fasta with pbsim ground-truth coordinates in the descriptions, and lifts them using a chain file 
 - [liftOver](https://genome.ucsc.edu/goldenPath/help/hgTracksHelp.html#Liftover)
+- [hg002v1.1_to_CHM13v2.0.chain](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/changes/hg002v1.1_to_CHM13v2.0.chain.gz) [12M] -- chain file to lift read coordinates from **HG002** to **CHM13**; reads that cannot be lifted are discarded (<5% of the reads)
 
 ## Compared mappers
-
 - [minimap2](https://github.com/lh3/minimap2) (commit [618d335](https://github.com/lh3/minimap2/commit/618d335))
 - [winnowmap](https://github.com/marbl/winnowmap) (commit [ddf7257](https://github.com/marbl/Winnowmap/commit/ddf7257))
 - [mapquik](https://github.com/ekimb/mapquik) (commit [d304b38](https://github.com/ekimb/mapquik/commit/d304b38))
