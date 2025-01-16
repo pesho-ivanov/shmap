@@ -34,7 +34,7 @@ INF = 999999
 
 ARGS_SHMAP ?= 
 
-REFNAME ?= t2tChrY
+REFNAME ?= chm13v2.0chrY
 ACCURACY ?= 0.99
 DEPTH ?= 1
 MEANLEN ?= 10000
@@ -259,11 +259,11 @@ eval_mapquik: gen_reads
 	-paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
 #eval_tools: eval_shmap eval_shmap_noprune eval_minimap eval_mapquik eval_blend #eval_winnowmap #eval_shmap_onesweep #eval_mm2 
-eval_tools: eval_minimap eval_mapquik eval_blend #eval_winnowmap # eval_shmap
+eval_tools: eval_blend eval_minimap eval_mapquik #eval_winnowmap # eval_shmap
 
 eval_tools_on_datasets:
-#	make eval_tools REFNAME=chm13v2.0     READS_PREFIX=HG002
-#	make eval_tools REFNAME=chm13v2.0chrY READSIM_REFNAME=chm13v2.0chrY DEPTH=20
+	make eval_tools REFNAME=chm13v2.0     READS_PREFIX=HG002
+	make eval_tools REFNAME=chm13v2.0chrY READSIM_REFNAME=chm13v2.0chrY DEPTH=20
 	make eval_tools REFNAME=chm13v2.0     READSIM_REFNAME=hg002v1.1     DEPTH=10
 
 eval_shmap_on_datasets:
