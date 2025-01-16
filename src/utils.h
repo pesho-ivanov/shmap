@@ -43,8 +43,10 @@ public:
     }
 
     double secs() const {
-		if (running_)
-            throw std::runtime_error("Timer is still running.");
+		if (running_) {
+        //    throw std::runtime_error("Timer is still running.");
+            return std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - start_time_point_).count();
+        }
 		return accumulated_time_;
     }
 
@@ -151,7 +153,7 @@ inline void printProgress(std::ostream& os, double progress, const std::string& 
     int val = (int) (progress * 100);
     int lpad = (int) (progress * PBWIDTH);
     int rpad = PBWIDTH - lpad;
-    os << "\r" << std::setw(3) << val << "% [" << std::string(lpad, '|') << std::string(rpad, ' ') << "] " << msg << std::flush;
+    os << "\r" << msg << std::setw(3) << val << "% [" << std::string(lpad, '|') << std::string(rpad, ' ') << "]" << std::flush;
 }
 
 } // namespace sweepmap

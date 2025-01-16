@@ -13,6 +13,9 @@
 #include "buckets.h"
 #include "refine.h"
 
+//#include "indicators.hpp"
+//using namespace indicators;
+
 namespace sweepmap {
 
 class SHMapper : public Mapper {
@@ -395,8 +398,24 @@ public:
 
 				*os << endl;
 			H->T.stop("output");
-			string msg = std::to_string(H->C.count("mapped_reads")) + " mapped reads";
-			printProgress(std::cerr, progress, msg);
+
+			if (H->C.count("mapped_reads") % 100 == 0) {
+//				std::ostringstream msg_stream;
+//				msg_stream
+//					<< std::fixed << std::setprecision(1)
+//					<< H->C.count("mapped_reads") << " reads: "
+//					<< H->C.perc("mapped_reads", "reads") << "% mapped, ";
+//					//<< H->C.perc("mapq60", "mapped_reads") << "% with Q60";
+//				string msg = msg_stream.str();
+				printProgress(std::cerr, progress, "Mapping");
+				cerr << endl;
+
+				print_stats();
+				print_time_stats();
+
+				cerr << "\033[32A\033[G";
+				cerr.flush();
+			}
 
 			H->T.start("query_reading");
 		});
