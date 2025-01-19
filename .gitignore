@@ -43,3 +43,4 @@ src/fa2tsv
 *.tsv
 *.paf
 *.zip
+out_small

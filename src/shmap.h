@@ -251,8 +251,8 @@ public:
 
 					//qpos_t lmax = qpos_t(m / H->params.theta);					// maximum length of a similar mapping
 					//qpos_t lmin = qpos_t(ceil(p.size() * H->params.theta));					// maximum length of a similar mapping
-					//qpos_t lmax = qpos_t(p.size() / H->params.theta);					// maximum length of a similar mapping
-					qpos_t lmax = p_all.size();					// maximum length of a similar mapping
+					qpos_t lmax = qpos_t(p_all.size() / H->params.theta);					// maximum length of a similar mapping
+					//qpos_t lmax = p_all.size();					// maximum length of a similar mapping
 					//qpos_t bucket_l = lmax;
 
 					//double coef = 1.0;// * nonzero / p.size();
@@ -337,12 +337,15 @@ public:
 
 				int lost_on_pruning = 1;
 				H->T.start("match_rest");
+				H->T.start("match_rest_for_best");
 					vector<Mapping> maps;
 					//vector<Bucket> B_vec(B.begin(), B.end());
 					//sort(B_vec.begin(), B_vec.end(), [](const Bucket &a, const Bucket &b) { return a.second > b.second; });  // TODO: sort intervals by decreasing number of matches
 					int total_matches=seed_matches, best_idx=-1, best2_idx=-1, final_buckets;
 					double best_thr = H->params.theta;
 					match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best_idx, final_buckets, best_thr, -1, query_id, &lost_on_pruning, H->params.max_overlap);
+				H->T.stop("match_rest_for_best");
+
 					auto [FP, PP, FDR, FPTP] = tuple(-1, -1, -1, -1);
 					//auto [FP, PP, FDR, FPTP] = calc_FDR(maps, H->params.theta, lmax, bucket_l, tidx, p_ht, P_sz, lmin, m, diff_hist);
 					H->C.inc("FP", FP);
@@ -352,11 +355,13 @@ public:
 
 					//cerr << "best_idx: " << best_idx << " " << maps[best_idx] << endl;
 
-					if (best_idx != -1) {
-						// find second best mapping for mapq computation
-						double second_best_thr = maps[best_idx].score() - H->params.min_diff;
-						match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, second_best_thr, best_idx, query_id, &lost_on_pruning, H->params.max_overlap);
-					}
+				//H->T.start("match_rest_for_best2");
+				//	if (best_idx != -1) {
+				//		// find second best mapping for mapq computation
+				//		double second_best_thr = maps[best_idx].score() - H->params.min_diff;
+				//		match_rest(P_sz, p_all.size(), m, kmers, B, diff_hist, seeds, i, p_ht, maps, total_matches, best2_idx, final_buckets, second_best_thr, best_idx, query_id, &lost_on_pruning, H->params.max_overlap);
+				//	}
+				//H->T.stop("match_rest_for_best2");
 				H->T.stop("match_rest");
 				H->C.inc("lost_on_pruning", lost_on_pruning);
 			H->T.stop("query_mapping");
@@ -408,13 +413,12 @@ public:
 //					//<< H->C.perc("mapq60", "mapped_reads") << "% with Q60";
 //				string msg = msg_stream.str();
 				printProgress(std::cerr, progress, "Mapping");
-				cerr << endl;
 
-				print_stats();
-				print_time_stats();
-
-				cerr << "\033[32A\033[G";
-				cerr.flush();
+//				cerr << endl;
+//				print_stats();
+//				print_time_stats();
+//				cerr << "\033[32A\033[G";
+//				cerr.flush();
 			}
 
 			H->T.start("query_reading");
@@ -476,7 +480,7 @@ public:
 //        cerr << " |  |  | thin sketch:             " << setw(5) << right << H->T.secs("thin_sketch")       << " (" << setw(4) << right << H->T.perc("thin_sketch", "seeding")         << "\%, " << setw(6) << right << H->T.range_ratio("thin_sketch") << "x)" << endl;
 //        cerr << " |  |  | unique seeds:            " << setw(5) << right << H->T.secs("unique_seeds")      << " (" << setw(4) << right << H->T.perc("unique_seeds", "seeding")        << "\%, " << setw(6) << right << H->T.range_ratio("unique_seeds") << "x)" << endl;
         cerr << " |  | match seeds:            " << setw(5) << right << H->T.secs("match_seeds")  << " (" << setw(4) << right << H->T.perc("match_seeds", "mapping")   << "\%, " << setw(6) << right << H->T.range_ratio("match_seeds") << "x)" << endl;
-        cerr << " |  | match rest:             " << setw(5) << right << H->T.secs("match_rest")   << " (" << setw(4) << right << H->T.perc("match_rest", "mapping")     << "\%, " << setw(6) << right << H->T.range_ratio("match_rest") << "x)" << endl;
+        cerr << " |  | match rest:             " << setw(5) << right << H->T.secs("match_rest")   << " (" << setw(4) << right << H->T.perc("match_rest", "mapping")     << "\%, " << setw(6) << right << H->T.range_ratio("match_rest") << "x): " << H->T.perc("match_rest_for_best2", "match_rest") << "% for second best" << endl;
         cerr << " |  |  | seed heuristic:         " << setw(5) << right << H->T.secs("seed_heuristic")    << " (" << setw(4) << right << H->T.perc("seed_heuristic", "match_rest")     << "\%, " << setw(6) << right << H->T.range_ratio("seed_heuristic") << "x)" << endl;
         cerr << " |  |  | matches collect:        " << setw(5) << right << H->T.secs("match_collect")     << " (" << setw(4) << right << H->T.perc("match_collect", "match_rest")      << "\%, " << setw(6) << right << H->T.range_ratio("match_collect") << "x)" << endl;
         cerr << " |  |  | sweep:                  " << setw(5) << right << H->T.secs("sweep")             << " (" << setw(4) << right << H->T.perc("sweep", "match_rest")              << "\%, " << setw(6) << right << H->T.range_ratio("sweep") << "x)" << endl;

@@ -34,10 +34,10 @@ INF = 999999
 
 ARGS_SHMAP ?= 
 
-REFNAME ?= chm13v2.0chrY
-ACCURACY ?= 0.99
+REFNAME ?= chrY
+ACCURACY ?= ?
 DEPTH ?= 1
-MEANLEN ?= 10000
+MEANLEN ?= ?
 READSIM_REFNAME ?= $(REFNAME)
 
 K ?= 25
@@ -75,7 +75,7 @@ READS = $(ALLREADS_DIR)/$(READS_PREFIX).fa
 #    READS = $(ALLREADS_DIR)/$(READS_PREFIX).fq
 #endif
 ONE_READ = $(ALLREADS_DIR)/$(READS_PREFIX).oneread.fa
-ALLOUT_DIR = $(DIR)/out
+ALLOUT_DIR ?= $(DIR)/out
 #OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)/k$(K)-r$(R)-s$(S)-m$(M)-t$(T)
 OUTDIR = $(ALLOUT_DIR)/$(READS_PREFIX)
 
@@ -90,14 +90,15 @@ LIFT_FASTA = $(DIR)/convert_fasta_with_args.py
 STREAM_LIFT_FASTA = $(DIR)/stream_fasta.py
 CHAIN_FILE = $(DIR)/refs/hg002v1.1_to_CHM13v2.0.chain
 
-SHMAP_PREF         = $(ALLOUT_DIR)/shmap/$(READS_PREFIX)/shmap
-SHMAP_NOPRUNE_PREF = $(ALLOUT_DIR)/shmap-noprune/$(READS_PREFIX)/shmap-noprune
-SHMAP_ONESWEEP_PREF= $(ALLOUT_DIR)/shmap-onesweep/$(READS_PREFIX)/shmap-onesweep # NOT USED
+SHMAP_PREF         = $(ALLOUT_DIR)/shmap-diff$(MIN_DIFF)/$(READS_PREFIX)/shmap-diff$(MIN_DIFF)
 MINIMAP_PREF       = $(ALLOUT_DIR)/minimap/$(READS_PREFIX)/minimap
-MM2_PREF           = $(ALLOUT_DIR)/mm2-fast/$(READS_PREFIX)/mm2-fast   # NOT USED
+MM2_PREF           = $(ALLOUT_DIR)/mm2-fast/$(READS_PREFIX)/mm2-fast
 BLEND_PREF         = $(ALLOUT_DIR)/blend/$(READS_PREFIX)/blend
 MAPQUIK_PREF       = $(ALLOUT_DIR)/mapquik/$(READS_PREFIX)/mapquik
 WINNOWMAP_PREF     = $(ALLOUT_DIR)/winnowmap/$(READS_PREFIX)/winnowmap
+
+#SHMAP_NOPRUNE_PREF = $(ALLOUT_DIR)/shmap-noprune/$(READS_PREFIX)/shmap-noprune
+#SHMAP_ONESWEEP_PREF= $(ALLOUT_DIR)/shmap-onesweep/$(READS_PREFIX)/shmap-onesweep
 
 all: $(SHMAP_BIN)
 
@@ -204,7 +205,7 @@ fdr_per_theta: $(SHMAP_BIN) gen_reads
 
 eval_shmap: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_PREF))
-#	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) $(ARGS_SHMAP) 2>/dev/null >/dev/null
+	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) $(ARGS_SHMAP) 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) $(ARGS_SHMAP)    2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
 	$(PAFTOOLS) mapeval -r 0.1 $(SHMAP_PREF).paf 2>/dev/null | tee $(SHMAP_PREF).eval || true
 	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_PREF).paf >$(SHMAP_PREF).wrong 2>/dev/null || true
@@ -213,14 +214,14 @@ eval_shmap_noprune: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_NOPRUNE_PREF))
 	$(TIME_CMD) -o $(SHMAP_NOPRUNE_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -x -b 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(SHMAP_NOPRUNE_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_NOPRUNE_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -x -b    2> >(tee $(SHMAP_NOPRUNE_PREF).log) > $(SHMAP_NOPRUNE_PREF).paf
-	-paftools.js mapeval -r 0.1 $(SHMAP_NOPRUNE_PREF).paf | tee $(SHMAP_NOPRUNE_PREF).eval
+	-$(PAFTOOLS) mapeval -r 0.1 $(SHMAP_NOPRUNE_PREF).paf | tee $(SHMAP_NOPRUNE_PREF).eval
 	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_NOPRUNE_PREF).paf >$(SHMAP_NOPRUNE_PREF).wrong
 
 eval_shmap_onesweep: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_ONESWEEP_PREF))
 	$(TIME_CMD) -o $(SHMAP_ONESWEEP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -M $(M) -x -B 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(SHMAP_ONESWEEP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_ONESWEEP_PREF).params -k $(K) -r $(R) -t $(T) -M $(M) -x -B    2> >(tee $(SHMAP_ONESWEEP_PREF).log) > $(SHMAP_ONESWEEP_PREF).paf
-	-paftools.js mapeval -r 0.1 $(SHMAP_ONESWEEP_PREF).paf | tee $(SHMAP_ONESWEEP_PREF).eval
+	-$(PAFTOOLS) mapeval -r 0.1 $(SHMAP_ONESWEEP_PREF).paf | tee $(SHMAP_ONESWEEP_PREF).eval
 	-$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_ONESWEEP_PREF).paf >$(SHMAP_ONESWEEP_PREF).wrong
 
 eval_winnowmap: gen_reads
@@ -231,45 +232,56 @@ eval_winnowmap: gen_reads
 	fi
 	$(TIME_CMD) -o $(WINNOWMAP_PREF).index.time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 --secondary=no --sv-off $(REF) $(ONE_READ) >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(WINNOWMAP_PREF).time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 --secondary=no --sv-off -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(WINNOWMAP_PREF).log) >$(WINNOWMAP_PREF).paf 
-	-paftools.js mapeval $(WINNOWMAP_PREF).paf | tee $(WINNOWMAP_PREF).eval
+	-$(PAFTOOLS) mapeval $(WINNOWMAP_PREF).paf | tee $(WINNOWMAP_PREF).eval
 
 eval_minimap: gen_reads
 	@mkdir -p $(shell dirname $(MINIMAP_PREF))
 	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level -a $(REF) $(ONE_READ) >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(MINIMAP_PREF).time       $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).paf
-	-paftools.js mapeval $(MINIMAP_PREF).paf | tee $(MINIMAP_PREF).eval
+	-$(PAFTOOLS) mapeval $(MINIMAP_PREF).paf | tee $(MINIMAP_PREF).eval
 	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(MINIMAP_PREF).paf >$(MINIMAP_PREF).wrong 2>/dev/null || true
 
 eval_mm2: gen_reads
 	@mkdir -p $(shell dirname $(MM2_PREF))
 	$(TIME_CMD) -o $(MM2_PREF).index.time $(MM2_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level -a $(REF) $(ONE_READ) >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(MM2_PREF).time       $(MM2_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(MM2_PREF).log) >$(MM2_PREF).paf
-	-paftools.js mapeval $(MM2_PREF).paf | tee $(MM2_PREF).eval
+	-$(PAFTOOLS) mapeval $(MM2_PREF).paf | tee $(MM2_PREF).eval
 
 eval_blend: gen_reads
 	@mkdir -p $(shell dirname $(BLEND_PREF))
 	$(TIME_CMD) -o $(BLEND_PREF).index.time $(BLEND_BIN) -x map-hifi -t 1 -N 0 $(REF) $(ONE_READ) >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(BLEND_PREF).time $(BLEND_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(BLEND_PREF).log) >$(BLEND_PREF).paf 
-	-paftools.js mapeval $(BLEND_PREF).paf | tee $(BLEND_PREF).eval
+	-$(PAFTOOLS) mapeval $(BLEND_PREF).paf | tee $(BLEND_PREF).eval
 
 eval_mapquik: gen_reads
 	@mkdir -p $(shell dirname $(MAPQUIK_PREF))
 	$(TIME_CMD) -o $(MAPQUIK_PREF).index.time $(MAPQUIK_BIN) $(ONE_READ) --reference $(REF) --threads 1  >/dev/null
 	$(TIME_CMD) -o $(MAPQUIK_PREF).time $(MAPQUIK_BIN) $(READS) --reference $(REF) --threads 1 -p $(MAPQUIK_PREF) | tee $(MAPQUIK_PREF).log
-	-paftools.js mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
+	-$(PAFTOOLS) mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
 #eval_tools: eval_shmap eval_shmap_noprune eval_minimap eval_mapquik eval_blend #eval_winnowmap #eval_shmap_onesweep #eval_mm2 
-eval_tools: eval_blend eval_minimap eval_mapquik #eval_winnowmap # eval_shmap
+eval_tools: eval_shmap eval_blend eval_mapquik eval_minimap eval_mm2 #eval_winnowmap 
+
+eval_tools_on_small_datasets:
+	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chrY READSIM_REFNAME=chrY DEPTH=2
+	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READS_PREFIX=HG002_small
+	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=hg002     DEPTH=1
+	#make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=chm13     DEPTH=1
 
 eval_tools_on_datasets:
-	make eval_tools REFNAME=chm13v2.0     READS_PREFIX=HG002
-	make eval_tools REFNAME=chm13v2.0chrY READSIM_REFNAME=chm13v2.0chrY DEPTH=20
-	make eval_tools REFNAME=chm13v2.0     READSIM_REFNAME=hg002v1.1     DEPTH=10
+	make eval_tools REFNAME=chm13 READS_PREFIX=HG002
+	make eval_tools REFNAME=chrY  READSIM_REFNAME=chrY DEPTH=20
+	make eval_tools REFNAME=chm13 READSIM_REFNAME=hg002     DEPTH=10
 
 eval_shmap_on_datasets:
-#	make eval_shmap REFNAME=chm13v2.0     READS_PREFIX=HG002
-	make eval_shmap REFNAME=chm13v2.0chrY READSIM_REFNAME=chm13v2.0chrY DEPTH=20
-#	make eval_shmap REFNAME=chm13v2.0     READSIM_REFNAME=hg002v1.1     DEPTH=10
+	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chrY READSIM_REFNAME=chrY DEPTH=2
+	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READS_PREFIX=HG002_small
+	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=hg002     DEPTH=1
+	#make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=chm13     DEPTH=1
+
+#	make eval_shmap REFNAME=chm13     READS_PREFIX=HG002
+	#make eval_shmap REFNAME=chrY READSIM_REFNAME=chrY DEPTH=20
+#	make eval_shmap REFNAME=chm13     READSIM_REFNAME=hg002     DEPTH=10
 
 #eval_winnowmap_on_datasets:
 #	make eval_winnowmap REFNAME=t2tChrY DEPTH=10
