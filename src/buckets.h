@@ -72,6 +72,10 @@ public:
         _B[b] += matches;
     }
 
+	bool delete_bucket(Bucket b) {
+		return _B.erase(b);
+	}
+
 	qpos_t get_bucket_len() const {
 		return len;
 	}
