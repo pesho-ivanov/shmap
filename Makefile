@@ -42,8 +42,8 @@ READSIM_REFNAME ?= $(REFNAME)
 
 K ?= 25
 R ?= 0.05
-T ?= 0.5
-MIN_DIFF ?= 0.15
+T ?= 0.7
+MIN_DIFF ?= 0.1
 MAX_OVERLAP ?= 0.7
 
 THETAS = 0.95 0.9 0.85 0.8 0.75 0.7 0.65 0.6 0.55 0.5  
@@ -260,34 +260,19 @@ eval_mapquik: gen_reads
 	-$(PAFTOOLS) mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
 #eval_tools: eval_shmap eval_shmap_noprune eval_minimap eval_mapquik eval_blend #eval_winnowmap #eval_shmap_onesweep #eval_mm2 
-eval_tools: eval_shmap eval_blend eval_mapquik eval_minimap eval_mm2 #eval_winnowmap 
-
-eval_tools_on_small_datasets:
-	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chrY READSIM_REFNAME=chrY DEPTH=2
-	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READS_PREFIX=HG002_small
-	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=hg002     DEPTH=1
-	#make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=chm13     DEPTH=1
+eval_tools: eval_mm2 #eval_shmap eval_blend eval_mapquik eval_minimap #eval_winnowmap 
 
 eval_tools_on_datasets:
-	make eval_tools REFNAME=chm13 READS_PREFIX=HG002
-	make eval_tools REFNAME=chrY  READSIM_REFNAME=chrY DEPTH=20
-	make eval_tools REFNAME=chm13 READSIM_REFNAME=hg002     DEPTH=10
+	#make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chrY READSIM_REFNAME=chrY DEPTH=2
+	#make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READS_PREFIX=HG002_small
+	#make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=hg002     DEPTH=1
+	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=chm13     DEPTH=1
 
 eval_shmap_on_datasets:
 	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chrY READSIM_REFNAME=chrY DEPTH=2
 	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READS_PREFIX=HG002_small
 	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=hg002     DEPTH=1
-	#make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=chm13     DEPTH=1
-
-#	make eval_shmap REFNAME=chm13     READS_PREFIX=HG002
-	#make eval_shmap REFNAME=chrY READSIM_REFNAME=chrY DEPTH=20
-#	make eval_shmap REFNAME=chm13     READSIM_REFNAME=hg002     DEPTH=10
-
-#eval_winnowmap_on_datasets:
-#	make eval_winnowmap REFNAME=t2tChrY DEPTH=10
-#	make eval_winnowmap REFNAME=chm13   DEPTH=1
-#	make eval_winnowmap REFNAME=t2tChrY DEPTH=10  MEANLEN=24000
-#	make eval_winnowmap REFNAME=chm13   READS_PREFIX=HG002_24kb_10G
+	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=chm13     DEPTH=1
 
 #SHMAP_PREF         = $(ALLOUT_DIR)/pauls_experiment/$(READS_PREFIX)/
 pauls_experiment: $(SHMAP_BIN) gen_reads
