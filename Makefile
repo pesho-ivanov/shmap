@@ -34,11 +34,11 @@ INF = 999999
 
 ARGS_SHMAP ?= 
 
-REFNAME ?= chrY
+REFNAME ?= chm13-chr1
+READSIM_REFNAME ?= $(REFNAME)
 ACCURACY ?= ?
 DEPTH ?= 1
 MEANLEN ?= ?
-READSIM_REFNAME ?= $(REFNAME)
 
 K ?= 25
 R ?= 0.05
@@ -90,7 +90,7 @@ LIFT_FASTA = $(DIR)/convert_fasta_with_args.py
 STREAM_LIFT_FASTA = $(DIR)/stream_fasta.py
 CHAIN_FILE = $(DIR)/refs/hg002v1.1_to_CHM13v2.0.chain
 
-SHMAP_PREF         = $(ALLOUT_DIR)/shmap-diff$(MIN_DIFF)/$(READS_PREFIX)/shmap-diff$(MIN_DIFF)
+SHMAP_PREF         = $(ALLOUT_DIR)/shmap-k$(K)-r$(R)-t$(T)-diff$(MIN_DIFF)/$(READS_PREFIX)/shmap-k$(K)-r$(R)-t$(T)-diff$(MIN_DIFF)
 MINIMAP_PREF       = $(ALLOUT_DIR)/minimap/$(READS_PREFIX)/minimap
 MM2_PREF           = $(ALLOUT_DIR)/mm2-fast/$(READS_PREFIX)/mm2-fast
 BLEND_PREF         = $(ALLOUT_DIR)/blend/$(READS_PREFIX)/blend
