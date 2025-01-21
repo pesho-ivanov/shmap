@@ -99,8 +99,7 @@ public:
 		bool ret = true;
 		for (; i < (qpos_t)kmers.size(); i++) {
 			seeds += kmers[i].occs_in_p;
-			if (tidx.matches_in_bucket(kmers[i], b))
-				seed_matches += kmers[i].occs_in_p;
+			seed_matches += tidx.matches_in_bucket(kmers[i], b);
 			double sh = hseed(m, seeds, seed_matches);
 			assert(sh <= *lowest_sh);
 			*lowest_sh = min(*lowest_sh, sh);	
@@ -149,6 +148,10 @@ public:
 								best_J = max(best_J, best_in_bucket.score());
 								best_idx = maps.size()-1;
 								thr = best_in_bucket.score();
+								//if (forbidden_idx != -1) {
+								//	H->T.stop("sweep");
+								//	break;
+								//}
 							}
 						}
 					}

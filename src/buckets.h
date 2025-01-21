@@ -133,7 +133,7 @@ public:
 
 	class OrderedIterator {
 	public:
-		using sorted_vector_t = std::vector<bucket_map_t::value_type>;
+		using sorted_vector_t = std::vector<std::reference_wrapper<const bucket_map_t::value_type>>;
 		using sorted_iterator = typename sorted_vector_t::const_iterator;
 		using iterator_category = std::forward_iterator_tag;
 		using value_type = Pos;
@@ -144,11 +144,11 @@ public:
 		OrderedIterator(sorted_iterator it) : it_(it) {}
 
 		const bucket_map_t::value_type& operator*() const {
-			return *it_;
+			return it_->get();
 		}
 
         const bucket_map_t::value_type* operator->() const {
-            return &(*it_);
+            return &(it_->get());
         }
 
 		OrderedIterator& operator++() {
@@ -166,15 +166,19 @@ public:
 
     // TODO: sort once, not every time; make sure nothing changes
 	// Helper to create a sorted vector
-	std::vector<bucket_map_t::value_type> get_sorted_buckets() const {
-		std::vector<bucket_map_t::value_type> sorted_buckets(_B.begin(), _B.end());
+	std::vector<std::reference_wrapper<const bucket_map_t::value_type>> get_sorted_buckets() const {
+		std::vector<std::reference_wrapper<const bucket_map_t::value_type>> sorted_buckets;
+		sorted_buckets.reserve(_B.size());
+		for (const auto& bucket : _B) {
+			sorted_buckets.push_back(std::cref(bucket));
+		}
 		std::sort(sorted_buckets.begin(), sorted_buckets.end(),
-				  [](const bucket_map_t::value_type& a, const bucket_map_t::value_type& b) {
+				  [](const auto& a, const auto& b) {
 					  // Define sorting criteria, e.g., by segm_id and then r
-					//  if (a.first.segm_id != b.first.segm_id)
-					//	  return a.first.segm_id < b.first.segm_id;
+					//  if (a.get().first.segm_id != b.get().first.segm_id)
+					//	  return a.get().first.segm_id < b.get().first.segm_id;
                     // Sort by decreasing number of matches
-					  return a.second > b.second; 
+					  return a.get().second > b.get().second; 
 				  });
 		return sorted_buckets;
 	}
@@ -189,7 +193,7 @@ public:
 	}
 
 private:
-	mutable std::vector<bucket_map_t::value_type> sorted_buckets_;
+	mutable std::vector<std::reference_wrapper<const bucket_map_t::value_type>> sorted_buckets_;
 
 	qpos_t len;  // half-length; the bucket spans [r*len, (r+2)*len)
 	bucket_map_t _B;
