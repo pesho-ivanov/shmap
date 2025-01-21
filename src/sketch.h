@@ -466,7 +466,7 @@ public:
 			// TODO: tie break
 			auto h = h_rc ^ h_fw;
 			if (h <= hThres) {
-				if (h_fw == h_rc) cerr << "h_fw == h_rc == " << h_fw << endl;
+				//if (h_fw == h_rc) cerr << "h_fw == h_rc == " << h_fw << endl;
 				const bool strand = h_fw > h_rc;
 				kmers.push_back(Kmer(r-1, h, strand));
 			}

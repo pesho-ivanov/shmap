@@ -154,10 +154,11 @@ public:
 
 		auto l = M.begin(), r = M.begin();
 		for(; l != M.end(); ++l) {
-			for(;  r != M.end()  && r->hit.tpos <= l->hit.tpos + lmax; ++r) {
+			//for(;  r != M.end()  && r->hit.tpos <= l->hit.tpos + lmax; ++r) {
 				//&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
 				//&& r->hit.tpos + H->params.k <= l->hit.tpos + P_sz
 				//&& r->hit.r + H->params.k <= l->hit.r + P_sz
+			for(;  r != M.end()  && r->hit.r <= l->hit.r + P_sz; ++r) {
 				assert(diff_hist.contains(r->seed.kmer.h));
 				if (--diff_hist[r->seed.kmer.h] >= 0) {
 					++intersection;
