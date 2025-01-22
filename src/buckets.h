@@ -44,18 +44,22 @@ public:
 	struct BucketContent {
 		qpos_t matches;
 		int codirection;
+		rpos_t r_min, r_max;
 
-		BucketContent() : matches(0), codirection(0) {}
-		BucketContent(qpos_t matches, int codirection) : matches(matches), codirection(codirection) {}
+		BucketContent() : matches(0), codirection(0), r_min(std::numeric_limits<rpos_t>::max()), r_max(-1) {}
+		BucketContent(qpos_t matches, int codirection, rpos_t r_min, rpos_t r_max) : matches(matches), codirection(codirection), r_min(r_min), r_max(r_max) {}
 
 		friend std::ostream& operator<<(std::ostream& os, const BucketContent& b) {
-			os << "(" << b.matches << "," << b.codirection << ")";
+			os << "(" << b.matches << "," << b.codirection << "," << b.r_min << "," << b.r_max << ")";
 			return os;
 		}
 
 		BucketContent operator+=(const BucketContent &other) {
 			matches += other.matches;
 			codirection += other.codirection;
+			r_min = std::min(r_min, other.r_min);
+			r_max = std::max(r_max, other.r_max);
+
 			return *this;
 		}
 	};

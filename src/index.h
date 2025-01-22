@@ -109,6 +109,8 @@ public:
 			if (b.begin() <= hit.r && hit.r < b.end()) {
 				bucket.matches = 1;
 				bucket.codirection = hit.strand == s.kmer.strand ? 1 : -1;
+				bucket.r_min = hit.r;
+				bucket.r_max = hit.r;
 			}
 		} else if (s.hits_in_T > 1) {
 			const auto &hits = h2multi.at(s.kmer.h);
@@ -121,6 +123,8 @@ public:
 			for (; it != hits.end() && it->segm_id == b.segm_id && it->r < b.end(); ++it) {
 				bucket.matches += 1;
 				bucket.codirection += it->strand == s.kmer.strand ? 1 : -1;
+				bucket.r_min = std::min(bucket.r_min, it->r);
+				bucket.r_max = std::max(bucket.r_max, it->r);
 			}
 			//auto it_prev = it; if (it_prev != hits.begin()) { --it_prev; assert(it_prev->r < from); }
 			//if (it != hits.end()) assert(from <= it->r);

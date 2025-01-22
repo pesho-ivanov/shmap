@@ -143,7 +143,7 @@ public:
 					Mapping best_in_bucket;
 					int sz = P_sz;
 					// TODO: refine left and right bounds
-					best_in_bucket.update(0, P_sz-1, b_it->first.begin(), b_it->first.end(), tidx.T[b_it->first.segm_id], b_it->second.matches, lowest_sh, b_it->second.codirection, 2*sz); // TODO: should it be prev(r) instead?
+					best_in_bucket.update(0, P_sz-1, b_it->second.r_min, b_it->second.r_max, tidx.T[b_it->first.segm_id], b_it->second.matches, lowest_sh, b_it->second.codirection, b_it->second.r_max - b_it->second.r_min); // TODO: should it be prev(r) instead?
 
 					best_in_bucket.set_bucket(b_it->first);
 					//assert(best_in_bucket.score() <= lowest_sh + 1e-7);
@@ -303,11 +303,11 @@ public:
 							//////////////// correct B
 							Buckets b2m(B.get_bucket_len());
 							for (auto &m: seed_matches) {
-								Buckets::BucketContent content(seed.occs_in_p, m.codirection());
+								Buckets::BucketContent content(seed.occs_in_p, m.codirection(), m.hit.r, m.hit.r);
 								b2m.assign_to_pos(Buckets::Pos(m.hit.segm_id, m.hit.r), content);
 							}
 							for (auto it = b2m.unordered_begin(); it != b2m.unordered_end(); ++it) {
-								Buckets::BucketContent content(it->second.matches, it->second.codirection);
+								Buckets::BucketContent content(it->second.matches, it->second.codirection, it->second.r_min, it->second.r_max);
 								B.add_to_bucket(it->first, content);
 								matches_in_B += it->second.matches;
 							}
