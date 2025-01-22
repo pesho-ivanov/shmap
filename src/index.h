@@ -102,6 +102,7 @@ public:
 
 	Buckets::BucketContent matches_in_bucket(const Seed &s, const Buckets::BucketLoc b) const {
 		Buckets::BucketContent bucket;
+		bucket.seeds = s.occs_in_p;
 		if (s.hits_in_T == 0) {
 			return bucket;
 		} else if (s.hits_in_T == 1) {
@@ -120,12 +121,14 @@ public:
 					return hit.segm_id < b.segm_id;
 				return hit.r < pos;
 			});
+			rpos_t matches = 0;
 			for (; it != hits.end() && it->segm_id == b.segm_id && it->r < b.end(); ++it) {
-				bucket.matches += 1;
+				matches += 1;
 				bucket.codirection += it->strand == s.kmer.strand ? 1 : -1;
 				bucket.r_min = std::min(bucket.r_min, it->r);
 				bucket.r_max = std::max(bucket.r_max, it->r);
 			}
+			bucket.matches = min(matches, s.occs_in_p);
 			//auto it_prev = it; if (it_prev != hits.begin()) { --it_prev; assert(it_prev->r < from); }
 			//if (it != hits.end()) assert(from <= it->r);
 			//cout << (it != hits.end() && it->r < to) << ", [" << from << ", " << to << ")" << ", it: " << (it != hits.end() ? it->r : -1) << endl;

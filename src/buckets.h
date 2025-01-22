@@ -8,8 +8,13 @@
 namespace sweepmap {
 
 class Buckets {
+	qpos_t len;  // half-length; the bucket spans [r*len, (r+2)*len)
+
 public:
-	Buckets(qpos_t len) : len(len) {}
+	int i;  				// index of the next kmer for all buckets
+	int seeds; 				// number of seeds in all buckets
+
+	Buckets(qpos_t len) : len(len), i(0), seeds(0) {}
 
     struct BucketLoc {
         segm_t segm_id;		// segm_id refers to tidx.T[segm_id]
@@ -42,20 +47,26 @@ public:
 	};
 
 	struct BucketContent {
+		// propagated from parent, then updated individually
+		int i;   // index of the next kmer for this bucket
+		qpos_t seeds;
+
+		// not propagated from parent
 		qpos_t matches;
 		int codirection;
 		rpos_t r_min, r_max;
 
-		BucketContent() : matches(0), codirection(0), r_min(std::numeric_limits<rpos_t>::max()), r_max(-1) {}
-		BucketContent(qpos_t matches, int codirection, rpos_t r_min, rpos_t r_max) : matches(matches), codirection(codirection), r_min(r_min), r_max(r_max) {}
+		BucketContent() : i(-1), seeds(0), matches(0), codirection(0), r_min(std::numeric_limits<rpos_t>::max()), r_max(-1) {}
+		BucketContent(qpos_t matches, qpos_t seeds, int codirection, rpos_t r_min, rpos_t r_max) : i(-1), seeds(seeds), matches(matches), codirection(codirection), r_min(r_min), r_max(r_max) {}
 
 		friend std::ostream& operator<<(std::ostream& os, const BucketContent& b) {
-			os << "(" << b.matches << "," << b.codirection << "," << b.r_min << "," << b.r_max << ")";
+			os << "(i=" << b.i << ", seeds=" << b.seeds << ", matches=" << b.matches << ", codirection=" << b.codirection << ", r=[" << b.r_min << "," << b.r_max << "])";
 			return os;
 		}
 
 		BucketContent operator+=(const BucketContent &other) {
 			matches += other.matches;
+			seeds += other.seeds;
 			codirection += other.codirection;
 			r_min = std::min(r_min, other.r_min);
 			r_max = std::max(r_max, other.r_max);
@@ -63,6 +74,15 @@ public:
 			return *this;
 		}
 	};
+
+	void propagate() {
+		//cerr << "propagate: i=" << i << " seeds=" << seeds << endl;
+		for (auto &bucket : _B) {
+			assert(bucket.second.i == -1);
+			bucket.second.i = i;
+			bucket.second.seeds = seeds;
+		}
+	}
 
 	using bucket_map_t = ankerl::unordered_dense::map<BucketLoc, BucketContent, BucketHash, std::equal_to<BucketLoc> >;
 
@@ -83,12 +103,6 @@ public:
         qpos_t b = p.r/len;
         _B[ BucketLoc(p.segm_id, b, this) ] += content;
         if (b>0) _B[ BucketLoc(p.segm_id, b-1, this) ] += content;
-    }
-
-    void assign_to_pos(const Pos& p, const BucketContent &content) {
-        qpos_t b = p.r/len;
-        _B[ BucketLoc(p.segm_id, b, this) ] = content;
-        if (b>0) _B[ BucketLoc(p.segm_id, b-1, this) ] = content;
     }
 
     void add_to_bucket(BucketLoc b, const BucketContent &content) {
@@ -219,7 +233,6 @@ public:
 private:
 	std::vector<std::reference_wrapper<bucket_map_t::value_type>> sorted_buckets_;
 
-	qpos_t len;  // half-length; the bucket spans [r*len, (r+2)*len)
 	bucket_map_t _B;
 };
 

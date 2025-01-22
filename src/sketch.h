@@ -272,6 +272,8 @@ public:
 	double score2() const { return local_stats.J2; }
 	int segm_id() const { return paf.segm_id; }
 
+	void set_sh(double sh) { local_stats.sh = sh; }
+
 	void set_score2(double score2) {
 		local_stats.J2 = score2;
 	}
