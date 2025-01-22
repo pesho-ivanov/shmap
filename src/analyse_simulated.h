@@ -8,6 +8,8 @@
 #include "mapper.h"
 #include "refine.h"
 
+#include "../ext/gtl/vector.hpp"
+
 namespace sweepmap {
 
 class AnalyseSimulatedReads {
@@ -29,11 +31,11 @@ public:
 	qpos_t start, end;
 	int segm_id;
 	string segm_name;
-	vector<Buckets::Bucket> J_buckets;
-	vector<Buckets::Bucket> C_buckets;
-	Buckets::Bucket gt_b_l;
-	Buckets::Bucket gt_b_r; 
-	Buckets::Bucket gt_b_next;
+	vector<Buckets::BucketLoc> J_buckets;
+	vector<Buckets::BucketLoc> C_buckets;
+	Buckets::BucketLoc gt_b_l;
+	Buckets::BucketLoc gt_b_r; 
+	Buckets::BucketLoc gt_b_next;
 	Matches gt_M_l;
 	Matches gt_M_r;
 	Matches gt_M_next;
@@ -60,14 +62,15 @@ public:
 				break;
 			}
 		assert(segm_id >= 0 && segm_id < (rpos_t)tidx.T.size());
+		return {parsed.start_pos, parsed.end_pos, segm_id, parsed.segm_id};
 		
-		const auto &segm = tidx.T[segm_id];
-		qpos_t start = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.start_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
-		qpos_t end  = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.end_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
-		return {start, end, segm_id, parsed.segm_id};
+		//const auto &segm = tidx.T[segm_id];
+		//qpos_t start = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.start_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
+		//qpos_t end  = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.end_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
+		//return {start, end, segm_id, parsed.segm_id};
 	}
 
-	string vec2str(vector<Buckets::Bucket> buckets, int bucket_l) {
+	string vec2str(vector<Buckets::BucketLoc> buckets, int bucket_l) {
 		stringstream res;
 		res << std::fixed << std::setprecision(4);
 		res << "{";
@@ -87,7 +90,7 @@ public:
 	}
 
 public:
-	AnalyseSimulatedReads(const string& query_id, const string &P, int P_sz, const Hist &diff_hist, int m, unordered_map<hash_t, Seed> p_ht, const SketchIndex &tidx, const Buckets &B, const double theta)
+	AnalyseSimulatedReads(const string& query_id, const string &P, int P_sz, const Hist &diff_hist, int m, unordered_map<hash_t, Seed> p_ht, const SketchIndex &tidx, Buckets &B, const double theta)
 	 : query_id(query_id), P(P), P_sz(P_sz), diff_hist(diff_hist), m(m), p_ht(p_ht), tidx(tidx), B(B), theta(theta), matcher(tidx, diff_hist) {
 		bucket_l = B.get_bucket_len();
 
@@ -98,9 +101,9 @@ public:
 
 		tie(start, end, segm_id, segm_name) = GT_start_end(query_id);
 		//update(0, P_sz-1, start, end, tidx.T[segm_id], -1, -1, -1, nullptr, nullptr); // TODO: should it be prev(r) instead?
-		gt_b_l 		= Buckets::Bucket(segm_id, max(0, start/bucket_l-1), &B);
-		gt_b_r 		= Buckets::Bucket(segm_id, start/bucket_l, &B);
-		gt_b_next 	= Buckets::Bucket(segm_id, start/bucket_l+1, &B);
+		gt_b_l 		= Buckets::BucketLoc(segm_id, max(0, start/bucket_l-1), &B);
+		gt_b_r 		= Buckets::BucketLoc(segm_id, start/bucket_l, &B);
+		gt_b_next 	= Buckets::BucketLoc(segm_id, start/bucket_l+1, &B);
 		gt_M_l 		= matcher.collect_matches(gt_b_l, p_ht);
 		gt_M_r 		= matcher.collect_matches(gt_b_r, p_ht);
 		gt_M_next 	= matcher.collect_matches(gt_b_next, p_ht);
@@ -113,8 +116,8 @@ public:
 		gt_C_l_lmax = matcher.bestFixedLength(gt_M_l, P_sz, bucket_l, m, Metric::CONTAINMENT_INDEX);
 		
 		// Buckets with Jaccard and Containment index >= theta
-		vector<Buckets::Bucket> J_buckets;
-		vector<Buckets::Bucket> C_buckets;
+		vector<Buckets::BucketLoc> J_buckets;
+		vector<Buckets::BucketLoc> C_buckets;
 		for (auto it = B.ordered_begin(); it != B.ordered_end(); ++it) {
 		//for (auto it = B.unordered_begin(); it != B.unordered_end(); ++it) {
 			//cerr << it->first << " " << it->first.parent << endl;
@@ -201,6 +204,9 @@ public:
 		out << "\tgt_b_l:i:" << gt_b_l.b
 			<< "\tgt_b_r:i:" << gt_b_r.b
 			<< "\tgt_b_next:i:" << gt_b_next.b
+			<< "\tgt_M_l:i:" << gt_M_l.size()					
+			<< "\tgt_M_r:i:" << gt_M_r.size()					
+			<< "\tgt_M_next:i:" << gt_M_next.size()					
 			<< "\tgt_J_l:f:" << gt_J_l.score()
 			<< "\tgt_J_r:f:" << gt_J_r.score()
 			<< "\tgt_J_next:f:" << gt_J_next.score()

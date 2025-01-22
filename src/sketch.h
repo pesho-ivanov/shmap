@@ -27,7 +27,7 @@ struct Kmer {
 	}
 };
 
-using sketch_t = std::vector<Kmer>;
+using sketch_t = gtl::vector<Kmer>;
 
 // Hit -- a kmer hit in the reference T
 struct Hit {  // TODO: compress into a 32bit field
@@ -57,7 +57,7 @@ struct Seed {
 		return os;
 	}
 };
-using Seeds = std::vector<Seed>;
+using Seeds = gtl::vector<Seed>;
 
 // Match -- a pair of a seed and a hit
 struct Match {
@@ -66,15 +66,15 @@ struct Match {
 	Match(const Seed &seed, const Hit &hit)
 		: seed(seed), hit(hit) {}
 	
-	inline bool is_same_strand() const {
-		return seed.kmer.strand == hit.strand;
+	inline int codirection() const {
+		return seed.kmer.strand == hit.strand ? +1 : -1;
 	}
 	friend std::ostream& operator<<(std::ostream& os, const Match& match) {
 		os << "Match(" << match.seed << ", " << match.hit << ")";
 		return os;
 	}
 };
-using Matches = std::vector<Match>;
+using Matches = gtl::vector<Match>;
 
 struct RefSegment {
 	sketch_t kmers;
@@ -135,9 +135,10 @@ struct LocalMappingStats {
 	bool unreasonable;  // reserved for filtering matches
 	std::vector<Match>::const_iterator l, r;
 	double J, J2;     // Similarity in [0;1] for the best and for the second best mapping
+	double sh;
 	qpos_t p_sz;     // number of seeds (subset of the sketch kmers)
-	Buckets::Bucket bucket;			 // the bucket where the mapping is found
-	Buckets::Bucket bucket2;  // the bucket of the second best mapping
+	Buckets::BucketLoc bucket;			 // the bucket where the mapping is found
+	Buckets::BucketLoc bucket2;  // the bucket of the second best mapping
 	qpos_t intersection2; // number of matches in the second best mapping
 	double sigmas_diff;  // how many sigmas is the diff between intersection1 and intersection2
 
@@ -149,6 +150,7 @@ struct LocalMappingStats {
 		unreasonable = false;
 		J = -1.0;
 		J2 = -1.0;
+		sh = -1.0;
 		p_sz = -1;
 		intersection2 = -1;
 		sigmas_diff = -1.0;
@@ -165,6 +167,7 @@ struct LocalMappingStats {
 			<< "\t" << "J:f:"			<< stats.J   // Similarity [0; 1]
 			<< "\t" << "J2:f:"			<< stats.J2   // second best mapping similarity [0; 1]
 			<< "\t" << "Jdiff:f:"		<< stats.J - stats.J2   // second best mapping similarity [0; 1]
+			<< "\t" << "sh:f:"			<< stats.sh
 			<< "\t" << "strand:i:"		<< stats.same_strand_seeds
 			<< "\t" << "t:f:"			<< stats.map_time
 			<< "\t" << "b:s:"			<< stats.bucket.segm_id << "," << stats.bucket.b
@@ -232,16 +235,16 @@ public:
     Mapping() {}
 	Mapping(const Mapping &m) : paf(m.paf), local_stats(m.local_stats), global_stats(m.global_stats ? std::make_unique<GlobalMappingStats>(*m.global_stats) : nullptr) {}
 
-	void update(qpos_t P_start, qpos_t P_end, rpos_t T_l, rpos_t T_r, const RefSegment &segm, qpos_t intersection, double new_score,
-				int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r) {
+	void update(qpos_t P_start, qpos_t P_end, rpos_t T_l, rpos_t T_r, const RefSegment &segm, qpos_t intersection, double new_score, int same_strand_seeds, rpos_t sz) {
 		if (new_score > score()) {
 			paf = MappingPAF(P_start, P_end, same_strand_seeds > 0 ? '+' : '-', segm.name.c_str(), segm.sz, segm.id, T_l, T_r);
-			local_stats.s_sz = r->hit.tpos - l->hit.tpos + 1;
+			//local_stats.s_sz = r->hit.tpos - l->hit.tpos + 1;
+			local_stats.s_sz = sz;
 			local_stats.same_strand_seeds = same_strand_seeds;
 			local_stats.intersection = intersection;
 			local_stats.J = new_score;
-			local_stats.l = l;
-			local_stats.r = r;
+			//local_stats.l = l;
+			//local_stats.r = r;
 		}
 	}
 	//Mapping(qpos_t P_start, qpos_t P_end, rpos_t T_l, rpos_t T_r, const RefSegment &segm, qpos_t intersection, double J, int same_strand_seeds, std::vector<Match>::const_iterator l, std::vector<Match>::const_iterator r)
@@ -263,7 +266,9 @@ public:
 		return *this;
 	}
 
-	double score() const { return local_stats.J; }
+	double sh() const { return local_stats.sh; }
+	//double score() const { return local_stats.J; }
+	double score() const { return local_stats.sh; }
 	double score2() const { return local_stats.J2; }
 	int segm_id() const { return paf.segm_id; }
 
@@ -307,11 +312,11 @@ public:
 		return paf.mapq;
 	}
 
-	Buckets::Bucket bucket() const {
+	Buckets::BucketLoc bucket() const {
 		return local_stats.bucket;
 	}
 
-	void set_bucket(const Buckets::Bucket &bucket) {
+	void set_bucket(const Buckets::BucketLoc &bucket) {
 		local_stats.bucket = bucket;
 	}
 
@@ -366,6 +371,7 @@ public:
 		int cap = std::max(0, std::min(a.paf.T_r, b.paf.T_r) - std::max(a.paf.T_l, b.paf.T_l));
 		int cup = std::max(a.paf.T_r, b.paf.T_r) - std::min(a.paf.T_l, b.paf.T_l);
 		assert(cup >= 0 && cap >=0 && cup >= cap);
+		//cerr << "overlap: " << a.paf.T_l << " " << a.paf.T_r << " " << b.paf.T_l << " " << b.paf.T_r << " " << cap << " / " << cup << " = " << 1.0 * cap / cup << endl;
 		return 1.0 * cap / cup;
 	}
 		//if (J > 1.0)

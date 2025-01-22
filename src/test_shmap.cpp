@@ -179,31 +179,31 @@ TEST_CASE("Bucketing") {
     CHECK(B.get_bucket_len() == 10);
     segm_t segm_id = 0;
     SUBCASE("Bucket") {
-        Buckets::Bucket b0(segm_id, 0, &B);
+        Buckets::BucketLoc b0(segm_id, 0, &B);
         CHECK(b0.begin() == 0);
         CHECK(b0.end() == 2*l);
-        Buckets::Bucket b1(segm_id, 1, &B);
+        Buckets::BucketLoc b1(segm_id, 1, &B);
         CHECK(b1.begin() == l);
         CHECK(b1.end() == l+2*l);
         CHECK(!(b0 == b1));
     }
     SUBCASE("Add matches to bucket") {
-        B.add_to_bucket(Buckets::Bucket(segm_id, 2, &B), 10);
-        CHECK(B.get_matches(Buckets::Bucket(segm_id, 2, &B)) == 10);
+        B.add_to_bucket(Buckets::BucketLoc(segm_id, 2, &B), 10);
+        CHECK(B.get_matches(Buckets::BucketLoc(segm_id, 2, &B)) == 10);
     }
     SUBCASE("Add matches to position") {
         B.add_to_pos(Buckets::Pos(segm_id, 5), 1);
         CHECK(B.size() == 1);
-        CHECK(B.get_matches(Buckets::Bucket(segm_id, 0, &B)) == 1);
+        CHECK(B.get_matches(Buckets::BucketLoc(segm_id, 0, &B)) == 1);
         B.add_to_pos(Buckets::Pos(0, 15), 1);
         CHECK(B.size() == 2);
-        CHECK(B.get_matches(Buckets::Bucket(segm_id, 0, &B)) == 2);
-        CHECK(B.get_matches(Buckets::Bucket(segm_id, 1, &B)) == 1);
+        CHECK(B.get_matches(Buckets::BucketLoc(segm_id, 0, &B)) == 2);
+        CHECK(B.get_matches(Buckets::BucketLoc(segm_id, 1, &B)) == 1);
     }
     SUBCASE("Iteration") {
         vector<int> matches = {1, 2, 3, 4, 5, 6, 5, 4, 2, 2};
         for (int i = 0; i < (int)matches.size(); i++)
-            B.add_to_bucket(Buckets::Bucket(segm_id, i, &B), matches[i]);
+            B.add_to_bucket(Buckets::BucketLoc(segm_id, i, &B), matches[i]);
         int cnt = 0;
         SUBCASE("Unordered") {
             for (auto it = B.unordered_begin(); it != B.unordered_end(); ++it) {

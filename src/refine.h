@@ -26,7 +26,7 @@ public:
 		this->diff_hist = diff_hist;
 	}
 
-    bool do_overlap(const string& query_id, const Buckets::Bucket& b) {
+    bool do_overlap(const string& query_id, const Buckets::BucketLoc& b) {
         auto parsed = ParsedQueryId::parse(query_id);
         if (!parsed.valid) return false;
 		//cerr << query_id << ", " << b.segm_id << ", " << b.begin() << ", " << b.end() << endl;
@@ -73,15 +73,20 @@ public:
 		return 1.0*intersection / (m + s_sz - intersection);
 	}
 
-	Matches collect_matches(const Buckets::Bucket &b, const unordered_map<hash_t, Seed> &p_ht) {
+	Matches collect_matches(const Buckets::BucketLoc &b, const unordered_map<hash_t, Seed> &p_ht) {
 		Matches M;
 		//cerr << b << endl;
 		assert(b.parent != nullptr);
 		assert(b.segm_id >= 0 && b.segm_id < (rpos_t)tidx.T.size());
-		for (rpos_t i = b.begin(); i < std::min(b.end(), (rpos_t)tidx.T[b.segm_id].kmers.size()); i++) {
-			assert(i < (rpos_t)tidx.T[b.segm_id].kmers.size());
+
+		const auto &segm = tidx.T[b.segm_id];
+		qpos_t start = lower_bound(segm.kmers.begin(), segm.kmers.end(), b.begin(), [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
+		qpos_t end  = lower_bound(segm.kmers.begin(), segm.kmers.end(), b.end(), [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
+		for (rpos_t i = start; i < end; i++) {
+		//for (rpos_t i = b.begin(); i < std::min(b.end(), (rpos_t)tidx.T[b.segm_id].kmers.size()); i++) {
+			assert(i < (rpos_t)segm.kmers.size());
 			//cerr << "parent" << b.parent << " " << b << " " << i << " " << tidx.T.size() << " " << tidx.T[b.segm_id].kmers.size() << endl;
-			const auto kmer = tidx.T[b.segm_id].kmers[i];
+			const auto kmer = segm.kmers[i];
 			const auto seed_it = p_ht.find(kmer.h);
 			if (seed_it != p_ht.end()) {
 				M.push_back(Match(seed_it->second, Hit(kmer, i, b.segm_id)));
@@ -91,7 +96,7 @@ public:
 		return M;
 	}
 
-	Mapping bestIncludedJaccard(const vector<Match> &M, const qpos_t P_sz, qpos_t lmin, qpos_t lmax, const qpos_t m) {
+	Mapping bestIncludedJaccard(const gtl::vector<Match> &M, const qpos_t P_sz, qpos_t lmin, qpos_t lmax, const qpos_t m) {
 		qpos_t intersection = 0;
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 		Mapping best;
@@ -107,7 +112,7 @@ public:
 				--r;
 				if (++diff_hist[r->seed.kmer.h] >= 1) {
 					--intersection;
-					same_strand_seeds -= r->is_same_strand() ? +1 : -1;
+					same_strand_seeds -= r->codirection();
 				}
 			}
 
@@ -116,14 +121,15 @@ public:
 				assert(diff_hist.contains(r->seed.kmer.h));
 				if (--diff_hist[r->seed.kmer.h] >= 0) {
 					++intersection;
-					same_strand_seeds += r->is_same_strand() ? +1 : -1;
+					same_strand_seeds += r->codirection();
 				}
 				
 				assert (l->hit.r <= r->hit.r);
 				if (l < r) {
 					int s_sz = prev(r)->hit.tpos - l->hit.tpos + 1;
 					double J = Jaccard(intersection, m, s_sz);
-					best.update(0, P_sz-1, l->hit.r, prev(r)->hit.r, tidx.T[l->hit.segm_id], intersection, J, same_strand_seeds, l, prev(r)); // TODO: should it be prev(r) instead?
+					rpos_t sz = prev(r)->hit.tpos - l->hit.tpos + 1;
+					best.update(0, P_sz-1, l->hit.r, prev(r)->hit.r, tidx.T[l->hit.segm_id], intersection, J, same_strand_seeds, sz); // TODO: should it be prev(r) instead?
 					//best = Mapping(H->params.k, P_sz, m, l->hit.r, r->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, r);
 				}
 			}
@@ -131,7 +137,7 @@ public:
 			assert(diff_hist.contains(l->seed.kmer.h));
 			if (++diff_hist[l->seed.kmer.h] >= 1) {
 				--intersection;
-				same_strand_seeds -= l->is_same_strand() ? +1 : -1;
+				same_strand_seeds -= l->codirection();
 			}
 
 			assert(intersection >= 0);
@@ -143,7 +149,7 @@ public:
 		return best;
 	}
 
-	Mapping bestFixedLength(const vector<Match> &M, const qpos_t P_sz, qpos_t lmax, const qpos_t m, Metric metric) {
+	Mapping bestFixedLength(const gtl::vector<Match> &M, const qpos_t P_sz, qpos_t lmax, const qpos_t m, Metric metric) {
 		qpos_t intersection = 0;
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 		Mapping best;
@@ -162,7 +168,7 @@ public:
 				assert(diff_hist.contains(r->seed.kmer.h));
 				if (--diff_hist[r->seed.kmer.h] >= 0) {
 					++intersection;
-					same_strand_seeds += r->is_same_strand() ? +1 : -1;
+					same_strand_seeds += r->codirection();
 				}
 				
 				assert (l->hit.r <= r->hit.r);
@@ -181,14 +187,16 @@ public:
 
 			assert(J >= -0.0);
 			assert(J <= 1.0);
-			if (J > best.score())
-				best.update(0, P_sz-1, l->hit.r, prev(r)->hit.r, tidx.T[l->hit.segm_id], intersection, J, same_strand_seeds, l, prev(r)); // TODO: should it be prev(r) instead?
+			if (J > best.score()) {
+				rpos_t sz = prev(r)->hit.tpos - l->hit.tpos + 1;
+				best.update(0, P_sz-1, l->hit.r, prev(r)->hit.r, tidx.T[l->hit.segm_id], intersection, J, same_strand_seeds, sz); // TODO: should it be prev(r) instead?
+			}
 				//best = Mapping(H->params.k, P_sz, m, l->hit.r, prev(r)->hit.r, l->hit.segm_id, intersection, J, same_strand_seeds, l, prev(r));
 
 			assert(diff_hist.contains(l->seed.kmer.h));
 			if (++diff_hist[l->seed.kmer.h] >= 1) {
 				--intersection;
-				same_strand_seeds -= l->is_same_strand() ? +1 : -1;
+				same_strand_seeds -= l->codirection();
 			}
 
 			assert(intersection >= 0);

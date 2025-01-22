@@ -11,18 +11,18 @@ class Buckets {
 public:
 	Buckets(qpos_t len) : len(len) {}
 
-    struct Bucket {
+    struct BucketLoc {
         segm_t segm_id;		// segm_id refers to tidx.T[segm_id]
         rpos_t b;   		// b refers to interval [lmax*b, lmax*(b+2)) in tidx.T[segm_id].kmers
 		const Buckets* parent;
 
-        Bucket() : segm_id(-1), b(-1), parent(nullptr) {}
-        Bucket(segm_t segm_id, rpos_t b, const Buckets* parent) : segm_id(segm_id), b(b), parent(parent) {}
+        BucketLoc() : segm_id(-1), b(-1), parent(nullptr) {}
+        BucketLoc(segm_t segm_id, rpos_t b, const Buckets* parent) : segm_id(segm_id), b(b), parent(parent) {}
 
-        bool operator==(const Bucket &other) const {
+        bool operator==(const BucketLoc &other) const {
             return segm_id == other.segm_id && b == other.b;
         }
-        friend std::ostream& operator<<(std::ostream& os, const Bucket& b) {
+        friend std::ostream& operator<<(std::ostream& os, const BucketLoc& b) {
             os << "(" << b.segm_id << "," << b.b << ")";
             return os;
         }
@@ -36,11 +36,31 @@ public:
 		}
 	};
 	struct BucketHash {
-		std::size_t operator()(const Bucket& b) const {
+		std::size_t operator()(const BucketLoc& b) const {
 			return std::hash<segm_t>()(b.segm_id) ^ (std::hash<rpos_t>()(b.b) << 1);
 		}
 	};
-	using bucket_map_t = ankerl::unordered_dense::map<Bucket, qpos_t, BucketHash, std::equal_to<Bucket> >;
+
+	struct BucketContent {
+		qpos_t matches;
+		int codirection;
+
+		BucketContent() : matches(0), codirection(0) {}
+		BucketContent(qpos_t matches, int codirection) : matches(matches), codirection(codirection) {}
+
+		friend std::ostream& operator<<(std::ostream& os, const BucketContent& b) {
+			os << "(" << b.matches << "," << b.codirection << ")";
+			return os;
+		}
+
+		BucketContent operator+=(const BucketContent &other) {
+			matches += other.matches;
+			codirection += other.codirection;
+			return *this;
+		}
+	};
+
+	using bucket_map_t = ankerl::unordered_dense::map<BucketLoc, BucketContent, BucketHash, std::equal_to<BucketLoc> >;
 
 	struct Pos {
 		segm_t segm_id;
@@ -55,24 +75,24 @@ public:
 	//	return Pos(segm_id, r, this);
 	//}
 
-    void add_to_pos(const Pos& p, qpos_t matches) {
+    void add_to_pos(const Pos& p, const BucketContent &content) {
         qpos_t b = p.r/len;
-        _B[ Bucket(p.segm_id, b, this) ] += matches;
-        if (b>0) _B[ Bucket(p.segm_id, b-1, this) ] += matches;
+        _B[ BucketLoc(p.segm_id, b, this) ] += content;
+        if (b>0) _B[ BucketLoc(p.segm_id, b-1, this) ] += content;
     }
 
-    void assign_to_pos(const Pos& p, qpos_t matches) {
+    void assign_to_pos(const Pos& p, const BucketContent &content) {
         qpos_t b = p.r/len;
-        _B[ Bucket(p.segm_id, b, this) ] = matches;
-        if (b>0) _B[ Bucket(p.segm_id, b-1, this) ] = matches;
+        _B[ BucketLoc(p.segm_id, b, this) ] = content;
+        if (b>0) _B[ BucketLoc(p.segm_id, b-1, this) ] = content;
     }
 
-    void add_to_bucket(Bucket b, qpos_t matches) {
+    void add_to_bucket(BucketLoc b, const BucketContent &content) {
 		b.parent = this;
-        _B[b] += matches;
+        _B[b] += content;
     }
 
-	bool delete_bucket(Bucket b) {
+	bool delete_bucket(BucketLoc b) {
 		return _B.erase(b);
 	}
 
@@ -80,10 +100,10 @@ public:
 		return len;
 	}
 
-	qpos_t get_matches(const Bucket& b) const {
+	qpos_t get_matches(const BucketLoc& b) const {
 		auto it = _B.find(b);
 		if (it == _B.end()) return 0;
-		return it->second;
+		return it->second.matches;
 	}
 
 	int size() const {
@@ -133,8 +153,8 @@ public:
 
 	class OrderedIterator {
 	public:
-		using sorted_vector_t = std::vector<std::reference_wrapper<const bucket_map_t::value_type>>;
-		using sorted_iterator = typename sorted_vector_t::const_iterator;
+		using sorted_vector_t = std::vector<std::reference_wrapper<bucket_map_t::value_type>>;
+		using sorted_iterator = typename sorted_vector_t::iterator;
 		using iterator_category = std::forward_iterator_tag;
 		using value_type = Pos;
 		using difference_type = std::ptrdiff_t;
@@ -143,11 +163,11 @@ public:
 
 		OrderedIterator(sorted_iterator it) : it_(it) {}
 
-		const bucket_map_t::value_type& operator*() const {
+		bucket_map_t::value_type& operator*() {
 			return it_->get();
 		}
 
-        const bucket_map_t::value_type* operator->() const {
+        bucket_map_t::value_type* operator->() {
             return &(it_->get());
         }
 
@@ -166,11 +186,11 @@ public:
 
     // TODO: sort once, not every time; make sure nothing changes
 	// Helper to create a sorted vector
-	std::vector<std::reference_wrapper<const bucket_map_t::value_type>> get_sorted_buckets() const {
-		std::vector<std::reference_wrapper<const bucket_map_t::value_type>> sorted_buckets;
+	std::vector<std::reference_wrapper<bucket_map_t::value_type>> get_sorted_buckets() {
+		std::vector<std::reference_wrapper<bucket_map_t::value_type>> sorted_buckets;
 		sorted_buckets.reserve(_B.size());
-		for (const auto& bucket : _B) {
-			sorted_buckets.push_back(std::cref(bucket));
+		for (auto& bucket : _B) {
+			sorted_buckets.push_back(std::ref(bucket));
 		}
 		std::sort(sorted_buckets.begin(), sorted_buckets.end(),
 				  [](const auto& a, const auto& b) {
@@ -178,22 +198,22 @@ public:
 					//  if (a.get().first.segm_id != b.get().first.segm_id)
 					//	  return a.get().first.segm_id < b.get().first.segm_id;
                     // Sort by decreasing number of matches
-					  return a.get().second > b.get().second; 
+					  return a.get().second.matches > b.get().second.matches; 
 				  });
 		return sorted_buckets;
 	}
 
-	OrderedIterator ordered_begin() const {
+	OrderedIterator ordered_begin() {
 		sorted_buckets_ = get_sorted_buckets();
-		return OrderedIterator(sorted_buckets_.cbegin());
+		return OrderedIterator(sorted_buckets_.begin());
 	}
 
-	OrderedIterator ordered_end() const {
-		return OrderedIterator(sorted_buckets_.cend());
+	OrderedIterator ordered_end() {
+		return OrderedIterator(sorted_buckets_.end());
 	}
 
 private:
-	mutable std::vector<std::reference_wrapper<const bucket_map_t::value_type>> sorted_buckets_;
+	std::vector<std::reference_wrapper<bucket_map_t::value_type>> sorted_buckets_;
 
 	qpos_t len;  // half-length; the bucket spans [r*len, (r+2)*len)
 	bucket_map_t _B;

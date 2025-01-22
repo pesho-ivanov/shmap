@@ -4,6 +4,8 @@
 #include <vector>
 
 #include <ankerl/unordered_dense.h>
+#include "../ext/gtl/phmap.hpp"
+#include "../ext/gtl/vector.hpp"
 
 #include "sketch.h"
 #include "utils.h"
@@ -17,8 +19,10 @@ class SketchIndex {
 
 public:
 	std::vector<RefSegment> T;
-	ankerl::unordered_dense::map<hash_t, Hit> h2single;               // all sketched kmers with =1 hit
-	ankerl::unordered_dense::map<hash_t, std::vector<Hit>> h2multi;   // all sketched kmers with >1 hits
+	//ankerl::unordered_dense::map<hash_t, Hit> h2single;               // all sketched kmers with =1 hit
+	//ankerl::unordered_dense::map<hash_t, gtl::vector<Hit>> h2multi;   // all sketched kmers with >1 hits
+	gtl::flat_hash_map<hash_t, Hit> h2single;               // all sketched kmers with =1 hit
+	gtl::flat_hash_map<hash_t, gtl::vector<Hit>> h2multi;   // all sketched kmers with >1 hits
 
 	Handler *H;
 
@@ -48,11 +52,20 @@ public:
 		H->C.inc("indexed_highest_freq_kmer", max_occ);
 	}
 
-	rpos_t count(hash_t h) const {
-		if (h2single.contains(h)) return 1;
-		else if (h2multi.contains(h)) return h2multi.at(h).size();
-		else return 0;
+//	rpos_t count(hash_t h) const {
+//		if (h2single.contains(h)) return 1;
+//		else if (h2multi.contains(h)) return h2multi.at(h).size();
+//		else return 0;
+//	}
+
+	inline rpos_t count(hash_t h) const {
+		if (auto it = h2single.find(h); it != h2single.end())
+			return 1;
+		if (auto it = h2multi.find(h); it != h2multi.end())
+			return it->second.size();
+		return 0;
 	}
+
 
 	bool intersect(const Hit &hit, const rpos_t from, const rpos_t to) const {
 		// TODO: account for segments
@@ -87,34 +100,38 @@ public:
 //		return false;
 //	}
 
-	int matches_in_bucket(const Seed &s, const Buckets::Bucket b) const {
+	Buckets::BucketContent matches_in_bucket(const Seed &s, const Buckets::BucketLoc b) const {
+		Buckets::BucketContent bucket;
 		if (s.hits_in_T == 0) {
-			return 0;
+			return bucket;
 		} else if (s.hits_in_T == 1) {
 			auto &hit = h2single.at(s.kmer.h);
-			return (b.begin() <= hit.tpos && hit.tpos < b.end()) ? 1 : 0;
+			if (b.begin() <= hit.r && hit.r < b.end()) {
+				bucket.matches = 1;
+				bucket.codirection = hit.strand == s.kmer.strand ? 1 : -1;
+			}
 		} else if (s.hits_in_T > 1) {
-			const vector<Hit> &hits = h2multi.at(s.kmer.h);
+			const auto &hits = h2multi.at(s.kmer.h);
 			//for (int i=1; i<(int)hits.size(); i++) assert(hits[i-1].r <= hits[i].r);
 			auto it = lower_bound(hits.begin(), hits.end(), b.begin(), [&b](const Hit &hit, rpos_t pos) {
 				if (hit.segm_id != b.segm_id)
 					return hit.segm_id < b.segm_id;
-				return hit.tpos < pos;
+				return hit.r < pos;
 			});
-			int matches = 0;
-			for (; it != hits.end() && it->segm_id == b.segm_id && it->tpos < b.end(); ++it)
-				++matches;
-			return matches;
+			for (; it != hits.end() && it->segm_id == b.segm_id && it->r < b.end(); ++it) {
+				bucket.matches += 1;
+				bucket.codirection += it->strand == s.kmer.strand ? 1 : -1;
+			}
 			//auto it_prev = it; if (it_prev != hits.begin()) { --it_prev; assert(it_prev->r < from); }
 			//if (it != hits.end()) assert(from <= it->r);
 			//cout << (it != hits.end() && it->r < to) << ", [" << from << ", " << to << ")" << ", it: " << (it != hits.end() ? it->r : -1) << endl;
 			
 			//return it != hits.end() && it->tpos < b.end();
 		}
-		return 0;
+		return bucket;
 	}
 
-	void get_matches(std::vector<Match> *matches, const Seed &s) const {
+	void get_matches(gtl::vector<Match> *matches, const Seed &s) const {
 		matches->reserve(matches->size() + s.hits_in_T);
 		if (s.hits_in_T == 1) {
 			matches->push_back(Match(s, h2single.at(s.kmer.h)));

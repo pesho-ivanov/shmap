@@ -2,7 +2,7 @@ SHELL := /bin/bash
 CC = g++
 CXX_STANDARD = -std=c++20
 DEBUG_FLAGS = -g -DDEBUG
-RELEASE_FLAGS = -O3 -DNDEBUG -flto
+RELEASE_FLAGS = -Ofast -DNDEBUG -flto -march=native
 CFLAGS = -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
 ifeq ($(DEBUG), 1)
     CFLAGS += $(DEBUG_FLAGS)
@@ -42,9 +42,9 @@ MEANLEN ?= ?
 
 K ?= 25
 R ?= 0.05
-T ?= 0.7
+T ?= 0.5
 MIN_DIFF ?= 0.1
-MAX_OVERLAP ?= 0.7
+MAX_OVERLAP ?= 0.4
 
 THETAS = 0.95 0.9 0.85 0.8 0.75 0.7 0.65 0.6 0.55 0.5  
 PAUL_THETAS = 1.0 0.9 0.8 0.7 0.6 0.5 0.4 0.3
@@ -208,7 +208,7 @@ eval_shmap: $(SHMAP_BIN) gen_reads
 	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) $(ARGS_SHMAP) 2>/dev/null >/dev/null
 	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) $(ARGS_SHMAP)    2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
 	$(PAFTOOLS) mapeval -r 0.1 $(SHMAP_PREF).paf 2>/dev/null | tee $(SHMAP_PREF).eval || true
-	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_PREF).paf >$(SHMAP_PREF).wrong 2>/dev/null || true
+	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_PREF).paf > $(SHMAP_PREF).wrong 2>/dev/null || true
 
 eval_shmap_noprune: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_NOPRUNE_PREF))
