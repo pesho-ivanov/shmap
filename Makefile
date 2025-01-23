@@ -43,8 +43,8 @@ MEANLEN ?= ?
 K ?= 25
 R ?= 0.05
 T ?= 0.4
-MIN_DIFF ?= 0.15
-MAX_OVERLAP ?= 0.2
+MIN_DIFF ?= 0.05
+MAX_OVERLAP ?= 0.4
 
 THETAS = 0.95 0.9 0.85 0.8 0.75 0.7 0.65 0.6 0.55 0.5  
 PAUL_THETAS = 1.0 0.9 0.8 0.7 0.6 0.5 0.4 0.3
@@ -263,16 +263,16 @@ eval_mapquik: gen_reads
 eval_tools: eval_mm2 #eval_shmap eval_blend eval_mapquik eval_minimap #eval_winnowmap 
 
 eval_tools_on_datasets:
-	#make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chrY READSIM_REFNAME=chrY DEPTH=2
-	#make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READS_PREFIX=HG002_small
-	#make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=hg002     DEPTH=1
-	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=chm13     DEPTH=1
+	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chrY 	READSIM_REFNAME=chrY    DEPTH=2
+	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READSIM_REFNAME=chm13   DEPTH=1
+	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READSIM_REFNAME=hg002   DEPTH=1
+	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READS_PREFIX=HG002_small
 
 eval_shmap_on_datasets:
-	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chrY READSIM_REFNAME=chrY DEPTH=2
-	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READS_PREFIX=HG002_small
-	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=hg002     DEPTH=1
-	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13     READSIM_REFNAME=chm13     DEPTH=1
+	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chrY 	READSIM_REFNAME=chrY 	DEPTH=2
+	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13 	READSIM_REFNAME=hg002 	DEPTH=1
+	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READSIM_REFNAME=chm13   DEPTH=1
+	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READS_PREFIX=HG002_small
 
 #SHMAP_PREF         = $(ALLOUT_DIR)/pauls_experiment/$(READS_PREFIX)/
 pauls_experiment: $(SHMAP_BIN) gen_reads

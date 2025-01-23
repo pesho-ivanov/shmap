@@ -206,8 +206,8 @@ struct params_t {
 					break;
 				case 'd':
 					min_diff = atof(optarg);
-					if(min_diff < 0.0 || min_diff > 1.0) {
-						cerr << "ERROR: The minimum difference (-d) should be between 0 and 1." << "You provided " << optarg << "." << endl;
+					if(min_diff < 0.0) {
+						cerr << "ERROR: The minimum difference (-d) should be >=0." << "You provided " << optarg << "." << endl;
 						return false;
 					}
 					break;

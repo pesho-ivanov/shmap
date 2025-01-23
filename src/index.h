@@ -164,6 +164,7 @@ public:
 
 	void populate_h2pos(const sketch_t& sketch, segm_t segm_id) {
 		// TODO: skip creating the sketch structure
+		// TODO: prepare the hits and initialize hashmaps in batch
 		for (size_t tpos = 0; tpos < sketch.size(); ++tpos) {
 			const Kmer& kmer = sketch[tpos];
 			const auto hit = Hit(kmer, tpos, segm_id);

@@ -281,23 +281,56 @@ public:
 	qpos_t intersection() const {
 		return local_stats.intersection;
 	}
-
+	
+	// similar to minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1
 	int calc_mapq(double theta, double min_diff) {
-		// minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
-		assert(score() >= 0.0);
 		if (score2() < theta)
 			set_score2(theta);
-		double diff = score() - score2();
+		double frac = 1.0 - score2()/score();
+		//double diff = score() - score2();
 		int mapq_strand = (abs(local_stats.same_strand_seeds) < local_stats.intersection/2) ? 5 : 60;
-		if (diff > min_diff) {
+		if (frac > min_diff) {
 			return std::min(60, mapq_strand);
-		} else if (diff < min_diff/2) {
+		} else if (frac < min_diff/2) {
 			return 0;
 		} else {
-			diff -= min_diff/2;
-			return std::min(int(60*diff/(min_diff/2)), mapq_strand);
+			frac -= min_diff/2;
+			return std::min(int(60*frac/(min_diff/2)), mapq_strand);
 		}
 	}
+
+//	int calc_mapq(double theta, double min_diff) {
+//		if (score2() < theta)
+//			set_score2(theta);
+//		double frac = (1.0 - score2()) / (1.0 - score());
+//		//double diff = score() - score2();
+//		int mapq_strand = (abs(local_stats.same_strand_seeds) < local_stats.intersection/2) ? 5 : 60;
+//		if (frac > min_diff) {
+//			return std::min(60, mapq_strand);
+//		} else if (frac < min_diff/2) {
+//			return 0;
+//		} else {
+//			frac -= min_diff/2;
+//			return std::min(int(60*frac/(min_diff/2)), mapq_strand);
+//		}
+//	}
+
+//	int calc_mapq(double theta, double min_diff) {
+//		// minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1, where m is #anchors on primary chain
+//		assert(score() >= 0.0);
+//		if (score2() < theta)
+//			set_score2(theta);
+//		double diff = score() - score2();
+//		int mapq_strand = (abs(local_stats.same_strand_seeds) < local_stats.intersection/2) ? 5 : 60;
+//		if (diff > min_diff) {
+//			return std::min(60, mapq_strand);
+//		} else if (diff < min_diff/2) {
+//			return 0;
+//		} else {
+//			diff -= min_diff/2;
+//			return std::min(int(60*diff/(min_diff/2)), mapq_strand);
+//		}
+//	}
 
 	double sigmas_diff(qpos_t X, qpos_t Y) {
 		if (X==-1) X=0;

@@ -342,9 +342,9 @@ public:
 					//cerr << "B.unordered:" << endl;
 					//for (auto it = B.unordered_begin(); it != B.unordered_end(); ++it)
 					//	cerr << it->first << " -> " << it->second << endl;
-					cerr << "B.ordered: " << endl;
-					for (auto it = B.ordered_begin(); it != B.ordered_end(); ++it)
-						cerr << it->first << " -> " << it->second << endl;
+					//cerr << "B.ordered: " << endl;
+					//for (auto it = B.ordered_begin(); it != B.ordered_end(); ++it)
+					//	cerr << it->first << " -> " << it->second << endl;
 				}
 
 				//int lost_on_seeding = matcher.lost_correct_mapping(query_id, B);
@@ -379,7 +379,11 @@ public:
 					//cerr << "match_rest_for_best2" << endl;
 					if (best_idx != -1) {
 						// find second best mapping for mapq computation
-						double second_best_thr = maps[best_idx].sh() - H->params.min_diff;
+						//double second_best_thr = maps[best_idx].sh() - H->params.min_diff;
+						//double second_best_thr = 1.0 - (1.0 - maps[best_idx].sh()) * H->params.min_diff;  // for a franctional diff
+						// 1.0 - score2()/score() > min_diff => score2() < score() * (1.0 - min_diff)
+						//double second_best_thr = 1.0 - maps[best_idx].sh() * H->params.min_diff;
+						double second_best_thr = maps[best_idx].sh() * (1.0 - H->params.min_diff);  // f1 * (1 - min_diff)
 						match_rest(P_sz, m, m, kmers, B, diff_hist, p_ht, maps, total_matches, best2_idx, final_buckets, second_best_thr, min_diff, best_idx, query_id, &lost_on_pruning, H->params.max_overlap);
 					}
 				H->T.stop("match_rest_for_best2");
@@ -414,9 +418,9 @@ public:
 					if (best_idx != -1) {
 						gt.print_paf(cout);
 						auto gt_overlap = Mapping::overlap(gt.gt_mapping, maps[best_idx]);
-						*os << "\tgt_mapping_len:" << (gt.gt_mapping.paf.T_r-gt.gt_mapping.paf.T_l)
-						   << "\treported_mapping_len:" << (maps[best_idx].paf.T_r-maps[best_idx].paf.T_l)
-						   << "\tgt_overlap:" << std::fixed << std::setprecision(3) << gt_overlap;
+						*os << "\tgt_mapping_len:i:" << (gt.gt_mapping.paf.T_r-gt.gt_mapping.paf.T_l)
+						   << "\treported_mapping_len:i:" << (maps[best_idx].paf.T_r-maps[best_idx].paf.T_l)
+						   << "\tgt_overlap:f:" << std::fixed << std::setprecision(3) << gt_overlap;
 					}
 					if (!H->params.paramsFile.empty())
 						gt.print_tsv(paulout);
