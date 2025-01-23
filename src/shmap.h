@@ -279,28 +279,30 @@ public:
 				H->T.stop("prepare");
 
 				H->T.start("match_seeds");
-					int matches_in_B = 0;
+					//int matches_in_B = 0;
 					rpos_t seed_matches(0), max_seed_matches(0), seeded_buckets(0);  // stats
 					for (; B.i < (qpos_t)kmers.size() && B.seeds < S; B.i++) {
 						Seed seed = kmers[B.i];
 						if (seed.hits_in_T > 0) {
 							seed_matches += seed.hits_in_T;
 							max_seed_matches = max(max_seed_matches, seed.hits_in_T);
-							Matches seed_matches;
-							tidx.get_matches(&seed_matches, seed);
-
-							//auto B2 = B;	
-							//////////////// correct B
-							Buckets b2m(B.get_bucket_len());
-							for (auto &m: seed_matches) {
-								Buckets::BucketContent content(1, 0, m.codirection(), m.hit.r, m.hit.r);
-								//b2m.assign_to_pos(Buckets::Pos(m.hit.segm_id, m.hit.r), content);
-								b2m.add_to_pos(Buckets::Pos(m.hit.segm_id, m.hit.r), content);
-							}
-							for (auto it = b2m.unordered_begin(); it != b2m.unordered_end(); ++it) {
-								Buckets::BucketContent content(min(it->second.matches, seed.occs_in_p), 0, it->second.codirection, it->second.r_min, it->second.r_max);
-								B.add_to_bucket(it->first, content);
-								matches_in_B += it->second.matches;
+							//tidx.get_matches(&seed_matches, seed);
+							
+							if (seed.hits_in_T == 1) {
+								auto hit = tidx.h2single.at(seed.kmer.h);
+								Buckets::BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
+								B.add_to_pos(Buckets::Pos(hit.segm_id, hit.r), content);
+							} else if (seed.hits_in_T > 1) {
+								Buckets b2m(B.get_bucket_len());
+								for (const auto &hit: tidx.h2multi.at(seed.kmer.h)) {
+									Buckets::BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
+									b2m.add_to_pos(Buckets::Pos(hit.segm_id, hit.r), content);
+								}
+								for (auto it = b2m.unordered_begin(); it != b2m.unordered_end(); ++it) {
+									Buckets::BucketContent content(min(it->second.matches, seed.occs_in_p), 0, it->second.codirection, it->second.r_min, it->second.r_max);
+									B.add_to_bucket(it->first, content);
+									//matches_in_B += it->second.matches;
+								}
 							}
 
 							//bucket_t prev_b(-1, -1);
