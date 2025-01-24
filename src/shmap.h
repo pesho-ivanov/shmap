@@ -204,6 +204,7 @@ public:
 
 		H->T.start("mapping");
 		H->T.start("query_reading");
+		H->T.start("match_seeds_single"); H->T.stop("match_seeds_single");
 
 		string pauls_fn = H->params.paramsFile + ".paul.tsv";
 		string unmapped_fn = H->params.paramsFile + ".unmapped.paf";
@@ -289,14 +290,24 @@ public:
 							//tidx.get_matches(&seed_matches, seed);
 							
 							if (seed.hits_in_T == 1) {
-								auto hit = tidx.h2single.at(seed.kmer.h);
-								Buckets::BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
-								B.add_to_pos(Buckets::Pos(hit.segm_id, hit.r), content);
-							} else if (seed.hits_in_T > 1) {
+								H->T.start("match_seeds_single");
+									auto hit = tidx.h2single.at(seed.kmer.h);
+									Buckets::BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
+									B.add_to_pos(hit, content);
+								H->T.stop("match_seeds_single");
+							//}
+							//else if (seed.occs_in_p == 1) {
+							//	H->T.start("match_seeds_single");
+							//		for (const auto &hit: tidx.h2multi.at(seed.kmer.h)) {
+							//			Buckets::BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
+							//			B.add_to_bucket(Buckets::BucketLoc(hit.segm_id, hit.r/B.get_bucket_len(), &B), content);
+							//		}
+							//	H->T.stop("match_seeds_single");
+							} else {
 								Buckets b2m(B.get_bucket_len());
 								for (const auto &hit: tidx.h2multi.at(seed.kmer.h)) {
 									Buckets::BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
-									b2m.add_to_pos(Buckets::Pos(hit.segm_id, hit.r), content);
+									b2m.add_to_pos(hit, content);
 								}
 								for (auto it = b2m.unordered_begin(); it != b2m.unordered_end(); ++it) {
 									Buckets::BucketContent content(min(it->second.matches, seed.occs_in_p), 0, it->second.codirection, it->second.r_min, it->second.r_max);
@@ -511,6 +522,7 @@ public:
 //        cerr << " |  |  | thin sketch:             " << setw(5) << right << H->T.secs("thin_sketch")       << " (" << setw(4) << right << H->T.perc("thin_sketch", "seeding")         << "\%, " << setw(6) << right << H->T.range_ratio("thin_sketch") << "x)" << endl;
 //        cerr << " |  |  | unique seeds:            " << setw(5) << right << H->T.secs("unique_seeds")      << " (" << setw(4) << right << H->T.perc("unique_seeds", "seeding")        << "\%, " << setw(6) << right << H->T.range_ratio("unique_seeds") << "x)" << endl;
         cerr << " |  | match seeds:            " << setw(5) << right << H->T.secs("match_seeds")  << " (" << setw(4) << right << H->T.perc("match_seeds", "mapping")   << "\%, " << setw(6) << right << H->T.range_ratio("match_seeds") << "x)" << endl;
+		cerr << " |  |  | match seeds single:     " << setw(5) << right << H->T.secs("match_seeds_single")  << " (" << setw(4) << right << H->T.perc("match_seeds_single", "match_seeds")   << "\%, " << setw(6) << right << H->T.range_ratio("match_seeds_single") << "x)" << endl;
         cerr << " |  | match rest:             " << setw(5) << right << H->T.secs("match_rest")   << " (" << setw(4) << right << H->T.perc("match_rest", "mapping")     << "\%, " << setw(6) << right << H->T.range_ratio("match_rest") << "x): " << H->T.perc("match_rest_for_best2", "match_rest") << "% for second best" << endl;
         cerr << " |  |  | seed heuristic:         " << setw(5) << right << H->T.secs("seed_heuristic")    << " (" << setw(4) << right << H->T.perc("seed_heuristic", "match_rest")     << "\%, " << setw(6) << right << H->T.range_ratio("seed_heuristic") << "x)" << endl;
         cerr << " |  |  | matches collect:        " << setw(5) << right << H->T.secs("match_collect")     << " (" << setw(4) << right << H->T.perc("match_collect", "match_rest")      << "\%, " << setw(6) << right << H->T.range_ratio("match_collect") << "x)" << endl;

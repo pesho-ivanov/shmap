@@ -3,7 +3,7 @@
 #include <ankerl/unordered_dense.h>
 #include <functional>  // for std::hash
 
-#include "utils.h"
+#include "types.h"
 
 namespace sweepmap {
 
@@ -99,10 +99,10 @@ public:
 	//	return Pos(segm_id, r, this);
 	//}
 
-    void add_to_pos(const Pos& p, const BucketContent &content) {
-        qpos_t b = p.r/len;
-        _B[ BucketLoc(p.segm_id, b, this) ] += content;
-        if (b>0) _B[ BucketLoc(p.segm_id, b-1, this) ] += content;
+    void add_to_pos(const Hit& hit, const BucketContent &content) {
+        qpos_t b = hit.r/len;
+        _B[ BucketLoc(hit.segm_id, b, this) ] += content;
+        if (b>0) _B[ BucketLoc(hit.segm_id, b-1, this) ] += content;
     }
 
     void add_to_bucket(BucketLoc b, const BucketContent &content) {

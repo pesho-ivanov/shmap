@@ -8,12 +8,9 @@
 #include <string>
 #include <unordered_map>
 
-namespace sweepmap {
+#include "types.h"
 
-using hash_t     = uint64_t;
-using rpos_t     = int32_t;  // reference position; klib anyway doesn't support 64-bit
-using qpos_t     = int32_t;  // query position
-using segm_t     = int32_t;
+namespace sweepmap {
 
 class Timer {
 public:
