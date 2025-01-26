@@ -1,26 +1,40 @@
 SHELL := /bin/bash
 CC = g++
-CXX_STANDARD = -std=c++20
-DEBUG_FLAGS = -g -pg -DDEBUG
-RELEASE_FLAGS = -Ofast -DNDEBUG -flto -march=native -pg
-CFLAGS = -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
+CFLAGS = -std=c++20 -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
 ifeq ($(DEBUG), 1)
-    CFLAGS += $(DEBUG_FLAGS)
 	SHMAP_BIN = ./debug/shmap
-	FLAG_FILE = debug_flag
 else
-    CFLAGS += $(RELEASE_FLAGS)
 	SHMAP_BIN = ./release/shmap
-	FLAG_FILE = release_flag
 endif
+
+SRCS = map.cpp mapper.cpp io.cpp 
+#edlib.cpp
+OBJS = $(SRCS:.cpp=.o)
+DEPS = $(OBJS:.o=.d)
+
+DBGDIR = debug
+RELDIR = release
+BIN = shmap
+
+# Debug build settings
+DBGDIR = debug
+DBGBIN = $(DBGDIR)/$(BIN)
+DBGOBJS = $(addprefix $(DBGDIR)/, $(OBJS))
+DBGCFLAGS = -g -O0 -DDEBUG
+# -pg 
+
+# Release build settings
+RELDIR = release
+RELBIN = $(RELDIR)/$(BIN)
+RELOBJS = $(addprefix $(RELDIR)/, $(OBJS))
+RELCFLAGS = -O3 -DNDEBUG
+#-Ofast -DNDEBUG -flto -march=native -pg
+
+#SHMAP_BIN = ./release/$(BIN)
 LIBS = -lz
 DEPFLAGS = -MMD -MP
 
 TIME_CMD = /usr/bin/time -f "%U\t%M"
-
-SRCS = src/map.cpp src/mapper.cpp src/io.cpp ext/edlib.cpp
-OBJS = $(SRCS:.cpp=.o)
-DEPS = $(OBJS:.o=.d)
 
 MINIMAP_BIN = ~/libs/minimap2/minimap2
 MM2_BIN = ~/libs/mm2-fast/minimap2
@@ -43,7 +57,7 @@ MEANLEN ?= ?
 
 K ?= 25
 R ?= 0.05
-T ?= 0.4
+T ?= 0.5
 MIN_DIFF ?= 0.15
 MAX_OVERLAP ?= 0.4
 
@@ -103,27 +117,51 @@ WINNOWMAP_PREF     = $(ALLOUT_DIR)/winnowmap/$(READS_PREFIX)/winnowmap
 
 .PHONY: all clean clean_evals simulate_SVs gen_reads eval_sketching eval_thinning fdr_per_theta eval_shmap eval_shmap_noprune eval_shmap_onesweep eval_winnowmap eval_minimap eval_mm2 eval_blend eval_mapquik eval_tools eval_tools_on_datasets eval_shmap_on_datasets pauls_experiment eval_tools_on_SV clean_evals
 
-all: $(SHMAP_BIN)
+all: prep release
+	
+prep:
+	@mkdir -p $(DBGDIR) $(RELDIR)
+	
+debug: $(DBGBIN)
+	
+$(DBGDIR)/$(BIN): $(DBGOBJS)
+	$(CC) $(CFLAGS) $(DBGCFLAGS) -o $(DBGDIR)/$(BIN) $^ $(LIBS)
 
-# Add the flag file as a prerequisite and create it if needed
-$(SHMAP_BIN): $(OBJS) | $(FLAG_FILE)
-	mkdir -p $(shell dirname $@)
-	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $@ $(OBJS) $(LIBS)
+$(DBGDIR)/%.o: src/%.cpp
+	$(CC) -c $(CFLAGS) $(DBGCFLAGS) -o $@ $<
 
-# Create flag files if they don't exist
-$(FLAG_FILE):
-	@rm -f debug_flag release_flag
-	@touch $@
+release: $(RELBIN)
+	
+$(RELBIN): $(RELOBJS)
+	$(CC) $(CFLAGS) $(RELCFLAGS) -o $(RELBIN) $^ $(LIBS)
 
-%.o: %.cpp
-	$(CXX) $(CXX_STANDARD) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+$(RELDIR)/%.o: src/%.cpp
+	$(CC) -c $(CFLAGS) $(RELCFLAGS) -o $@ $<
 
--include $(DEPS)
+remake: clean all
 
 clean:
-	rm -f $(OBJS) debug_flag release_flag
-	rm -rf debug release
-	$(MAKE) clean_test
+	rm -f $(RELEXE) $(RELOBJS) $(DBGEXE) $(DBGOBJS)
+
+# Add the flag file as a prerequisite and create it if needed
+#$(SHMAP_BIN): $(OBJS) | $(FLAG_FILE)
+#	mkdir -p $(shell dirname $@)
+#	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $@ $(OBJS) $(LIBS)
+
+# Create flag files if they don't exist
+#$(FLAG_FILE):
+#	@rm -f debug_flag release_flag
+#	@touch $@
+
+#%.o: %.cpp
+#	$(CXX) $(CXX_STANDARD) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+
+#-include $(DEPS)
+
+#clean:
+#	rm -f $(OBJS) debug_flag release_flag
+#	rm -rf debug release
+#	$(MAKE) clean_test
 
 simulate_SVs:
 	cd $(REF_DIR);\

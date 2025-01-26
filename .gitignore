@@ -45,3 +45,5 @@ src/fa2tsv
 *.zip
 out_small
 profile.txt
+debug/
+release/

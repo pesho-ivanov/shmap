@@ -25,6 +25,7 @@
 
 namespace sweepmap {
 
+/*
 class TimerEmpty {
 public:
     void start() {}
@@ -46,8 +47,8 @@ public:
 
 typedef TimerEmpty Timer;
 typedef TimersEmpty Timers;
+*/
 
-/*
 class Timer {
 public:
     std::chrono::time_point<std::chrono::high_resolution_clock> start_time_point_, end_time_point_;
@@ -168,7 +169,6 @@ public:
         return *this;
     }
 };
-*/
 
 class Counter {
 private:
