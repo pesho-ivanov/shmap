@@ -472,6 +472,10 @@ public:
 	FracMinHash(int k, double hFrac, Counters *C, Timers *T)
 			: k(k), hFrac(hFrac), C(C), T(T) {
         initialize_LUT();
+		C->init("sketched_seqs");
+		C->init("sketched_len");
+		C->init("original_kmers");
+		C->init("sketched_kmers");
 	}
 };
 

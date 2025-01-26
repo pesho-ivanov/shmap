@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
 	tidx.build_index(H.params.tFile);
 	Mapper* mapper = MapperFactory::createMapper(H.params.mapper, tidx, &H);
 	if (mapper == nullptr) return 1;
-	mapper->map(H.params.pFile);
+	mapper->map_reads(H.params.pFile);
 
 	return 0;
 }

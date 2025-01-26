@@ -1,8 +1,8 @@
 SHELL := /bin/bash
 CC = g++
 CXX_STANDARD = -std=c++20
-DEBUG_FLAGS = -g -DDEBUG
-RELEASE_FLAGS = -Ofast -DNDEBUG -flto -march=native
+DEBUG_FLAGS = -g -pg -DDEBUG
+RELEASE_FLAGS = -Ofast -DNDEBUG -flto -march=native -pg
 CFLAGS = -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
 ifeq ($(DEBUG), 1)
     CFLAGS += $(DEBUG_FLAGS)
@@ -32,7 +32,8 @@ SURVIVOR_BIN = ~/libs/SURVIVOR/Debug/SURVIVOR
 
 INF = 999999
 
-ARGS_SHMAP ?= 
+SHMAP_NOINDEX ?= 0 
+SHMAP_ARGS ?= 
 
 REFNAME ?= chm13-chr1
 READSIM_REFNAME ?= $(REFNAME)
@@ -43,7 +44,7 @@ MEANLEN ?= ?
 K ?= 25
 R ?= 0.05
 T ?= 0.4
-MIN_DIFF ?= 0.05
+MIN_DIFF ?= 0.15
 MAX_OVERLAP ?= 0.4
 
 THETAS = 0.95 0.9 0.85 0.8 0.75 0.7 0.65 0.6 0.55 0.5  
@@ -99,6 +100,8 @@ WINNOWMAP_PREF     = $(ALLOUT_DIR)/winnowmap/$(READS_PREFIX)/winnowmap
 
 #SHMAP_NOPRUNE_PREF = $(ALLOUT_DIR)/shmap-noprune/$(READS_PREFIX)/shmap-noprune
 #SHMAP_ONESWEEP_PREF= $(ALLOUT_DIR)/shmap-onesweep/$(READS_PREFIX)/shmap-onesweep
+
+.PHONY: all clean clean_evals simulate_SVs gen_reads eval_sketching eval_thinning fdr_per_theta eval_shmap eval_shmap_noprune eval_shmap_onesweep eval_winnowmap eval_minimap eval_mm2 eval_blend eval_mapquik eval_tools eval_tools_on_datasets eval_shmap_on_datasets pauls_experiment eval_tools_on_SV clean_evals
 
 all: $(SHMAP_BIN)
 
@@ -205,8 +208,10 @@ fdr_per_theta: $(SHMAP_BIN) gen_reads
 
 eval_shmap: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_PREF))
-	$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) $(ARGS_SHMAP) 2>/dev/null >/dev/null
-	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) $(ARGS_SHMAP)    2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
+	if [ $(SHMAP_NOINDEX) -ne 1 ]; then \
+		$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) $(SHMAP_ARGS) 2>/dev/null >/dev/null; \
+	fi
+	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) $(SHMAP_ARGS)    2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
 	$(PAFTOOLS) mapeval -r 0.1 $(SHMAP_PREF).paf 2>/dev/null | tee $(SHMAP_PREF).eval || true
 	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_PREF).paf > $(SHMAP_PREF).wrong 2>/dev/null || true
 

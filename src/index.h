@@ -182,7 +182,10 @@ public:
 		populate_h2pos(sketch, T.size()-1);
 	}
 
-	SketchIndex(Handler *H) : H(H) {}
+	SketchIndex(Handler *H) : H(H) {
+		H->C.init("segments");
+		H->C.init("total_nucls");
+	}
 
 	void build_index(const std::string &tFile) {
 		H->T.start("indexing");

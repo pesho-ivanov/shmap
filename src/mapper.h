@@ -8,7 +8,7 @@ namespace sweepmap {
 
 class Mapper {
 public:
-	virtual void map(const string &) = 0;
+	virtual void map_reads(const string &) = 0;
     virtual void print_stats() = 0;
 };
 

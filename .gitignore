@@ -44,3 +44,4 @@ src/fa2tsv
 *.paf
 *.zip
 out_small
+profile.txt
