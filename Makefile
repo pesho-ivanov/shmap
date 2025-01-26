@@ -12,6 +12,9 @@ SRCS = map.cpp mapper.cpp io.cpp
 OBJS = $(SRCS:.cpp=.o)
 DEPS = $(OBJS:.o=.d)
 
+# Remove manual header list
+# HDRS = src/shmap.h src/refine.h src/utils.h src/index.h src/sketch.h
+
 DBGDIR = debug
 RELDIR = release
 BIN = shmap
@@ -21,14 +24,14 @@ DBGDIR = debug
 DBGBIN = $(DBGDIR)/$(BIN)
 DBGOBJS = $(addprefix $(DBGDIR)/, $(OBJS))
 DBGCFLAGS = -g -O0 -DDEBUG
-# -pg 
+DBGDEPS = $(DBGOBJS:.o=.d)
 
 # Release build settings
 RELDIR = release
 RELBIN = $(RELDIR)/$(BIN)
 RELOBJS = $(addprefix $(RELDIR)/, $(OBJS))
 RELCFLAGS = -O3 -DNDEBUG
-#-Ofast -DNDEBUG -flto -march=native -pg
+RELDEPS = $(RELOBJS:.o=.d)
 
 #SHMAP_BIN = ./release/$(BIN)
 LIBS = -lz
@@ -128,7 +131,7 @@ $(DBGDIR)/$(BIN): $(DBGOBJS)
 	$(CC) $(CFLAGS) $(DBGCFLAGS) -o $(DBGDIR)/$(BIN) $^ $(LIBS)
 
 $(DBGDIR)/%.o: src/%.cpp
-	$(CC) -c $(CFLAGS) $(DBGCFLAGS) -o $@ $<
+	$(CC) -c $(CFLAGS) $(DBGCFLAGS) $(DEPFLAGS) -o $@ $<
 
 release: $(RELBIN)
 	
@@ -136,7 +139,7 @@ $(RELBIN): $(RELOBJS)
 	$(CC) $(CFLAGS) $(RELCFLAGS) -o $(RELBIN) $^ $(LIBS)
 
 $(RELDIR)/%.o: src/%.cpp
-	$(CC) -c $(CFLAGS) $(RELCFLAGS) -o $@ $<
+	$(CC) -c $(CFLAGS) $(RELCFLAGS) $(DEPFLAGS) -o $@ $<
 
 remake: clean all
 
@@ -396,3 +399,7 @@ src/test_shmap.o: src/test_shmap.cpp
 
 clean_test:
 	rm -f $(TEST_OBJS) $(TEST_EXEC)
+
+# Include generated dependency files
+-include $(DBGDEPS)
+-include $(RELDEPS)
