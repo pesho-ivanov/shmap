@@ -118,15 +118,14 @@ public:
 		// Buckets with Jaccard and Containment index >= theta
 		vector<Buckets::BucketLoc> J_buckets;
 		vector<Buckets::BucketLoc> C_buckets;
-		for (auto it = B.ordered_begin(); it != B.ordered_end(); ++it) {
-		//for (auto it = B.unordered_begin(); it != B.unordered_end(); ++it) {
-			//cerr << it->first << " " << it->first.parent << endl;
-			auto M = matcher.collect_matches(it->first, p_ht);
+		auto sorted_buckets = B.get_sorted_buckets();
+		for (auto &[b, content] : sorted_buckets) {
+			auto M = matcher.collect_matches(b, p_ht);
 			auto mapping_J = matcher.bestIncludedJaccard(M, P_sz, end-start-2, end-start+2, m);
 			auto mapping_C = matcher.bestFixedLength(M, P_sz, 2*bucket_l, m, Metric::CONTAINMENT_INDEX);
-			mapping_J.set_bucket(it->first);
-			if (mapping_J.score() >= theta) J_buckets.push_back(it->first);
-			if (mapping_C.score() >= theta) C_buckets.push_back(it->first);
+			mapping_J.set_bucket(b);
+			if (mapping_J.score() >= theta) J_buckets.push_back(b);
+			if (mapping_C.score() >= theta) C_buckets.push_back(b);
 		}
 
 		//static int not_overlapping_with_gt = 0;

@@ -107,7 +107,11 @@ public:
 			return bucket;
 		} else if (s.hits_in_T == 1) {
 			auto &hit = h2single.at(s.kmer.h);
+#ifdef SHMAP_ABS_POS
 			if (b.begin() <= hit.r && hit.r < b.end()) {
+#else
+			if (b.begin() <= hit.tpos && hit.tpos < b.end()) {
+#endif
 				bucket.matches = 1;
 				bucket.codirection = hit.strand == s.kmer.strand ? 1 : -1;
 				bucket.r_min = hit.r;
@@ -115,14 +119,21 @@ public:
 			}
 		} else if (s.hits_in_T > 1) {
 			const auto &hits = h2multi.at(s.kmer.h);
-			//for (int i=1; i<(int)hits.size(); i++) assert(hits[i-1].r <= hits[i].r);
 			auto it = lower_bound(hits.begin(), hits.end(), b.begin(), [&b](const Hit &hit, rpos_t pos) {
 				if (hit.segm_id != b.segm_id)
 					return hit.segm_id < b.segm_id;
+#ifdef SHMAP_ABS_POS
 				return hit.r < pos;
+#else
+				return hit.tpos < pos;
+#endif
 			});
 			rpos_t matches = 0;
+#ifdef SHMAP_ABS_POS	
 			for (; it != hits.end() && it->segm_id == b.segm_id && it->r < b.end(); ++it) {
+#else
+			for (; it != hits.end() && it->segm_id == b.segm_id && it->tpos < b.end(); ++it) {
+#endif
 				matches += 1;
 				bucket.codirection += it->strand == s.kmer.strand ? 1 : -1;
 				bucket.r_min = std::min(bucket.r_min, it->r);

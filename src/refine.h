@@ -51,7 +51,7 @@ public:
 
     bool lost_correct_mapping(const string& query_id, const Buckets& B) {
 		bool res = true;
-		for (auto it = B.unordered_begin(); it != B.unordered_end(); ++it)
+		for (auto it = B.buckets.begin(); it != B.buckets.end(); ++it)
 				if (do_overlap(query_id, it->first)) {
 					res = false;
 					break;

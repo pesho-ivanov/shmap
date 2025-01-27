@@ -2,15 +2,15 @@
 
 #include <ankerl/unordered_dense.h>
 #include <functional>  // for std::hash
-
+#include <vector>
 #include "types.h"
 
 namespace sweepmap {
 
 class Buckets {
+public:
 	qpos_t len;  // half-length; the bucket spans [r*len, (r+2)*len)
 
-public:
 	int i;  				// index of the next kmer for all buckets
 	int seeds; 				// number of seeds in all buckets
 
@@ -77,7 +77,7 @@ public:
 
 	void propagate() {
 		//cerr << "propagate: i=" << i << " seeds=" << seeds << endl;
-		for (auto &bucket : _B) {
+		for (auto &bucket : buckets) {
 			assert(bucket.second.i == -1);
 			bucket.second.i = i;
 			bucket.second.seeds = seeds;
@@ -86,32 +86,36 @@ public:
 
 	using bucket_map_t = ankerl::unordered_dense::map<BucketLoc, BucketContent, BucketHash, std::equal_to<BucketLoc> >;
 
-	struct Pos {
-		segm_t segm_id;
-		qpos_t r;
+	//struct Pos {
+	//	segm_t segm_id;
+	//	qpos_t r;
 
-		Pos() : segm_id(-1), r(-1) {}
-		Pos(segm_t segm_id, qpos_t r)
-			: segm_id(segm_id), r(r) {}
-	};
+	//	Pos() : segm_id(-1), r(-1) {}
+	//	Pos(segm_t segm_id, qpos_t r)
+	//		: segm_id(segm_id), r(r) {}
+	//};
 
 	//Pos get_pos(segm_t segm_id, qpos_t r) const {
 	//	return Pos(segm_id, r, this);
 	//}
 
     void add_to_pos(const Hit& hit, const BucketContent &content) {
-        qpos_t b = hit.r/len;
-        _B[ BucketLoc(hit.segm_id, b, this) ] += content;
-        if (b>0) _B[ BucketLoc(hit.segm_id, b-1, this) ] += content;
+#ifdef SHMAP_ABS_POS
+		qpos_t b = hit.r/len;
+#else
+		qpos_t b = hit.tpos/len;
+#endif
+        buckets[ BucketLoc(hit.segm_id, b, this) ] += content;
+        if (b>0) buckets[ BucketLoc(hit.segm_id, b-1, this) ] += content;
     }
 
     void add_to_bucket(BucketLoc b, const BucketContent &content) {
 		b.parent = this;
-        _B[b] += content;
+        buckets[b] += content;
     }
 
 	bool delete_bucket(BucketLoc b) {
-		return _B.erase(b);
+		return buckets.erase(b);
 	}
 
 	qpos_t get_bucket_len() const {
@@ -119,121 +123,88 @@ public:
 	}
 
 	qpos_t get_matches(const BucketLoc& b) const {
-		auto it = _B.find(b);
-		if (it == _B.end()) return 0;
+		auto it = buckets.find(b);
+		if (it == buckets.end()) return 0;
 		return it->second.matches;
 	}
 
 	int size() const {
-		return _B.size();
+		return buckets.size();
 	}
 
-	class UnorderedIterator {
-	public:
-		using unordered_iterator = bucket_map_t::const_iterator;
-		using iterator_category = std::forward_iterator_tag;
-		using value_type = Pos;
-		using difference_type = std::ptrdiff_t;
-		using pointer = Pos*;
-		using reference = Pos&;
+//	class OrderedIterator {
+//	public:
+//		using sorted_vector_t = std::vector<std::reference_wrapper<bucket_map_t::value_type>>;
+//		using sorted_iterator = typename sorted_vector_t::iterator;
+//		using iterator_category = std::forward_iterator_tag;
+//		using value_type = BucketLoc;
+//		using difference_type = std::ptrdiff_t;
+//		using pointer = BucketLoc*;
+//		using reference = BucketLoc&;
+//
+//		OrderedIterator(sorted_iterator it) : it_(it) {}
+//
+//		bucket_map_t::value_type& operator*() {
+//			return it_->get();
+//		}
+//
+//        bucket_map_t::value_type* operator->() {
+//            return &(it_->get());
+//        }
+//
+//		OrderedIterator& operator++() {
+//			++it_;
+//			return *this;
+//		}
+//
+//		bool operator!=(const OrderedIterator& other) const {
+//			return it_ != other.it_;
+//		}
+//
+////	private:
+//		sorted_iterator it_;
+//	};
+//
+//    // TODO: sort once, not every time; make sure nothing changes
+//	// Helper to create a sorted vector
+//	std::vector<std::reference_wrapper<bucket_map_t::value_type>> get_sorted_buckets() {
+//		std::vector<std::reference_wrapper<bucket_map_t::value_type>> sorted_buckets;
+//		sorted_buckets.reserve(buckets.size());
+//		for (auto& bucket : buckets) {
+//			sorted_buckets.push_back(std::ref(bucket));
+//		}
+//		std::sort(sorted_buckets.begin(), sorted_buckets.end(),
+//				  [](const auto& a, const auto& b) {
+//					  // Define sorting criteria, e.g., by segm_id and then r
+//					//  if (a.get().first.segm_id != b.get().first.segm_id)
+//					//	  return a.get().first.segm_id < b.get().first.segm_id;
+//                    // Sort by decreasing number of matches
+//					  return a.get().second.matches > b.get().second.matches; 
+//				  });
+//		return sorted_buckets;
+//	}
+//
+//	OrderedIterator ordered_begin() {
+//		sorted_buckets_ = get_sorted_buckets();
+//		return OrderedIterator(sorted_buckets_.begin());
+//	}
+//
+//	OrderedIterator ordered_end() {
+//		return OrderedIterator(sorted_buckets_.end());
+//	}
+//
+////private:
+//	std::vector<std::reference_wrapper<bucket_map_t::value_type>> sorted_buckets_;
 
-		UnorderedIterator(unordered_iterator it) : it_(it) {}
-
-	    const bucket_map_t::value_type& operator*() const {
-			return *it_;
-		}
-
-        const bucket_map_t::value_type* operator->() const {
-            return &(*it_);
-        }
-
-		UnorderedIterator& operator++() {
-			++it_;
-			return *this;
-		}
-
-		bool operator!=(const UnorderedIterator& other) const {
-			return it_ != other.it_;
-		}
-
-	private:
-		unordered_iterator it_;
-		const Buckets* parent_;
-	};
-
-	UnorderedIterator unordered_begin() const {
-		return UnorderedIterator(_B.begin());
-	}
-
-	UnorderedIterator unordered_end() const {
-		return UnorderedIterator(_B.end());
-	}
-
-	class OrderedIterator {
-	public:
-		using sorted_vector_t = std::vector<std::reference_wrapper<bucket_map_t::value_type>>;
-		using sorted_iterator = typename sorted_vector_t::iterator;
-		using iterator_category = std::forward_iterator_tag;
-		using value_type = Pos;
-		using difference_type = std::ptrdiff_t;
-		using pointer = Pos*;
-		using reference = Pos&;
-
-		OrderedIterator(sorted_iterator it) : it_(it) {}
-
-		bucket_map_t::value_type& operator*() {
-			return it_->get();
-		}
-
-        bucket_map_t::value_type* operator->() {
-            return &(it_->get());
-        }
-
-		OrderedIterator& operator++() {
-			++it_;
-			return *this;
-		}
-
-		bool operator!=(const OrderedIterator& other) const {
-			return it_ != other.it_;
-		}
-
-	private:
-		sorted_iterator it_;
-	};
-
-    // TODO: sort once, not every time; make sure nothing changes
-	// Helper to create a sorted vector
-	std::vector<std::reference_wrapper<bucket_map_t::value_type>> get_sorted_buckets() {
-		std::vector<std::reference_wrapper<bucket_map_t::value_type>> sorted_buckets;
-		sorted_buckets.reserve(_B.size());
-		for (auto& bucket : _B) {
-			sorted_buckets.push_back(std::ref(bucket));
-		}
-		std::sort(sorted_buckets.begin(), sorted_buckets.end(),
-				  [](const auto& a, const auto& b) {
-					  // Define sorting criteria, e.g., by segm_id and then r
-					//  if (a.get().first.segm_id != b.get().first.segm_id)
-					//	  return a.get().first.segm_id < b.get().first.segm_id;
-                    // Sort by decreasing number of matches
-					  return a.get().second.matches > b.get().second.matches; 
-				  });
+	std::vector<Buckets::bucket_map_t::value_type> get_sorted_buckets() {
+		std::vector<Buckets::bucket_map_t::value_type> sorted_buckets(buckets.begin(), buckets.end());
+		std::sort(sorted_buckets.begin(), sorted_buckets.end(), [](const auto &a, const auto &b) {
+			return a.second.matches > b.second.matches;
+		});
 		return sorted_buckets;
 	}
 
-	OrderedIterator ordered_begin() {
-		sorted_buckets_ = get_sorted_buckets();
-		return OrderedIterator(sorted_buckets_.begin());
-	}
-
-	OrderedIterator ordered_end() {
-		return OrderedIterator(sorted_buckets_.end());
-	}
-
-private:
-	std::vector<std::reference_wrapper<bucket_map_t::value_type>> sorted_buckets_;
-
-	bucket_map_t _B;
+	bucket_map_t buckets;
 };
 
 } // namespace sweepmap

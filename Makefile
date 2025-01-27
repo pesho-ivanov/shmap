@@ -1,6 +1,7 @@
 SHELL := /bin/bash
 CC = g++
 CFLAGS = -std=c++20 -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
+#CFLAGS += -DSHMAP_ABS_POS
 ifeq ($(DEBUG), 1)
 	SHMAP_BIN = ./debug/shmap
 else
