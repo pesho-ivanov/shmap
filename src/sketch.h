@@ -111,8 +111,8 @@ struct LocalMappingStats {
 			<< "\t" << "sh:f:"			<< stats.sh
 			<< "\t" << "strand:i:"		<< stats.same_strand_seeds
 			<< "\t" << "t:f:"			<< stats.map_time
-			<< "\t" << "b:s:"			<< stats.bucket.segm_id << "," << stats.bucket.b
-			<< "\t" << "b2:s:"			<< stats.bucket2.segm_id << "," << stats.bucket2.b;
+			<< "\t" << "b:s:"			<< stats.bucket
+			<< "\t" << "b2:s:"			<< stats.bucket2;
 		return os;
 	}
 };

@@ -76,6 +76,12 @@ struct params_t {
 		m.push_back({"no-bucket-pruning", std::to_string(no_bucket_pruning)});
 		m.push_back({"one-sweep", std::to_string(one_sweep)});
 		m.push_back({"only-sh", std::to_string(only_sh)});
+#ifdef SHMAP_ABS_POS
+		m.push_back({"ABS_POS", "true"});
+#else
+		m.push_back({"ABS_POS", "false"});
+#endif
+
 		if (human) {
 			out << "Parameters:" << endl;
 			for (auto& p : m)
@@ -107,6 +113,11 @@ struct params_t {
 		out << " | min_diff:              " << min_diff << endl;
 		out << " | max_overlap:           " << max_overlap << endl;
 		out << " | only-sh:               " << only_sh << endl;
+#ifdef SHMAP_ABS_POS	
+		out << " | ABS_POS:               " << "true" << endl;
+#else
+		out << " | ABS_POS:               " << "false" << endl;
+#endif
 	}
 
 	void dsHlp() {

@@ -62,12 +62,15 @@ public:
 				break;
 			}
 		assert(segm_id >= 0 && segm_id < (rpos_t)tidx.T.size());
+
+#ifdef SHMAP_ABS_POS
 		return {parsed.start_pos, parsed.end_pos, segm_id, parsed.segm_id};
-		
-		//const auto &segm = tidx.T[segm_id];
-		//qpos_t start = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.start_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
-		//qpos_t end  = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.end_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
-		//return {start, end, segm_id, parsed.segm_id};
+#else
+		const auto &segm = tidx.T[segm_id];
+		qpos_t start = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.start_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
+		qpos_t end  = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.end_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
+		return {start, end, segm_id, parsed.segm_id};
+#endif
 	}
 
 	string vec2str(vector<Buckets::BucketLoc> buckets, int bucket_l) {
@@ -200,9 +203,9 @@ public:
 	}
 
 	void print_paf(ostream &out) {
-		out << "\tgt_b_l:i:" << gt_b_l.b
-			<< "\tgt_b_r:i:" << gt_b_r.b
-			<< "\tgt_b_next:i:" << gt_b_next.b
+		out << "\tgt_b_l:s:" << gt_b_l
+			<< "\tgt_b_r:s:" << gt_b_r
+			<< "\tgt_b_next:s:" << gt_b_next
 			<< "\tgt_M_l:i:" << gt_M_l.size()					
 			<< "\tgt_M_r:i:" << gt_M_r.size()					
 			<< "\tgt_M_next:i:" << gt_M_next.size()					

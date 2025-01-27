@@ -66,7 +66,6 @@ public:
 		return 0;
 	}
 
-
 	bool intersect(const Hit &hit, const rpos_t from, const rpos_t to) const {
 		// TODO: account for segments
 		return from <= hit.r && hit.r < to;
