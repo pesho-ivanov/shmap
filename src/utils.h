@@ -108,6 +108,11 @@ class Timers {
 public:
     std::unordered_map<std::string, Timer> timers_;
 
+    void init(std::convertible_to<std::string> auto&& ...s) {
+        for (auto v : std::initializer_list<std::string>{ s... })
+            timers_[v] = Timer();
+    }
+
     void start(const std::string& name) {
         //if (name == "mapping")
         //    std::cerr << "Starting timer " << name << std::endl;
@@ -200,10 +205,11 @@ private:
     std::unordered_map<std::string, Counter> counters_;
 
 public:
-    void init(const std::string& name) {
-        counters_[name] = Counter();
+    void init(std::convertible_to<std::string> auto&& ...s) {
+        for (auto v : std::initializer_list<std::string>{ s... })
+            counters_[v] = Counter();
     }
-    
+
     void inc(const std::string& name, int64_t value = 1) {
         //ASSERT(counters_.contains(name), "Counter \"" << name << "\" not found.");
         if (!counters_.contains(name))
