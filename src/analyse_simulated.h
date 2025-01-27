@@ -17,9 +17,9 @@ public:
 	const string &query_id;
 	const string &P;
 	const int P_sz;
-	const Hist &diff_hist;
+	const h2cnt &diff_hist;
 	const int m;
-	const unordered_map<hash_t, Seed> p_ht;
+	const h2seed_t &p_ht;
 	const SketchIndex &tidx;
 	const Buckets &B;
 	const double theta;
@@ -90,7 +90,7 @@ public:
 	}
 
 public:
-	AnalyseSimulatedReads(const string& query_id, const string &P, int P_sz, const Hist &diff_hist, int m, unordered_map<hash_t, Seed> p_ht, const SketchIndex &tidx, Buckets &B, const double theta)
+	AnalyseSimulatedReads(const string& query_id, const string &P, int P_sz, const h2cnt &diff_hist, int m, const h2seed_t &p_ht, const SketchIndex &tidx, Buckets &B, const double theta)
 	 : query_id(query_id), P(P), P_sz(P_sz), diff_hist(diff_hist), m(m), p_ht(p_ht), tidx(tidx), B(B), theta(theta), matcher(tidx, diff_hist) {
 		bucket_l = B.get_bucket_len();
 

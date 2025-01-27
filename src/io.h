@@ -22,7 +22,7 @@ using std::pair;
 using std::ifstream;
 using std::endl;
 
-#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:d:o:z:v:anhbB"
+#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:d:o:z:v:anhbBf"
 
 struct params_t {
 	// required
@@ -49,10 +49,11 @@ struct params_t {
 	// for degradation evals
 	bool no_bucket_pruning;
 	bool one_sweep;
+	bool only_sh;
 
 	params_t() :
 		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), min_diff(0.02), max_overlap(0.5), mapper("shmap"), verbose(0),
-		sam(false), normalize(false), /*onlybest(false),*/ no_bucket_pruning(false), one_sweep(false) {}
+		sam(false), normalize(false), /*onlybest(false),*/ no_bucket_pruning(false), one_sweep(false), only_sh(false) {}
 
 	void print(std::ostream& out, bool human) const {
 		std::vector<pair<string, string>> m;
@@ -74,7 +75,7 @@ struct params_t {
 		m.push_back({"verbose", std::to_string(verbose)});
 		m.push_back({"no-bucket-pruning", std::to_string(no_bucket_pruning)});
 		m.push_back({"one-sweep", std::to_string(one_sweep)});
-
+		m.push_back({"only-sh", std::to_string(only_sh)});
 		if (human) {
 			out << "Parameters:" << endl;
 			for (auto& p : m)
@@ -105,6 +106,7 @@ struct params_t {
 		out << " | tThres:                " << theta << endl;
 		out << " | min_diff:              " << min_diff << endl;
 		out << " | max_overlap:           " << max_overlap << endl;
+		out << " | only-sh:               " << only_sh << endl;
 	}
 
 	void dsHlp() {
@@ -133,6 +135,7 @@ struct params_t {
 		//cerr << "   -x   --onlybest          Output the best alignment if above threshold (otherwise none)" << endl;
 		cerr << "   -b   --no-bucket-pruning Disables bucket pruning" << endl;
 		cerr << "   -B   --one-sweep         Disregards the seed heuristic and runs one sweepmap on all matches" << endl;
+		cerr << "   -o   --only-sh           Only compute SH (do not refine using sweepline). Warning: This make the mappings approximate!" << endl;
 		cerr << "   -h   --help              Display this help message" << endl;
 	}
 
@@ -239,6 +242,9 @@ struct params_t {
 //					break;
 				case 'b':
 					no_bucket_pruning = true;
+					break;
+				case 'f':
+					only_sh = true;
 					break;
 				case 'h':
 					return false;

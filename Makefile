@@ -63,7 +63,7 @@ K ?= 25
 R ?= 0.05
 T ?= 0.5
 MIN_DIFF ?= 0.15
-MAX_OVERLAP ?= 0.4
+MAX_OVERLAP ?= 0.1
 
 THETAS = 0.95 0.9 0.85 0.8 0.75 0.7 0.65 0.6 0.55 0.5  
 PAUL_THETAS = 1.0 0.9 0.8 0.7 0.6 0.5 0.4 0.3
@@ -109,7 +109,7 @@ LIFT_FASTA = $(DIR)/convert_fasta_with_args.py
 STREAM_LIFT_FASTA = $(DIR)/stream_fasta.py
 CHAIN_FILE = $(DIR)/refs/hg002v1.1_to_CHM13v2.0.chain
 
-SHMAP_PREF         = $(ALLOUT_DIR)/shmap-k$(K)-r$(R)-t$(T)-diff$(MIN_DIFF)/$(READS_PREFIX)/shmap-k$(K)-r$(R)-t$(T)-diff$(MIN_DIFF)
+SHMAP_PREF         = $(ALLOUT_DIR)/shmap-k$(K)-r$(R)-t$(T)-d$(MIN_DIFF)-o$(MAX_OVERLAP)/$(READS_PREFIX)/shmap-k$(K)-r$(R)-t$(T)-d$(MIN_DIFF)-o$(MAX_OVERLAP)
 MINIMAP_PREF       = $(ALLOUT_DIR)/minimap/$(READS_PREFIX)/minimap
 MM2_PREF           = $(ALLOUT_DIR)/mm2-fast/$(READS_PREFIX)/mm2-fast
 BLEND_PREF         = $(ALLOUT_DIR)/blend/$(READS_PREFIX)/blend
@@ -251,7 +251,7 @@ fdr_per_theta: $(SHMAP_BIN) gen_reads
 eval_shmap: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_PREF))
 	if [ $(SHMAP_NOINDEX) -ne 1 ]; then \
-		$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) $(SHMAP_ARGS) 2>/dev/null >/dev/null; \
+		$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) $(SHMAP_ARGS) 2>/dev/null >/dev/null; \
 	fi
 	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) $(SHMAP_ARGS)    2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
 	$(PAFTOOLS) mapeval -r 0.1 $(SHMAP_PREF).paf 2>/dev/null | tee $(SHMAP_PREF).eval || true

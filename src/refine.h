@@ -4,10 +4,9 @@
 #include "utils.h"
 #include "index.h"
 //#include "edlib.h"
+#include "types.h"
 
 namespace sweepmap {
-
-using Hist = ankerl::unordered_dense::map<hash_t, qpos_t>;
 
 enum class Metric {
 	JACCARD,
@@ -16,13 +15,13 @@ enum class Metric {
 
 class Matcher {
 	const SketchIndex &tidx;
-	Hist diff_hist;
+	h2cnt diff_hist;
 
 public:
 	Matcher(const SketchIndex &tidx) : tidx(tidx) {}
-	Matcher(const SketchIndex &tidx, const Hist &diff_hist) : tidx(tidx), diff_hist(diff_hist) {}
+	Matcher(const SketchIndex &tidx, const h2cnt &diff_hist) : tidx(tidx), diff_hist(diff_hist) {}
 
-	void update(const Hist &diff_hist) {
+	void update(const h2cnt &diff_hist) {
 		this->diff_hist = diff_hist;
 	}
 
@@ -73,7 +72,7 @@ public:
 		return 1.0*intersection / (m + s_sz - intersection);
 	}
 
-	Matches collect_matches(const Buckets::BucketLoc &b, const unordered_map<hash_t, Seed> &p_ht) {
+	Matches collect_matches(const Buckets::BucketLoc &b, const h2seed_t &p_ht) {
 		Matches M;
 		//cerr << b << endl;
 		assert(b.parent != nullptr);

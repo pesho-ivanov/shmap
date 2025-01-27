@@ -207,9 +207,8 @@ public:
 		return *this;
 	}
 
-	double sh() const { return local_stats.sh; }
-	//double score() const { return local_stats.J; }
-	double score() const { return local_stats.sh; }
+	//double sh() const { return local_stats.sh; }
+	double score() const { return local_stats.J; }
 	double score2() const { return local_stats.J2; }
 	int segm_id() const { return paf.segm_id; }
 

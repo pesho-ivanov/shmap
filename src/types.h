@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include "../ext/gtl/vector.hpp"
+#include <ankerl/unordered_dense.h>
 
 namespace sweepmap {
 
@@ -44,14 +45,13 @@ struct Seed {
 	rpos_t hits_in_T;
 	qpos_t occs_in_p;
 	qpos_t seed_num;
-	Seed(const Kmer &kmer, rpos_t hits_in_T, qpos_t seed_num) :
-		kmer(kmer), hits_in_T(hits_in_T), seed_num(seed_num) {}	
+	Seed(const Kmer &kmer, rpos_t hits_in_T, qpos_t occs_in_p, qpos_t seed_num) :
+		kmer(kmer), hits_in_T(hits_in_T), occs_in_p(occs_in_p), seed_num(seed_num) {}	
 	friend std::ostream& operator<<(std::ostream& os, const Seed& seed) {
 		os << "Seed(" << seed.kmer << ", hits_in_T=" << seed.hits_in_T << ", occs_in_p=" << seed.occs_in_p << ", seed_num=" << seed.seed_num << ")";
 		return os;
 	}
 };
-using Seeds = gtl::vector<Seed>;
 
 // Match -- a pair of a seed and a hit
 struct Match {
@@ -68,6 +68,18 @@ struct Match {
 		return os;
 	}
 };
-using Matches = gtl::vector<Match>;
 
+using Seeds 	 = gtl::vector<Seed>;
+using Matches 	 = gtl::vector<Match>;
+using h2cnt 	 = ankerl::unordered_dense::map<hash_t, qpos_t>;
+using h2seed_t   = ankerl::unordered_dense::map<hash_t, Seed>;
+
+inline int codirection(const Kmer &kmer, const Hit &hit) {
+	return kmer.strand == hit.strand ? +1 : -1;
 }
+
+inline int codirection(const Kmer &kmer1, const Kmer &kmer2) {
+	return kmer1.strand == kmer2.strand ? +1 : -1;
+}
+
+}  // namespace sweepmap
