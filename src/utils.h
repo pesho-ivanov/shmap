@@ -248,14 +248,25 @@ public:
     }
 };
 
-#define PBSTR "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||"
-#define PBWIDTH 60
+class ProgressBar {
+private:
+    static constexpr const char* PBSTR = "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||";
+    static constexpr int PBWIDTH = 60;
+    std::string message_;
+    std::ostream& out_;
 
-inline void printProgress(std::ostream& os, double progress, const std::string& msg) {
-    int val = (int) (progress * 100);
-    int lpad = (int) (progress * PBWIDTH);
-    int rpad = PBWIDTH - lpad;
-    os << "\r" << msg << std::setw(3) << val << "% [" << std::string(lpad, '|') << std::string(rpad, ' ') << "]" << std::flush;
-}
+public:
+    explicit ProgressBar(std::string message = "Progress", std::ostream& out = std::cerr) 
+        : message_(std::move(message)), out_(out) {}
+
+    void update(double progress) const {
+        int val = static_cast<int>(progress * 100);
+        int lpad = static_cast<int>(progress * PBWIDTH);
+        int rpad = PBWIDTH - lpad;
+        out_ << "\r" << message_ << " " << std::setw(3) << val << "% ["
+             << std::string(lpad, '|') << std::string(rpad, ' ') << "]" 
+             << std::flush;
+    }
+};
 
 } // namespace sweepmap

@@ -198,10 +198,12 @@ public:
 	}
 
 	void build_index(const std::string &tFile) {
+		ProgressBar progress_bar("Indexing");
+
 		H->T.start("indexing");
 		cerr << "Indexing " << tFile << "..." << endl;
 		H->T.start("index_reading");
-		read_fasta_klib(tFile, [this](const string &segm_name, const string &T, float progress) {
+		read_fasta_klib(tFile, [this, &progress_bar](const string &segm_name, const string &T, float indexing_progress) {
 			H->T.stop("index_reading");
 			H->T.start("index_sketching");
 			sketch_t t = H->sketcher.sketch(T);
@@ -211,8 +213,8 @@ public:
 			add_segment(segm_name, T, t);
 			H->T.stop("index_initializing");
 
-			string msg = std::to_string(H->C.count("segments")) + " indexed segment" + (H->C.count("segments") == 1 ? "" : "s");
-			printProgress(std::cerr, progress, msg);
+			//string msg = std::to_string(H->C.count("segments")) + " indexed segment" + (H->C.count("segments") == 1 ? "" : "s");
+			progress_bar.update(indexing_progress);
 
 			H->T.start("index_reading");
 		});

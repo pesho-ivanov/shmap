@@ -440,27 +440,9 @@ public:
 		T.stop("output");
 	}
 
-	void print_progress(const float progress) {
-		if (H->C.count("mapped_reads") % 100 == 0) {
-//				std::ostringstream msg_stream;
-//				msg_stream
-//					<< std::fixed << std::setprecision(1)
-//					<< C.count("mapped_reads") << " reads: "
-//					<< C.perc("mapped_reads", "reads") << "% mapped, ";
-//					//<< C.perc("mapq60", "mapped_reads") << "% with Q60";
-//				string msg = msg_stream.str();
-			printProgress(std::cerr, progress, "Mapping");
-
-//				cerr << endl;
-//				print_stats();
-//				print_time_stats();
-//				cerr << "\033[32A\033[G";
-//				cerr.flush();
-		}
-	}
-
 	void map_reads(const string &pFile) {
 		cerr << "Mapping reads using SHmap..." << endl;
+		ProgressBar progress_bar("Mapping");
 
 		string pauls_fn = H->params.paramsFile + ".paul.tsv";
 		string unmapped_fn = H->params.paramsFile + ".unmapped.paf";
@@ -477,13 +459,14 @@ public:
 
 		H->T.start("mapping");
 		H->T.start("query_reading");
-		read_fasta_klib(pFile, [this, &paulout, &unmapped_out](const string &query_id, const string &P, float progress) {
+		read_fasta_klib(pFile, [this, &paulout, &unmapped_out, &progress_bar](const string &query_id, const string &P, float mapping_progress) {
 			H->T.stop("query_reading");
 				H->C.inc("reads");
 				map_read(H->params, H->sketcher, paulout, unmapped_out, query_id, P);
 				H->C += C;
 				H->T += T;
-				print_progress(progress);
+				if (H->C.count("mapped_reads") % 100 == 0)
+					progress_bar.update(mapping_progress);
 			H->T.start("query_reading");
 		});
 		H->T.stop("query_reading");
