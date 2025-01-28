@@ -151,25 +151,20 @@ public:
 	}
 
 	bool seed_heuristic_pass(const Seeds &p_unique, qpos_t m, Buckets::BucketContent &bucket, Buckets::BucketLoc b, double *sh, double thr) {
-		if (H->params.no_bucket_pruning)
-			return true;
-
-		*sh = hseed(m, bucket.seeds, bucket.matches);
-		if (*sh < thr)
-			return false;
-
 		//T.start("seed_heuristic");
-		bool ret = true;
-		for (; bucket.i < (qpos_t)p_unique.size(); bucket.i++) {
-			bucket += tidx.matches_in_bucket(p_unique[bucket.i], b);
-			*sh = hseed(m, bucket.seeds, bucket.matches);
-			if (*sh < thr) {
-				ret = false;
-				break;
+		if (!H->params.no_bucket_pruning) {
+			while (1) {
+				*sh = hseed(m, bucket.seeds, bucket.matches);
+				if (*sh < thr)
+					return false;
+				if (bucket.i >= (qpos_t)p_unique.size())
+					break;
+				bucket += tidx.matches_in_bucket(p_unique[bucket.i], b);
+				bucket.i++;
 			}
 		}
 		//T.stop("seed_heuristic");
-		return ret;
+		return true;
 	}
 	
 	Mapping bestFixedLength(const RefSegment &segm, const Buckets::BucketLoc &b, const h2seed_t &p_ht, h2cnt &diff_hist, const qpos_t P_sz, const qpos_t m) {
@@ -229,7 +224,7 @@ public:
 		std::optional<Mapping> best;
 		C.inc("lost_on_seeding", lost_on_seeding);
 
-		for (auto &[b, content] : sorted_buckets) {
+		for (auto &[b, content]: sorted_buckets) {
 			double sh = 1.0;
 			if (seed_heuristic_pass(p_unique, m, content, b, &sh, thr)) {
 				T.start("sweep");
