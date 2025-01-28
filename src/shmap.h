@@ -1,15 +1,17 @@
 #pragma once
 
+#include <optional>
+
 #include "analyse_simulated.h"
+#include "buckets.h"
+#include "handler.h"
 #include "index.h"
 #include "io.h"
-#include "sketch.h"
-#include "utils.h"
-#include "handler.h"
 #include "mapper.h"
-#include "buckets.h"
 #include "refine.h"
+#include "sketch.h"
 #include "types.h"
+#include "utils.h"
 
 namespace sweepmap {
 
@@ -221,12 +223,12 @@ public:
 		return best;
 	}
 	
-	void match_rest(qpos_t P_sz, qpos_t m, const Seeds &p_unique, vector<Buckets::bucket_map_t::value_type> &sorted_buckets, h2cnt &diff_hist, const h2seed_t &p_ht,
-			vector<Mapping> &maps, int &best_idx, int &final_buckets, double thr, const int forbidden_idx, const string &query_id, int *lost_on_pruning, double max_overlap) {
+	std::optional<Mapping> match_rest(qpos_t P_sz, qpos_t m, const Seeds &p_unique, vector<Buckets::bucket_map_t::value_type> &sorted_buckets, h2cnt &diff_hist, const h2seed_t &p_ht,
+			double thr, std::optional<Mapping> forbidden, const string &query_id, int *lost_on_pruning, double max_overlap) {
 		int lost_on_seeding = (0);
+		std::optional<Mapping> best;
 		C.inc("lost_on_seeding", lost_on_seeding);
 
-		final_buckets = 0;
 		for (auto &[b, content] : sorted_buckets) {
 			double sh = 1.0;
 			if (seed_heuristic_pass(p_unique, m, content, b, &sh, thr)) {
@@ -251,22 +253,18 @@ public:
 				best_in_bucket.set_sh(sh);
 
 				if (best_in_bucket.score() > thr) {
-					++final_buckets;
-					maps.emplace_back(best_in_bucket);
-					if (forbidden_idx == -1 || Mapping::overlap(best_in_bucket, maps[forbidden_idx]) < max_overlap) {
-						best_idx = maps.size()-1;
+					C.inc("final_buckets");
+					if (!forbidden || Mapping::overlap(best_in_bucket, forbidden.value()) < max_overlap) {
+						best = best_in_bucket;
 						thr = best_in_bucket.score();
-						//if (forbidden_idx != -1) {
-						//	break;
-						//}
+						// TODO (optimize): if (forbidden_idx != -1) break;
 					}
 				}
 				T.stop("sweep");
 			}
 		}
 
-		C.inc("final_buckets", final_buckets);
-		C.inc("final_mappings", maps.size());
+		return best;
 	}
 
 	inline void map_read(const params_t &params, const FracMinHash &sketcher, ofstream &paulout, ofstream &unmapped_out, const string &query_id, const string &P) {
@@ -276,7 +274,7 @@ public:
 		C.init("seeds_limit_reached", "mapped_reads", "kmers", "kmers_notmatched", "seeds", "matches",
 			   "seed_matches", "max_seed_matches", "matches_freq", "spurious_matches", "mappings", "J_best",
 			   "sketched_kmers", "total_edit_distance", "intersection_diff", "mapq60", "matches_in_reported_mappings",
-			   "lost_on_seeding", "lost_on_pruning");
+			   "lost_on_seeding", "lost_on_pruning", "final_buckets");
 
 		T.init("seed_heuristic", "match_collect", "sweep");
 
@@ -347,16 +345,15 @@ public:
 			auto sorted_buckets = B.get_sorted_buckets();
 
 			int lost_on_pruning = 1;
+			std::optional<Mapping> best, best2;
 			T.start("match_rest");
 				T.start("match_rest_for_best");
-					vector<Mapping> maps;
-					int best_idx=-1, best2_idx=-1, final_buckets;
-					match_rest(P.size(), m, p_unique, sorted_buckets, diff_hist, p_ht, maps, best_idx, final_buckets, params.theta, -1, query_id, &lost_on_pruning, params.max_overlap);
+					best = match_rest(P.size(), m, p_unique, sorted_buckets, diff_hist, p_ht, params.theta, std::nullopt, query_id, &lost_on_pruning, params.max_overlap);
 				T.stop("match_rest_for_best");
 				T.start("match_rest_for_best2");
-					if (best_idx != -1) {
-						double second_best_thr = maps[best_idx].score() * (1.0 - params.min_diff);
-						match_rest(P.size(), m, p_unique, sorted_buckets, diff_hist, p_ht, maps, best2_idx, final_buckets, second_best_thr, best_idx, query_id, &lost_on_pruning, params.max_overlap);
+					if (best) {
+						double second_best_thr = best->score() * (1.0 - params.min_diff);
+						best2 = match_rest(P.size(), m, p_unique, sorted_buckets, diff_hist, p_ht, second_best_thr, best, query_id, &lost_on_pruning, params.max_overlap);
 					}
 				T.stop("match_rest_for_best2");
 			T.stop("match_rest");
@@ -373,31 +370,29 @@ public:
 
 		T.start("output");
 			std::ostream* os;
-			Mapping best;
-			if (best_idx != -1) {
-				best = maps[best_idx];
-				if (best2_idx != -1)
-					best.set_second_best(maps[best2_idx]);
+			if (best) {
+				if (best2)
+					best->set_second_best(best2.value());
 
-				if (best.mapq() == 60) C.inc("mapq60");
-				C.inc("matches_in_reported_mappings", best.intersection());
-				C.inc("J_best", rpos_t(10000.0*best.score()));
+				if (best->mapq() == 60) C.inc("mapq60");
+				C.inc("matches_in_reported_mappings", best->intersection());
+				C.inc("J_best", rpos_t(10000.0*best->score()));
 				C.inc("mappings");
 				C.inc("mapped_reads");
 				os = &cout;
 			} else {
 				os = &unmapped_out;
 			}
-			best.set_global_stats(params.theta, params.min_diff, m, query_id.c_str(), P.size(), params.k, S, C.count("total_matches"), C.count("max_seed_matches"), C.count("seed_matches"), C.count("seeded_buckets"), final_buckets, FPTP, T.secs("query_mapping"));  // TODO: disable by flag
-			best.print_paf(*os);
+			best->set_global_stats(params.theta, params.min_diff, m, query_id.c_str(), P.size(), params.k, S, C.count("total_matches"), C.count("max_seed_matches"), C.count("seed_matches"), C.count("seeded_buckets"), C.count("final_buckets"), FPTP, T.secs("query_mapping"));  // TODO: disable by flag
+			best->print_paf(*os);
 
 			if (params.verbose >= 2) {
 				AnalyseSimulatedReads gt(query_id, P, P.size(), diff_hist, m, p_ht, tidx, B, params.theta);
-				if (best_idx != -1) {
+				if (best) {
 					gt.print_paf(cout);
-					auto gt_overlap = Mapping::overlap(gt.gt_mapping, maps[best_idx]);
-					*os << "\tgt_mapping_len:i:" << (gt.gt_mapping.paf.T_r-gt.gt_mapping.paf.T_l)
-					   << "\treported_mapping_len:i:" << (maps[best_idx].paf.T_r-maps[best_idx].paf.T_l)
+					auto gt_overlap = Mapping::overlap(gt.gt_mapping, best.value());
+					*os << "\tgt_mapping_len:i:" << (gt.gt_mapping.paf.T_r - gt.gt_mapping.paf.T_l)
+					   << "\treported_mapping_len:i:" << (best->paf.T_r - best->paf.T_l)
 					   << "\tgt_overlap:f:" << std::fixed << std::setprecision(3) << gt_overlap;
 				}
 				if (!params.paramsFile.empty())
@@ -472,10 +467,10 @@ public:
 		cerr << " | | Seeded buckets:          " << H->C.frac("seeded_buckets", "reads") << " /read" << endl;
 		cerr << " | Mappings:              " << H->C.count("mappings") << " (" << H->C.perc("mappings", "reads") << "\% of reads)" << endl;
 		cerr << " | | Final buckes:            " << H->C.frac("final_buckets", "mappings") << " /mapping" << endl;
-		cerr << " | | Final mappings:          " << H->C.frac("final_mappings", "mappings") << " /mapping" << endl;
+//		cerr << " | | Final mappings:          " << H->C.frac("final_mappings", "mappings") << " /mapping" << endl;
 		cerr << " | | Average best sim.:       " << std::fixed << std::setprecision(3) << H->C.frac("J_best", "mappings") / 10000.0 << endl;
 		cerr << " | | mapq=60:                 " << H->C.count("mapq60") << " (" << H->C.perc("mapq60", "mappings") << "\% of mappings)" << endl;
-		cerr << " | | FDR:                     " << H->C.perc("FP", "PP") << "%" << " = " << H->C.frac("FP", "reads") << " / " << H->C.frac("PP", "reads") << " per reads" << endl;
+		//cerr << " | | FDR:                     " << H->C.perc("FP", "PP") << "%" << " = " << H->C.frac("FP", "reads") << " / " << H->C.frac("PP", "reads") << " per reads" << endl;
 
 		//cerr << " | Average edit dist:     " << H->C.frac("total_edit_distance", "mappings") << endl;
 		//print_time_stats();
