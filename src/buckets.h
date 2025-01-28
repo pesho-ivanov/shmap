@@ -75,7 +75,7 @@ public:
 		}
 	};
 
-	void propagate() {
+	void propagate_seeds_to_buckets() {
 		//cerr << "propagate: i=" << i << " seeds=" << seeds << endl;
 		for (auto &bucket : buckets) {
 			assert(bucket.second.i == -1);

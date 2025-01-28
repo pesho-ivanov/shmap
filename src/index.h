@@ -52,12 +52,6 @@ public:
 		H->C.inc("indexed_highest_freq_kmer", max_occ);
 	}
 
-//	rpos_t count(hash_t h) const {
-//		if (h2single.contains(h)) return 1;
-//		else if (h2multi.contains(h)) return h2multi.at(h).size();
-//		else return 0;
-//	}
-
 	inline rpos_t count(hash_t h) const {
 		if (auto it = h2single.find(h); it != h2single.end())
 			return 1;
@@ -70,34 +64,6 @@ public:
 		// TODO: account for segments
 		return from <= hit.r && hit.r < to;
 	}
-
-//	bool get_matches_in_t_interval(std::vector<Match> *matches, const Seed &s, const rpos_t from, const rpos_t to) const {
-//		// assume matches of each seed are sorted by position in T
-//		// TODO: account for segments
-//		if (s.hits_in_T == 1) {
-//			auto &hit = h2single.at(s.kmer.h);
-//			if (from <= hit.tpos && hit.tpos < to) {
-//				matches->push_back(Match(s, hit));
-//				return true;
-//			}
-//		} else if (s.hits_in_T > 1) {
-//			// TODO: account for segments
-//			// TODO: careful with left and right ends
-//			const vector<Hit> &hits = h2multi.at(s.kmer.h);
-//				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, rpos_t pos) { return hit.tpos < pos; });
-//				//auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, rpos_t pos) { return hit.r > pos; });
-//
-//				//matches->push_back(Match(s, *it));
-//				//matches->push_back(Match(s, *it_r));
-//
-//				for (; it != hits.end() && it->tpos < to; ++it)
-//					matches->push_back(Match(s, *it));
-//
-//				return true;
-////			}
-//		}	
-//		return false;
-//	}
 
 	Buckets::BucketContent matches_in_bucket(const Seed &s, const Buckets::BucketLoc b) const {
 		Buckets::BucketContent bucket;
@@ -148,29 +114,19 @@ public:
 		return bucket;
 	}
 
-	void get_matches(gtl::vector<Match> *matches, const Seed &s) const {
-		matches->reserve(matches->size() + s.hits_in_T);
-		if (s.hits_in_T == 1) {
-			matches->push_back(Match(s, h2single.at(s.kmer.h)));
-		} else if (s.hits_in_T > 1) {
-			for (const auto &hit: h2multi.at(s.kmer.h))
-				matches->push_back(Match(s, hit));
-		}	
-	}
+	//void erase_frequent_kmers() {
+	//	assert(H->params.max_matches != -1);
+	//	std::vector<hash_t> blacklisted_h;
+	//	for (const auto &[h, hits]: h2multi)
+	//		if (rpos_t(hits.size()) > H->params.max_matches) {
+	//			blacklisted_h.push_back(h);
+	//			H->C.inc("blacklisted_kmers");
+	//			H->C.inc("blacklisted_hits", hits.size());
+	//		}
 
-	void erase_frequent_kmers() {
-		assert(H->params.max_matches != -1);
-		std::vector<hash_t> blacklisted_h;
-		for (const auto &[h, hits]: h2multi)
-			if (rpos_t(hits.size()) > H->params.max_matches) {
-				blacklisted_h.push_back(h);
-				H->C.inc("blacklisted_kmers");
-				H->C.inc("blacklisted_hits", hits.size());
-			}
-
-		for (auto h: blacklisted_h)
-			h2multi.erase(h);
-	}
+	//	for (auto h: blacklisted_h)
+	//		h2multi.erase(h);
+	//}
 
 	void populate_h2pos(const sketch_t& sketch, segm_t segm_id) {
 		// TODO: skip creating the sketch structure
@@ -239,8 +195,8 @@ public:
 		get_kmer_stats();
         H->C.inc("blacklisted_kmers", 0);
         H->C.inc("blacklisted_hits", 0);
-		if (H->params.max_matches != -1)
-			erase_frequent_kmers();
+		//if (H->params.max_matches != -1)
+		//	erase_frequent_kmers();
 		print_stats();
 	}
 
@@ -266,6 +222,81 @@ public:
 };
 
 } // namespace sweepmap
+
+//	bool get_matches_in_t_interval(std::vector<Match> *matches, const Seed &s, const rpos_t from, const rpos_t to) const {
+//		// assume matches of each seed are sorted by position in T
+//		// TODO: account for segments
+//		if (s.hits_in_T == 1) {
+//			auto &hit = h2single.at(s.kmer.h);
+//			if (from <= hit.tpos && hit.tpos < to) {
+//				matches->push_back(Match(s, hit));
+//				return true;
+//			}
+//		} else if (s.hits_in_T > 1) {
+//			// TODO: account for segments
+//			// TODO: careful with left and right ends
+//			const vector<Hit> &hits = h2multi.at(s.kmer.h);
+//				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, rpos_t pos) { return hit.tpos < pos; });
+//				//auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, rpos_t pos) { return hit.r > pos; });
+//
+//				//matches->push_back(Match(s, *it));
+//				//matches->push_back(Match(s, *it_r));
+//
+//				for (; it != hits.end() && it->tpos < to; ++it)
+//					matches->push_back(Match(s, *it));
+//
+//				return true;
+////			}
+//		}	
+//		return false;
+//	}
+
+//	bool get_matches_in_t_interval(std::vector<Match> *matches, const Seed &s, const rpos_t from, const rpos_t to) const {
+//		// assume matches of each seed are sorted by position in T
+//		// TODO: account for segments
+//		if (s.hits_in_T == 1) {
+//			auto &hit = h2single.at(s.kmer.h);
+//			if (from <= hit.tpos && hit.tpos < to) {
+//				matches->push_back(Match(s, hit));
+//				return true;
+//			}
+//		} else if (s.hits_in_T > 1) {
+//			// TODO: account for segments
+//			// TODO: careful with left and right ends
+//			const vector<Hit> &hits = h2multi.at(s.kmer.h);
+//				auto it = lower_bound(hits.begin(), hits.end(), from, [](const Hit &hit, rpos_t pos) { return hit.tpos < pos; });
+//				//auto it_r = lower_bound(hits.rbegin(), hits.rend(), to, [](const Hit &hit, rpos_t pos) { return hit.r > pos; });
+//
+//				//matches->push_back(Match(s, *it));
+//				//matches->push_back(Match(s, *it_r));
+//
+//				for (; it != hits.end() && it->tpos < to; ++it)
+//					matches->push_back(Match(s, *it));
+//
+//				return true;
+////			}
+//		}	
+//		return false;
+//	}
+
+
+//	rpos_t count(hash_t h) const {
+//		if (h2single.contains(h)) return 1;
+//		else if (h2multi.contains(h)) return h2multi.at(h).size();
+//		else return 0;
+//	}
+
+ 
+//	void get_matches(gtl::vector<Match> *matches, const Seed &s) const {
+//		matches->reserve(matches->size() + s.hits_in_T);
+//		if (s.hits_in_T == 1) {
+//			matches->push_back(Match(s, h2single.at(s.kmer.h)));
+//		} else if (s.hits_in_T > 1) {
+//			for (const auto &hit: h2multi.at(s.kmer.h))
+//				matches->push_back(Match(s, hit));
+//		}	
+//	}
+
 
 	//bool is_kmer_in_interval(const Seed &s, int from, int to) const {
 	//	assert(s.hits_in_T > 0);

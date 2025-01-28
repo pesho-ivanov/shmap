@@ -1,8 +1,5 @@
 #pragma once
 
-#include <set>
-#include <map>
-
 #include "analyse_simulated.h"
 #include "index.h"
 #include "io.h"
@@ -272,22 +269,6 @@ public:
 		C.inc("final_mappings", maps.size());
 	}
 
-	std::tuple<int, int, double, double> calc_FDR(vector<Mapping> &maps, double theta, qpos_t lmax, const SketchIndex &tidx, const h2seed_t &p_ht, qpos_t P_sz, qpos_t lmin, qpos_t m, const h2cnt &diff_hist) {
-		int FP = 0;
-		for (auto &mapping: maps) {
-			auto M = matcher.collect_matches(mapping.bucket(), p_ht);
-			auto mapping_best_J = matcher.bestIncludedJaccard(M, P_sz, lmin, lmax, m);
-			mapping_best_J.set_bucket(mapping.bucket());
-			if (mapping_best_J.score() < H->params.theta)
-				++FP;
-		}
-
-		int PP = maps.size();
-		double FDR = 1.0 * FP / PP;
-		double FPTP = (PP - FP > 0) ?  1.0 * FP / (PP - FP) : 0.0;
-		return {PP, FP, FDR, FPTP};
-	}
-
 	inline void map_read(const params_t &params, const FracMinHash &sketcher, ofstream &paulout, ofstream &unmapped_out, const string &query_id, const string &P) {
 		C.clear();
 		T.clear();
@@ -358,22 +339,10 @@ public:
 				match_seeds(p_unique, B, S);
 			T.stop("match_seeds");
 
-			B.propagate();
-
-			if (params.verbose >= 2) {
-				//cerr << "B.unordered:" << endl;
-				//for (auto it = B.unordered_begin(); it != B.unordered_end(); ++it)
-				//	cerr << it->first << " -> " << it->second << endl;
-				//cerr << "B.ordered: " << endl;
-				//for (auto it = B.ordered_begin(); it != B.ordered_end(); ++it)
-				//	cerr << it->first << " -> " << it->second << endl;
-			}
+			B.propagate_seeds_to_buckets();
 
 			//int lost_on_seeding = matcher.lost_correct_mapping(query_id, B);
 			//C.inc("lost_on_seeding", lost_on_seeding);
-
-			//	cerr << "seeded buckets:" << b_it->first << " " << b_it->second << endl;
-			//}
 			
 			auto sorted_buckets = B.get_sorted_buckets();
 
@@ -386,19 +355,18 @@ public:
 				T.stop("match_rest_for_best");
 				T.start("match_rest_for_best2");
 					if (best_idx != -1) {
-						double second_best_thr = maps[best_idx].score() * (1.0 - params.min_diff);  // f1 * (1 - min_diff)
+						double second_best_thr = maps[best_idx].score() * (1.0 - params.min_diff);
 						match_rest(P.size(), m, p_unique, sorted_buckets, diff_hist, p_ht, maps, best2_idx, final_buckets, second_best_thr, best_idx, query_id, &lost_on_pruning, params.max_overlap);
 					}
 				T.stop("match_rest_for_best2");
 			T.stop("match_rest");
 			
-			
 			auto [FP, PP, FDR, FPTP] = tuple(-1, -1, -1, -1);
 			//auto [FP, PP, FDR, FPTP] = calc_FDR(maps, params.theta, lmax, bucket_l, tidx, p_ht, P_sz, lmin, m, diff_hist);
-			C.inc("FP", FP);
-			C.inc("PP", PP);
-			C.inc("FDR", FDR);
-			C.inc("FPTP", FPTP);
+			//C.inc("FP", FP);
+			//C.inc("PP", PP);
+			//C.inc("FDR", FDR);
+			//C.inc("FPTP", FPTP);
 
 			C.inc("lost_on_pruning", lost_on_pruning);
 		T.stop("query_mapping");
@@ -545,3 +513,20 @@ public:
 };
 
 }  // namespace sweepmap
+
+//std::tuple<int, int, double, double> calc_FDR(vector<Mapping> &maps, double theta, qpos_t lmax, const SketchIndex &tidx, const h2seed_t &p_ht, qpos_t P_sz, qpos_t lmin, qpos_t m, const h2cnt &diff_hist) {
+//    int FP = 0;
+//    for (auto &mapping: maps) {
+//        auto M = matcher.collect_matches(mapping.bucket(), p_ht);
+//        auto mapping_best_J = matcher.bestIncludedJaccard(M, P_sz, lmin, lmax, m);
+//        mapping_best_J.set_bucket(mapping.bucket());
+//        if (mapping_best_J.score() < H->params.theta)
+//            ++FP;
+//    }
+//
+//    int PP = maps.size();
+//    double FDR = 1.0 * FP / PP;
+//    double FPTP = (PP - FP > 0) ?  1.0 * FP / (PP - FP) : 0.0;
+//    return {PP, FP, FDR, FPTP};
+//}
+//
