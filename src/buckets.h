@@ -28,10 +28,10 @@ struct BucketHash {
 	}
 };
 
-struct LightMatch {
-	qpos_t bucket_pos;  // [0, 2*bucket_halflen)
-	qpos_t seed_num;	// [0, |p_unique|)
-};
+//struct LightMatch {
+//	qpos_t r;  // TODO: shrink to [0, 2*bucket_halflen)
+//	qpos_t seed_num;	// [0, |p_unique|)
+//};
 
 struct BucketContent {
 	// propagated from Buckets, then updated individually
@@ -43,10 +43,10 @@ struct BucketContent {
 	int codirection;
 	rpos_t r_min, r_max;
 
-	//vector<LightMatch> matches;
-
-	BucketContent() : i(-1), seeds(0), matches(0), codirection(0), r_min(std::numeric_limits<rpos_t>::max()), r_max(-1) {}
-	BucketContent(qpos_t matches, qpos_t seeds, int codirection, rpos_t r_min, rpos_t r_max) : i(-1), seeds(seeds), matches(matches), codirection(codirection), r_min(r_min), r_max(r_max) {}
+	BucketContent()
+		: i(-1), seeds(0), matches(0), codirection(0), r_min(std::numeric_limits<rpos_t>::max()), r_max(-1) {}
+	BucketContent(qpos_t matches, qpos_t seeds, int codirection, rpos_t r_min, rpos_t r_max)
+		: i(-1), seeds(seeds), matches(matches), codirection(codirection), r_min(r_min), r_max(r_max) {}
 
 	friend std::ostream& operator<<(std::ostream& os, const BucketContent& b) {
 		os << "(i=" << b.i << ", seeds=" << b.seeds << ", matches=" << b.matches << ", codirection=" << b.codirection << ", r=[" << b.r_min << "," << b.r_max << "])";

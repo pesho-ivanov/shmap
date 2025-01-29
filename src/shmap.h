@@ -113,7 +113,6 @@ public:
 					for (auto it = b2m.buckets.begin(); it != b2m.buckets.end(); ++it) {
 						BucketContent content(min(it->second.matches, seed.occs_in_p), 0, it->second.codirection, it->second.r_min, it->second.r_max);
 						B.add_to_bucket(it->first, content);
-						//matches_in_B += it->second.matches;
 					}
 				}
 
@@ -174,7 +173,7 @@ public:
 	void matches_in_bucket(const BucketsType &B, const BucketLoc &b, BucketContent *bucket, const Seed &s) const {
 		bucket->seeds += s.occs_in_p;
 		if (s.hits_in_T == 0) {
-			return;
+			;
 		} else if (s.hits_in_T == 1) {
 			const auto &hit = tidx.h2single.at(s.kmer.h);
 			if (abs_pos ? B.begin(b) <= hit.r    && hit.r    < B.end(b)
@@ -232,14 +231,14 @@ public:
 	Mapping bestFixedLength(const RefSegment &segm, const BucketsType &B, const BucketLoc &b, const h2seed_t &p_ht, h2cnt &diff_hist, const qpos_t P_sz, const qpos_t m) {
 		qpos_t intersection = 0;
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
-		auto t = segm.kmers;
+		const auto &t = segm.kmers;
 
 		assert(B.begin(b) < t.size());
 		auto l = B.begin(b);
 		auto r = l;
 		auto end = min(rpos_t(t.size()), B.end(b));
 		assert(l < t.size());
-
+		
 		Mapping best;
 		for(; l < end; ++l) {
 			//for(;  r != t.begin() + end  && l-> hit.tpos <= l->hit.tpos + m; ++r) {
@@ -305,8 +304,9 @@ public:
 				Mapping best_in_bucket;
 				if constexpr (only_sh)
 					best_in_bucket.update(0, P_sz-1, content.r_min, content.r_max, tidx.T[b.segm_id], content.matches, sh, content.codirection, content.r_max - content.r_min); // TODO: should it be prev(r) instead?
-				else
+				else {
 					best_in_bucket = bestFixedLength(tidx.T[b.segm_id], B, b, p_ht, diff_hist, P_sz-H->params.k, m);
+				}
 				best_in_bucket.set_bucket(b);
 				best_in_bucket.set_sh(sh);
 
