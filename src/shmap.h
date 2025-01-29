@@ -15,7 +15,7 @@
 #include "utils.h"
 
 namespace sweepmap {
-
+	
 template <bool no_bucket_pruning, bool one_sweep, bool only_sh, bool abs_pos>
 class SHMapper : public Mapper {
 	using BucketsType = Buckets<abs_pos>;
@@ -92,7 +92,7 @@ public:
 				
 				if (seed.hits_in_T == 1) {
 					//T.start("match_seeds_single");
-						auto hit = tidx.h2single.at(seed.kmer.h);
+						const auto &hit = tidx.h2single.at(seed.kmer.h);
 						BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
 						B.add_to_pos(hit, content);
 					//T.stop("match_seeds_single");
@@ -171,26 +171,18 @@ public:
 		return 1.0 - double(seeds - matches) / p;
 	}
 
-	BucketContent matches_in_bucket(const BucketsType &B, const Seed &s, const BucketLoc &b) const {
-		BucketContent bucket;
-		bucket.seeds = s.occs_in_p;
+	void matches_in_bucket(const BucketsType &B, const BucketLoc &b, BucketContent *bucket, const Seed &s) const {
+		bucket->seeds += s.occs_in_p;
 		if (s.hits_in_T == 0) {
-			return bucket;
+			return;
 		} else if (s.hits_in_T == 1) {
-			auto &hit = tidx.h2single.at(s.kmer.h);
-			
-			bool in_bucket = false;
-			if constexpr (abs_pos) {
-				in_bucket = B.begin(b) <= hit.r && hit.r < B.end(b);
-			} else {
-				in_bucket = B.begin(b) <= hit.tpos && hit.tpos < B.end(b);
-			}
-			
-			if (in_bucket) {
-				bucket.matches = 1;
-				bucket.codirection = hit.strand == s.kmer.strand ? 1 : -1;
-				bucket.r_min = hit.r;
-				bucket.r_max = hit.r;
+			const auto &hit = tidx.h2single.at(s.kmer.h);
+			if (abs_pos ? B.begin(b) <= hit.r    && hit.r    < B.end(b)
+			 		    : B.begin(b) <= hit.tpos && hit.tpos < B.end(b)) {
+				bucket->matches += 1;
+				bucket->codirection += hit.strand == s.kmer.strand ? 1 : -1;
+				bucket->r_min = min(bucket->r_min, hit.r);
+				bucket->r_max = max(bucket->r_max, hit.r);
 			}
 		} else if (s.hits_in_T > 1) {
 			const auto &hits = tidx.h2multi.at(s.kmer.h);
@@ -203,8 +195,8 @@ public:
 					return hit.tpos < pos;
 				}
 			});
-			rpos_t matches = 0;
 
+			rpos_t matches = 0;
 			for (; it != hits.end(); ++it) {
 				if constexpr (abs_pos) {
 					if (!(it->segm_id == b.segm_id && it->r < B.end(b))) break;					
@@ -212,31 +204,25 @@ public:
 					if (!(it->segm_id == b.segm_id && it->tpos < B.end(b))) break;
 				}
 				matches += 1;
-				bucket.codirection += it->strand == s.kmer.strand ? 1 : -1;
-				bucket.r_min = std::min(bucket.r_min, it->r);
-				bucket.r_max = std::max(bucket.r_max, it->r);
+				bucket->codirection += it->strand == s.kmer.strand ? 1 : -1;
+				bucket->r_min = min(bucket->r_min, it->r);
+				bucket->r_max = max(bucket->r_max, it->r);
 			}
-			bucket.matches = min(matches, s.occs_in_p);
-			//auto it_prev = it; if (it_prev != hits.begin()) { --it_prev; assert(it_prev->r < from); }
-			//if (it != hits.end()) assert(from <= it->r);
-			//cout << (it != hits.end() && it->r < to) << ", [" << from << ", " << to << ")" << ", it: " << (it != hits.end() ? it->r : -1) << endl;
-			
-			//return it != hits.end() && it->tpos < b.end();
+			bucket->matches += min(matches, s.occs_in_p);
 		}
-		return bucket;
 	}
 
-	bool seed_heuristic_pass(const BucketsType &B, const Seeds &p_unique, qpos_t m, BucketContent &bucket, BucketLoc b, double *sh, double thr) {
+	bool seed_heuristic_pass(const BucketsType &B, const Seeds &p_unique, qpos_t m, const BucketLoc &b, BucketContent *bucket, double *sh, double thr) {
 		//T.start("seed_heuristic");
 		if constexpr (!no_bucket_pruning) {
 			while (1) {
-				*sh = hseed(m, bucket.seeds, bucket.matches);
+				*sh = hseed(m, bucket->seeds, bucket->matches);
 				if (*sh < thr)
 					return false;
-				if (bucket.i >= (qpos_t)p_unique.size())
+				if (bucket->i >= (qpos_t)p_unique.size())
 					break;
-				bucket += matches_in_bucket(B, p_unique[bucket.i], b);
-				bucket.i++;
+				matches_in_bucket(B, b, bucket, p_unique[bucket->i]);
+				bucket->i++;
 			}
 		}
 		//T.stop("seed_heuristic");
@@ -278,7 +264,7 @@ public:
 
 			double C = 1.0 * intersection / m;
 			assert(C >= -0.0 && C <= 1.0);
-			if (C > best.score())
+			if (l < r && C > best.score())
 				best.update(0, P_sz-1, t[l].r, t[r-1].r, segm, intersection, C, same_strand_seeds, t[r-1].r-t[l].r+1);
 
 			if (auto it = p_ht.find(t[l].h); it != p_ht.end()) {
@@ -303,7 +289,7 @@ public:
 
 		for (auto &[b, content]: sorted_buckets) {
 			double sh = 1.0;
-			if (seed_heuristic_pass(B, p_unique, m, content, b, &sh, thr)) {
+			if (seed_heuristic_pass(B, p_unique, m, b, &content, &sh, thr)) {
 				T.start("sweep");
 				//cerr << forbidden_idx << ", passed SH:" << b_it->first << " " << b_it->second << endl;
 				//if (matcher.do_overlap(query_id, b_it->first))

@@ -52,7 +52,6 @@ Mapper* MapperFactory::createMapper(const std::string& type, const SketchIndex& 
                   + (sh  ? 4 : 0)
                   + (ap  ? 8 : 0);
 
-        assert(index == 0);
         switch (index) {
             case 0: return new SHMapper<false, false, false, false>(tidx, H);
 //            case 1: return new SHMapper< true, false, false, false>(tidx, H);

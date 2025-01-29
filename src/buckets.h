@@ -28,6 +28,11 @@ struct BucketHash {
 	}
 };
 
+struct LightMatch {
+	qpos_t bucket_pos;  // [0, 2*bucket_halflen)
+	qpos_t seed_num;	// [0, |p_unique|)
+};
+
 struct BucketContent {
 	// propagated from Buckets, then updated individually
 	int i;   // index of the next kmer for this bucket
@@ -37,6 +42,8 @@ struct BucketContent {
 	qpos_t matches;
 	int codirection;
 	rpos_t r_min, r_max;
+
+	//vector<LightMatch> matches;
 
 	BucketContent() : i(-1), seeds(0), matches(0), codirection(0), r_min(std::numeric_limits<rpos_t>::max()), r_max(-1) {}
 	BucketContent(qpos_t matches, qpos_t seeds, int codirection, rpos_t r_min, rpos_t r_max) : i(-1), seeds(seeds), matches(matches), codirection(codirection), r_min(r_min), r_max(r_max) {}
@@ -52,7 +59,6 @@ struct BucketContent {
 		codirection += other.codirection;
 		r_min = std::min(r_min, other.r_min);
 		r_max = std::max(r_max, other.r_max);
-
 		return *this;
 	}
 };
@@ -92,11 +98,7 @@ public:
 	using bucket_map_t = ankerl::unordered_dense::map<BucketLoc, BucketContent, BucketHash, std::equal_to<BucketLoc> >;
 
     void add_to_pos(const Hit& hit, const BucketContent &content) {
-		qpos_t b;
-		if constexpr (abs_pos)
-			b = hit.r/len;
-		else
-			b = hit.tpos/len;
+		qpos_t b = (abs_pos ? hit.r : hit.tpos) / len;
         buckets[ BucketLoc(hit.segm_id, b) ] += content;
         if (b>0) buckets[ BucketLoc(hit.segm_id, b-1) ] += content;
     }
