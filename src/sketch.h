@@ -78,8 +78,8 @@ struct LocalMappingStats {
 	double J, J2;     // Similarity in [0;1] for the best and for the second best mapping
 	double sh;
 	qpos_t p_sz;     // number of seeds (subset of the sketch kmers)
-	Buckets::BucketLoc bucket;			 // the bucket where the mapping is found
-	Buckets::BucketLoc bucket2;  // the bucket of the second best mapping
+	BucketLoc bucket;			 // the bucket where the mapping is found
+	BucketLoc bucket2;  // the bucket of the second best mapping
 	qpos_t intersection2; // number of matches in the second best mapping
 	double sigmas_diff;  // how many sigmas is the diff between intersection1 and intersection2
 
@@ -287,11 +287,11 @@ public:
 		return paf.mapq;
 	}
 
-	Buckets::BucketLoc bucket() const {
+	BucketLoc bucket() const {
 		return local_stats.bucket;
 	}
 
-	void set_bucket(const Buckets::BucketLoc &bucket) {
+	void set_bucket(const BucketLoc &bucket) {
 		local_stats.bucket = bucket;
 	}
 

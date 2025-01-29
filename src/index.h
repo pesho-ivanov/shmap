@@ -65,55 +65,6 @@ public:
 		return from <= hit.r && hit.r < to;
 	}
 
-	Buckets::BucketContent matches_in_bucket(const Seed &s, const Buckets::BucketLoc b) const {
-		Buckets::BucketContent bucket;
-		bucket.seeds = s.occs_in_p;
-		if (s.hits_in_T == 0) {
-			return bucket;
-		} else if (s.hits_in_T == 1) {
-			auto &hit = h2single.at(s.kmer.h);
-#ifdef SHMAP_ABS_POS
-			if (b.begin() <= hit.r && hit.r < b.end()) {
-#else
-			if (b.begin() <= hit.tpos && hit.tpos < b.end()) {
-#endif
-				bucket.matches = 1;
-				bucket.codirection = hit.strand == s.kmer.strand ? 1 : -1;
-				bucket.r_min = hit.r;
-				bucket.r_max = hit.r;
-			}
-		} else if (s.hits_in_T > 1) {
-			const auto &hits = h2multi.at(s.kmer.h);
-			auto it = lower_bound(hits.begin(), hits.end(), b.begin(), [&b](const Hit &hit, rpos_t pos) {
-				if (hit.segm_id != b.segm_id)
-					return hit.segm_id < b.segm_id;
-#ifdef SHMAP_ABS_POS
-				return hit.r < pos;
-#else
-				return hit.tpos < pos;
-#endif
-			});
-			rpos_t matches = 0;
-#ifdef SHMAP_ABS_POS	
-			for (; it != hits.end() && it->segm_id == b.segm_id && it->r < b.end(); ++it) {
-#else
-			for (; it != hits.end() && it->segm_id == b.segm_id && it->tpos < b.end(); ++it) {
-#endif
-				matches += 1;
-				bucket.codirection += it->strand == s.kmer.strand ? 1 : -1;
-				bucket.r_min = std::min(bucket.r_min, it->r);
-				bucket.r_max = std::max(bucket.r_max, it->r);
-			}
-			bucket.matches = min(matches, s.occs_in_p);
-			//auto it_prev = it; if (it_prev != hits.begin()) { --it_prev; assert(it_prev->r < from); }
-			//if (it != hits.end()) assert(from <= it->r);
-			//cout << (it != hits.end() && it->r < to) << ", [" << from << ", " << to << ")" << ", it: " << (it != hits.end() ? it->r : -1) << endl;
-			
-			//return it != hits.end() && it->tpos < b.end();
-		}
-		return bucket;
-	}
-
 	//void erase_frequent_kmers() {
 	//	assert(H->params.max_matches != -1);
 	//	std::vector<hash_t> blacklisted_h;

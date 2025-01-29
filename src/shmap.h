@@ -1,5 +1,6 @@
 #pragma once
 
+#include <csignal>
 #include <optional>
 
 #include "analyse_simulated.h"
@@ -8,20 +9,35 @@
 #include "index.h"
 #include "io.h"
 #include "mapper.h"
-#include "refine.h"
+//#include "refine.h"
 #include "sketch.h"
 #include "types.h"
 #include "utils.h"
 
 namespace sweepmap {
 
+template <bool no_bucket_pruning, bool one_sweep, bool only_sh, bool abs_pos>
 class SHMapper : public Mapper {
+	using BucketsType = Buckets<abs_pos>;
+
 	const SketchIndex &tidx;
 	Handler *H;
-	Matcher matcher;
+	//Matcher matcher;
 
 	Counters C;   // local counters: cleared for each read
 	Timers T;     // local timers: cleared for each read
+
+private:
+	static SHMapper* current_instance;
+
+	static void handle_signal(int signal) {
+		if (current_instance) {
+			std::cout << "Signal received: " << signal << "\n";
+			current_instance->print_stats();
+			current_instance->print_time_stats();
+		}
+		std::exit(0);
+	}
 
 public:
 	//using Buckets = std::unordered_map<bucket_t, qpos_t>;
@@ -64,7 +80,7 @@ public:
 		return p_unique;
 	}
 
-	void match_seeds(const Seeds &p_unique, Buckets &B, qpos_t S) {
+	void match_seeds(const Seeds &p_unique, BucketsType &B, qpos_t S) {
 		rpos_t seed_matches(0), seeded_buckets(0);  // stats
 		for (; B.i < (qpos_t)p_unique.size() && B.seeds < S; B.i++) {
 			Seed seed = p_unique[B.i];
@@ -77,25 +93,25 @@ public:
 				if (seed.hits_in_T == 1) {
 					//T.start("match_seeds_single");
 						auto hit = tidx.h2single.at(seed.kmer.h);
-						Buckets::BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
+						BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
 						B.add_to_pos(hit, content);
 					//T.stop("match_seeds_single");
 				//}
 				//else if (seed.occs_in_p == 1) {
 				//	T.start("match_seeds_single");
 				//		for (const auto &hit: tidx.h2multi.at(seed.kmer.h)) {
-				//			Buckets::BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
-				//			B.add_to_bucket(Buckets::BucketLoc(hit.segm_id, hit.r/B.get_bucket_len(), &B), content);
+				//			BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
+				//			B.add_to_bucket(BucketLoc(hit.segm_id, hit.r/B.get_bucket_len(), &B), content);
 				//		}
 				//	T.stop("match_seeds_single");
 				} else {
-					Buckets b2m(B.get_bucket_len());
+					BucketsType b2m(B.get_bucket_len());
 					for (const auto &hit: tidx.h2multi.at(seed.kmer.h)) {
-						Buckets::BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
+						BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
 						b2m.add_to_pos(hit, content);
 					}
 					for (auto it = b2m.buckets.begin(); it != b2m.buckets.end(); ++it) {
-						Buckets::BucketContent content(min(it->second.matches, seed.occs_in_p), 0, it->second.codirection, it->second.r_min, it->second.r_max);
+						BucketContent content(min(it->second.matches, seed.occs_in_p), 0, it->second.codirection, it->second.r_min, it->second.r_max);
 						B.add_to_bucket(it->first, content);
 						//matches_in_B += it->second.matches;
 					}
@@ -137,29 +153,89 @@ public:
 
   public:
 	SHMapper(const SketchIndex &tidx, Handler *H)
-			: tidx(tidx), H(H), matcher(tidx) {
+			: tidx(tidx), H(H) { //, matcher(tidx) {
         if (H->params.theta < 0.0 || H->params.theta > 1.0) {
             cerr << "tThres = " << H->params.theta << " outside of [0,1]." << endl;
             exit(1);
         }
+        current_instance = this;  // Set current instance in constructor
     }
-	virtual ~SHMapper() = default;
+	virtual ~SHMapper() {
+		if (current_instance == this) {
+			current_instance = nullptr;
+		}
+	}
 
 	double hseed(qpos_t p, qpos_t seeds, qpos_t matches) {
 		assert(seeds >= matches);
 		return 1.0 - double(seeds - matches) / p;
 	}
 
-	bool seed_heuristic_pass(const Seeds &p_unique, qpos_t m, Buckets::BucketContent &bucket, Buckets::BucketLoc b, double *sh, double thr) {
+	BucketContent matches_in_bucket(const BucketsType &B, const Seed &s, const BucketLoc &b) const {
+		BucketContent bucket;
+		bucket.seeds = s.occs_in_p;
+		if (s.hits_in_T == 0) {
+			return bucket;
+		} else if (s.hits_in_T == 1) {
+			auto &hit = tidx.h2single.at(s.kmer.h);
+			
+			bool in_bucket = false;
+			if constexpr (abs_pos) {
+				in_bucket = B.begin(b) <= hit.r && hit.r < B.end(b);
+			} else {
+				in_bucket = B.begin(b) <= hit.tpos && hit.tpos < B.end(b);
+			}
+			
+			if (in_bucket) {
+				bucket.matches = 1;
+				bucket.codirection = hit.strand == s.kmer.strand ? 1 : -1;
+				bucket.r_min = hit.r;
+				bucket.r_max = hit.r;
+			}
+		} else if (s.hits_in_T > 1) {
+			const auto &hits = tidx.h2multi.at(s.kmer.h);
+			auto it = lower_bound(hits.begin(), hits.end(), B.begin(b), [&b](const Hit &hit, rpos_t pos) {
+				if (hit.segm_id != b.segm_id)
+					return hit.segm_id < b.segm_id;
+				if constexpr (abs_pos) {
+					return hit.r < pos;
+				} else {
+					return hit.tpos < pos;
+				}
+			});
+			rpos_t matches = 0;
+
+			for (; it != hits.end(); ++it) {
+				if constexpr (abs_pos) {
+					if (!(it->segm_id == b.segm_id && it->r < B.end(b))) break;					
+				} else {
+					if (!(it->segm_id == b.segm_id && it->tpos < B.end(b))) break;
+				}
+				matches += 1;
+				bucket.codirection += it->strand == s.kmer.strand ? 1 : -1;
+				bucket.r_min = std::min(bucket.r_min, it->r);
+				bucket.r_max = std::max(bucket.r_max, it->r);
+			}
+			bucket.matches = min(matches, s.occs_in_p);
+			//auto it_prev = it; if (it_prev != hits.begin()) { --it_prev; assert(it_prev->r < from); }
+			//if (it != hits.end()) assert(from <= it->r);
+			//cout << (it != hits.end() && it->r < to) << ", [" << from << ", " << to << ")" << ", it: " << (it != hits.end() ? it->r : -1) << endl;
+			
+			//return it != hits.end() && it->tpos < b.end();
+		}
+		return bucket;
+	}
+
+	bool seed_heuristic_pass(const BucketsType &B, const Seeds &p_unique, qpos_t m, BucketContent &bucket, BucketLoc b, double *sh, double thr) {
 		//T.start("seed_heuristic");
-		if (!H->params.no_bucket_pruning) {
+		if constexpr (!no_bucket_pruning) {
 			while (1) {
 				*sh = hseed(m, bucket.seeds, bucket.matches);
 				if (*sh < thr)
 					return false;
 				if (bucket.i >= (qpos_t)p_unique.size())
 					break;
-				bucket += tidx.matches_in_bucket(p_unique[bucket.i], b);
+				bucket += matches_in_bucket(B, p_unique[bucket.i], b);
 				bucket.i++;
 			}
 		}
@@ -167,15 +243,15 @@ public:
 		return true;
 	}
 	
-	Mapping bestFixedLength(const RefSegment &segm, const Buckets::BucketLoc &b, const h2seed_t &p_ht, h2cnt &diff_hist, const qpos_t P_sz, const qpos_t m) {
+	Mapping bestFixedLength(const RefSegment &segm, const BucketsType &B, const BucketLoc &b, const h2seed_t &p_ht, h2cnt &diff_hist, const qpos_t P_sz, const qpos_t m) {
 		qpos_t intersection = 0;
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 		auto t = segm.kmers;
 
-		assert(b.begin() < t.size());
-		auto l = b.begin();
+		assert(B.begin(b) < t.size());
+		auto l = B.begin(b);
 		auto r = l;
-		auto end = min(rpos_t(t.size()), b.end());
+		auto end = min(rpos_t(t.size()), B.end(b));
 		assert(l < t.size());
 
 		Mapping best;
@@ -184,18 +260,19 @@ public:
 				//&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
 				//&& r->hit.tpos + H->params.k <= l->hit.tpos + P_sz
 				//&& r->hit.r + H->params.k <= l->hit.r + P_sz
-#ifdef SHMAP_ABS_POS
-			for(;  r < end && t[r].r < t[l].r + m; ++r) {
-#else
-			for(;  r < end && r < l + m; ++r) {
-#endif
+			for(;  r < end; ++r) {
+				if constexpr (abs_pos) {
+					if (!(t[r].r < t[l].r + m)) break;
+				} else {
+					if (!(r < l + m)) break;
+				}
+
 				if (auto it = p_ht.find(t[r].h); it != p_ht.end()) {
 					same_strand_seeds += codirection(it->second.kmer, t[r]);
 					assert(diff_hist.contains(t[r].h));
 					if (--diff_hist[t[r].h] >= 0)
 						++intersection;
 				}
-				
 				assert (l <= r);
 			}
 
@@ -218,7 +295,7 @@ public:
 		return best;
 	}
 	
-	std::optional<Mapping> match_rest(qpos_t P_sz, qpos_t m, const Seeds &p_unique, vector<Buckets::bucket_map_t::value_type> &sorted_buckets, h2cnt &diff_hist, const h2seed_t &p_ht,
+	std::optional<Mapping> match_rest(qpos_t P_sz, qpos_t m, const Seeds &p_unique, const BucketsType &B, vector<typename BucketsType::bucket_map_t::value_type> &sorted_buckets, h2cnt &diff_hist, const h2seed_t &p_ht,
 			double thr, std::optional<Mapping> forbidden, const string &query_id, int *lost_on_pruning, double max_overlap) {
 		int lost_on_seeding = (0);
 		std::optional<Mapping> best;
@@ -226,7 +303,7 @@ public:
 
 		for (auto &[b, content]: sorted_buckets) {
 			double sh = 1.0;
-			if (seed_heuristic_pass(p_unique, m, content, b, &sh, thr)) {
+			if (seed_heuristic_pass(B, p_unique, m, content, b, &sh, thr)) {
 				T.start("sweep");
 				//cerr << forbidden_idx << ", passed SH:" << b_it->first << " " << b_it->second << endl;
 				//if (matcher.do_overlap(query_id, b_it->first))
@@ -240,10 +317,10 @@ public:
 				//cerr << b_it->first << ", " << b_it->second << "| sh: " << sh << " best_score: " << best_score << endl;
 
 				Mapping best_in_bucket;
-				if (H->params.only_sh)
+				if constexpr (only_sh)
 					best_in_bucket.update(0, P_sz-1, content.r_min, content.r_max, tidx.T[b.segm_id], content.matches, sh, content.codirection, content.r_max - content.r_min); // TODO: should it be prev(r) instead?
 				else
-					best_in_bucket = bestFixedLength(tidx.T[b.segm_id], b, p_ht, diff_hist, P_sz-H->params.k, m);
+					best_in_bucket = bestFixedLength(tidx.T[b.segm_id], B, b, p_ht, diff_hist, P_sz-H->params.k, m);
 				best_in_bucket.set_bucket(b);
 				best_in_bucket.set_sh(sh);
 
@@ -261,6 +338,7 @@ public:
 
 		return best;
 	}
+
 
 	inline void map_read(const params_t &params, const FracMinHash &sketcher, ofstream &paulout, ofstream &unmapped_out, const string &query_id, const string &P) {
 		C.clear();
@@ -316,11 +394,11 @@ public:
 				//double theta2 = params.theta + params.min_diff;
 				qpos_t S = qpos_t((1.0 - params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
 
-#ifdef SHMAP_ABS_POS
-				Buckets B(P.size());  			// B[segment][b] -- #matched kmers[0...i] in [bl, (b+2)l)
-#else
-				Buckets B(m/params.theta);  // TODO: consider other coefficients
-#endif
+				BucketsType B;
+				if constexpr (abs_pos)
+					B.set_bucket_halflen(P.size());
+				else
+					B.set_bucket_halflen(m/params.theta);
 
 				C.inc("kmers_sketched", m);
 				C.inc("kmers", m);
@@ -343,12 +421,12 @@ public:
 			std::optional<Mapping> best, best2;
 			T.start("match_rest");
 				T.start("match_rest_for_best");
-					best = match_rest(P.size(), m, p_unique, sorted_buckets, diff_hist, p_ht, params.theta, std::nullopt, query_id, &lost_on_pruning, params.max_overlap);
+					best = match_rest(P.size(), m, p_unique, B, sorted_buckets, diff_hist, p_ht, params.theta, std::nullopt, query_id, &lost_on_pruning, params.max_overlap);
 				T.stop("match_rest_for_best");
 				T.start("match_rest_for_best2");
 					if (best) {
 						double second_best_thr = best->score() * (1.0 - params.min_diff);
-						best2 = match_rest(P.size(), m, p_unique, sorted_buckets, diff_hist, p_ht, second_best_thr, best, query_id, &lost_on_pruning, params.max_overlap);
+						best2 = match_rest(P.size(), m, p_unique, B, sorted_buckets, diff_hist, p_ht, second_best_thr, best, query_id, &lost_on_pruning, params.max_overlap);
 					}
 				T.stop("match_rest_for_best2");
 			T.stop("match_rest");
@@ -382,7 +460,7 @@ public:
 			best->print_paf(*os);
 
 			if (params.verbose >= 2) {
-				AnalyseSimulatedReads gt(query_id, P, P.size(), diff_hist, m, p_ht, tidx, B, params.theta);
+				AnalyseSimulatedReads<abs_pos> gt(query_id, P, P.size(), diff_hist, m, p_ht, tidx, B, params.theta);
 				if (best) {
 					gt.print_paf(cout);
 					auto gt_overlap = Mapping::overlap(gt.gt_mapping, best.value());
@@ -399,6 +477,8 @@ public:
 	}
 
 	void map_reads(const string &pFile) {
+		//std::signal(SIGINT, handle_signal);
+
 		cerr << "Mapping reads using SHmap..." << endl;
 		ProgressBar progress_bar("Mapping");
 
@@ -418,14 +498,14 @@ public:
 		H->T.start("mapping");
 		H->T.start("query_reading");
 		read_fasta_klib(pFile, [this, &paulout, &unmapped_out, &progress_bar](const string &query_id, const string &P, float mapping_progress) {
+			H->C.inc("reads");
 			H->T.stop("query_reading");
-				H->C.inc("reads");
 				map_read(H->params, H->sketcher, paulout, unmapped_out, query_id, P);
-				H->C += C;
-				H->T += T;
-				if (H->C.count("mapped_reads") % 100 == 0)
-					progress_bar.update(mapping_progress);
 			H->T.start("query_reading");
+			H->C += C;
+			H->T += T;
+			if (H->C.count("mapped_reads") % 100 == 0)
+				progress_bar.update(mapping_progress);
 		});
 		H->T.stop("query_reading");
 		H->T.stop("mapping");
@@ -476,7 +556,6 @@ public:
         cerr << std::fixed << std::setprecision(1);
         cerr << " | Runtime:                "    << setw(5) << right << H->T.secs("mapping")       << " sec, " << 1.0 * H->C.count("reads") / H->T.secs("mapping")  << " reads/sec (" << setw(5) << right << H->T.range_ratio("query_mapping") << "x)" << endl; //setw(4) << right << H->C.count("reads") / H->T.secs("total") << " reads p/ sec)" << endl;
         cerr << " |  | load reads:             " << setw(5) << right << H->T.secs("query_reading")     << " (" << setw(4) << right << H->T.perc("query_reading", "mapping")       << "\%, " << setw(6) << right << H->T.range_ratio("query_reading") << "x)" << endl;
-//        cerr << " |  | prepare:                "     << setw(5) << right << H->T.secs("prepare")           << " (" << setw(4) << right << H->T.perc("prepare", "mapping")             << "\%, " << setw(6) << right << H->T.range_ratio("prepare") << "x)" << endl;
         cerr << " |  | sketch reads:           " << setw(5) << right << H->T.secs("sketching")         << " (" << setw(4) << right << H->T.perc("sketching", "mapping")           << "\%, " << setw(6) << right << H->T.range_ratio("sketching") << "x)" << endl;
 //        cerr << " |  | prepare:                " << setw(5) << right << H->T.secs("prepare")           << " (" << setw(4) << right << H->T.perc("prepare", "mapping")             << "\%, " << setw(6) << right << H->T.range_ratio("prepare") << "x)" << endl;
         cerr << " |  | seed:                   " << setw(5) << right << H->T.secs("seeding")           << " (" << setw(4) << right << H->T.perc("seeding", "mapping")             << "\%, " << setw(6) << right << H->T.range_ratio("seeding") << "x)" << endl;
@@ -501,6 +580,11 @@ public:
 //        cerr << " |  | post proc:              "     << setw(5) << right << H->T.secs("postproc")          << " (" << setw(4) << right << H->T.perc("postproc", "mapping")            << "\%, " << setw(6) << right << H->T.range_ratio("postproc") << "x)" << endl;
     }
 };
+
+// Initialize static member
+template <bool no_bucket_pruning, bool one_sweep, bool only_sh, bool abs_pos>
+SHMapper<no_bucket_pruning, one_sweep, only_sh, abs_pos>* 
+	SHMapper<no_bucket_pruning, one_sweep, only_sh, abs_pos>::current_instance = nullptr;
 
 }  // namespace sweepmap
 

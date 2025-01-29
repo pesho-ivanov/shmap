@@ -22,7 +22,7 @@ using std::pair;
 using std::ifstream;
 using std::endl;
 
-#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:d:o:z:v:anhbBf"
+#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:d:z:v:o:anhPBOF"
 
 struct params_t {
 	// required
@@ -46,14 +46,16 @@ struct params_t {
 	bool normalize; 		// Flag to save that scores are to be normalized
 	//bool onlybest;			// Output up to one (best) mapping (if above the threshold)
 
-	// for degradation evals
-	bool no_bucket_pruning;
-	bool one_sweep;
-	bool only_sh;
+	// for degradation evals; templated in compile-time
+	bool no_bucket_pruning; // Disables bucket pruning
+	bool one_sweep;         // Disregards the seed heuristic and runs one sweepmap on all matches
+	bool only_sh;           // Only compute SH (do not refine using sweepline). Warning: This make the mappings approximate!
+	bool abs_pos;           // Use absolute positions instead of kmer positions
 
 	params_t() :
 		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), min_diff(0.02), max_overlap(0.5), mapper("shmap"), verbose(0),
-		sam(false), normalize(false), /*onlybest(false),*/ no_bucket_pruning(false), one_sweep(false), only_sh(false) {}
+		sam(false), normalize(false), /*onlybest(false),*/
+		no_bucket_pruning(false), one_sweep(false), only_sh(false), abs_pos(false) {}
 
 	void print(std::ostream& out, bool human) const {
 		std::vector<pair<string, string>> m;
@@ -73,14 +75,11 @@ struct params_t {
 		m.push_back({"normalize", std::to_string(normalize)});
 		//m.push_back({"onlybest", std::to_string(onlybest)});
 		m.push_back({"verbose", std::to_string(verbose)});
+
 		m.push_back({"no-bucket-pruning", std::to_string(no_bucket_pruning)});
 		m.push_back({"one-sweep", std::to_string(one_sweep)});
 		m.push_back({"only-sh", std::to_string(only_sh)});
-#ifdef SHMAP_ABS_POS
-		m.push_back({"ABS_POS", "true"});
-#else
-		m.push_back({"ABS_POS", "false"});
-#endif
+		m.push_back({"abs-pos", std::to_string(abs_pos)});
 
 		if (human) {
 			out << "Parameters:" << endl;
@@ -107,17 +106,14 @@ struct params_t {
 		out << " | sam:                   " << sam << endl;
 		//out << " | onlybest:              " << onlybest << endl;
 		out << " | verbose:               " << verbose << endl;
-		out << " | no-bucket-pruning:     " << no_bucket_pruning << endl;
-		out << " | one-sweep:             " << one_sweep << endl;
 		out << " | tThres:                " << theta << endl;
 		out << " | min_diff:              " << min_diff << endl;
 		out << " | max_overlap:           " << max_overlap << endl;
+
+		out << " | no-bucket-pruning:     " << no_bucket_pruning << endl;
+		out << " | one-sweep:             " << one_sweep << endl;
 		out << " | only-sh:               " << only_sh << endl;
-#ifdef SHMAP_ABS_POS	
-		out << " | ABS_POS:               " << "true" << endl;
-#else
-		out << " | ABS_POS:               " << "false" << endl;
-#endif
+		out << " | abs-pos:               " << abs_pos << endl;
 	}
 
 	void dsHlp() {
@@ -137,6 +133,8 @@ struct params_t {
 		cerr << "   -S   --max_seeds         Max seeds in a sketch" << endl;
 		cerr << "   -M   --max_matches       Max seed matches in a sketch" << endl;
 		cerr << "   -t   --threshold         Homology percentage threshold [0, 1]" << endl;
+		cerr << "   -d   --min_diff          Minimum difference between the best and second best mapping" << endl;
+		cerr << "   -o   --max_overlap       Maximum overlap between the best and second best mapping" << endl;
 		cerr << "   -z   --params     		 Output file with parameters (tsv)" << endl;
 		cerr << "   -v   --verbose           Outputs debug information: 0 for no, 1 for some, 2 for all (warning: take time)" << endl;
 		cerr << endl;
@@ -144,9 +142,10 @@ struct params_t {
 		cerr << "   -a                       Output in SAM format (PAF by default)" << endl;
 		cerr << "   -n   --normalize         Normalize scores by length" << endl;
 		//cerr << "   -x   --onlybest          Output the best alignment if above threshold (otherwise none)" << endl;
-		cerr << "   -b   --no-bucket-pruning Disables bucket pruning" << endl;
+		cerr << "   -P   --no-bucket-pruning Disables bucket pruning" << endl;
 		cerr << "   -B   --one-sweep         Disregards the seed heuristic and runs one sweepmap on all matches" << endl;
-		cerr << "   -o   --only-sh           Only compute SH (do not refine using sweepline). Warning: This make the mappings approximate!" << endl;
+		cerr << "   -O   --only-sh           Only compute SH (do not refine using sweepline). Warning: This make the mappings approximate!" << endl;
+		cerr << "   -F   --abs-pos           Use absolute positions instead of kmer positions" << endl;
 		cerr << "   -h   --help              Display this help message" << endl;
 	}
 
@@ -166,7 +165,10 @@ struct params_t {
 			{"verbose",            required_argument,  0, 'v'},
 			{"normalize",          no_argument,        0, 'n'},
 //			{"onlybest",           no_argument,        0, 'x'},
-			{"no-bucket-pruning",  no_argument,        0, 'b'},
+			{"no-bucket-pruning",  no_argument,        0, 'P'},
+			{"one-sweep",          no_argument,        0, 'B'},
+			{"only-sh",            no_argument,        0, 'O'},
+			{"abs-pos",            no_argument,        0, 'F'},
 			{"help",               no_argument,        0, 'h'},
 			{0,                    0,                  0,  0 }
 		};
@@ -248,14 +250,17 @@ struct params_t {
 				case 'n':
 					normalize = true;
 					break;
-//				case 'x':
-//					onlybest = true;
-//					break;
-				case 'b':
+				case 'P':
 					no_bucket_pruning = true;
 					break;
-				case 'f':
+				case 'B':
+					one_sweep = true;
+					break;
+				case 'O':
 					only_sh = true;
+					break;
+				case 'F':
+					abs_pos = true;
 					break;
 				case 'h':
 					return false;

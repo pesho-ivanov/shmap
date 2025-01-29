@@ -13,19 +13,21 @@ enum class Metric {
 	CONTAINMENT_INDEX
 };
 
+template<bool abs_pos>
 class Matcher {
 	const SketchIndex &tidx;
+	const Buckets<abs_pos> &B;
 	h2cnt diff_hist;
 
 public:
-	Matcher(const SketchIndex &tidx) : tidx(tidx) {}
-	Matcher(const SketchIndex &tidx, const h2cnt &diff_hist) : tidx(tidx), diff_hist(diff_hist) {}
+	Matcher(const SketchIndex &tidx, const Buckets<abs_pos> &B) : tidx(tidx), B(B) {}
+	Matcher(const SketchIndex &tidx, const Buckets<abs_pos> &B, const h2cnt &diff_hist) : tidx(tidx), B(B), diff_hist(diff_hist) {}
 
 	void update(const h2cnt &diff_hist) {
 		this->diff_hist = diff_hist;
 	}
 
-    bool do_overlap(const string& query_id, const Buckets::BucketLoc& b) {
+    bool do_overlap(const string& query_id, const BucketLoc &b) {
         auto parsed = ParsedQueryId::parse(query_id);
         if (!parsed.valid) return false;
 		//cerr << query_id << ", " << b.segm_id << ", " << b.begin() << ", " << b.end() << endl;
@@ -35,10 +37,10 @@ public:
 		if (segm.name == parsed.segm_id) {
 			//rpos_t bucket_start_t = b.b * bucket_l;
 			//rpos_t bucket_end_t = bucket_start_t + 2 * bucket_l;
-			assert(b.begin() >= 0 && b.begin() < (rpos_t)segm.kmers.size());
-			rpos_t bucket_start_T = segm.kmers[b.begin()].r;
+			assert(B.begin(b) >= 0 && B.begin(b) < (rpos_t)segm.kmers.size());
+			rpos_t bucket_start_T = segm.kmers[B.begin(b)].r;
 			//assert(bucket_end_t >= 0 && bucket_end_t < (rpos_t)segm.kmers.size());
-			rpos_t bucket_end_T = b.end() < (rpos_t)segm.kmers.size() ? segm.kmers[b.end()].r : segm.sz;  // b.end() may not be a valid index
+			rpos_t bucket_end_T = B.end(b) < (rpos_t)segm.kmers.size() ? segm.kmers[B.end(b)].r : segm.sz;  // b.end() may not be a valid index
 
 //			cerr << "bucket_start_t: " << bucket_start_t << ", bucket_end_t: " << bucket_end_t << ", bucket_start_T: " << bucket_start_T << ", bucket_end_T: " << bucket_end_T << endl;
 			if (bucket_start_T < parsed.end_pos && bucket_end_T >= parsed.start_pos) {  // if overlap
@@ -48,7 +50,7 @@ public:
 		return false;
 	}
 
-    bool lost_correct_mapping(const string& query_id, const Buckets& B) {
+    bool lost_correct_mapping(const string& query_id) {
 		bool res = true;
 		for (auto it = B.buckets.begin(); it != B.buckets.end(); ++it)
 				if (do_overlap(query_id, it->first)) {
@@ -72,15 +74,14 @@ public:
 		return 1.0*intersection / (m + s_sz - intersection);
 	}
 
-	Matches collect_matches(const Buckets::BucketLoc &b, const h2seed_t &p_ht) {
+	Matches collect_matches(const BucketLoc &b, const h2seed_t &p_ht) {
 		Matches M;
 		//cerr << b << endl;
-		assert(b.parent != nullptr);
 		assert(b.segm_id >= 0 && b.segm_id < (rpos_t)tidx.T.size());
 
 		const auto &segm = tidx.T[b.segm_id];
-		qpos_t start = lower_bound(segm.kmers.begin(), segm.kmers.end(), b.begin(), [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
-		qpos_t end  = lower_bound(segm.kmers.begin(), segm.kmers.end(), b.end(), [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
+		qpos_t start = lower_bound(segm.kmers.begin(), segm.kmers.end(), B.begin(b), [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
+		qpos_t end  = lower_bound(segm.kmers.begin(), segm.kmers.end(), B.end(b), [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
 		for (rpos_t i = start; i < end; i++) {
 		//for (rpos_t i = b.begin(); i < std::min(b.end(), (rpos_t)tidx.T[b.segm_id].kmers.size()); i++) {
 			assert(i < (rpos_t)segm.kmers.size());
