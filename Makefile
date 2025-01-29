@@ -35,17 +35,17 @@ RELDEPS = $(RELOBJS:.o=.d)
 
 # Test build settings	
 TESTSRCS = test_shmap.cpp
-TESTSRCS += mapper.cpp io.cpp
+TESTSRCS += test_shmap.cpp mapper.cpp io.cpp
 TESTOBJSFILES = $(TESTSRCS:.cpp=.o)
 TESTDIR = test
 TESTBIN = $(TESTDIR)/test_shmap
 TESTOBJS = $(addprefix $(TESTDIR)/, $(TESTOBJSFILES))
-TESTCFLAGS =
+TESTCFLAGS = -O0 -DDEBUG
 TESTDEPS = $(TESTOBJS:.o=.d)
 
 #SHMAP_BIN = ./release/$(BIN)
 LIBS = -lz
-DEPFLAGS = -MMD -MP
+DEPFLAGS = -MMD -P
 
 TIME_CMD = /usr/bin/time -f "%U\t%M"
 
@@ -133,7 +133,7 @@ WINNOWMAP_PREF     = $(ALLOUT_DIR)/winnowmap/$(READS_PREFIX)/winnowmap
 all: prep release
 	
 prep:
-	mkdir -p $(DBGDIR) $(RELDIR) $(TESTDIR)
+	@mkdir -p $(DBGDIR) $(RELDIR) $(TESTDIR)
 	
 debug: prep $(DBGBIN)
 	
@@ -151,7 +151,10 @@ $(RELBIN): $(RELOBJS)
 $(RELDIR)/%.o: src/%.cpp
 	$(CC) -c $(CFLAGS) $(RELCFLAGS) $(DEPFLAGS) -o $@ $<
 
-test: prep $(TESTBIN)
+test: prep $(TESTBIN) run_test
+	
+run_test:
+	$(TESTBIN)
 
 $(TESTBIN): $(TESTOBJS)
 	$(CC) $(CFLAGS) $(TESTCFLAGS) -o $(TESTBIN) $^ $(LIBS)
