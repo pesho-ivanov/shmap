@@ -392,7 +392,8 @@ public:
 				//cerr << "theta: " << params.theta << " -> " << new_theta << endl;
 
 				//double theta2 = params.theta + params.min_diff;
-				qpos_t S = qpos_t((1.0 - params.theta) * m) + 1;			// any similar mapping includes at least 1 seed match
+				double theta2 = params.theta - params.min_diff;
+				qpos_t S = qpos_t((1.0 - theta2) * m) + 1;			// any similar mapping includes at least 1 seed match
 
 				BucketsType B;
 				if constexpr (abs_pos)
