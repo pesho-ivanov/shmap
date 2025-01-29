@@ -30,7 +30,6 @@ simulations/
 *.fai
 map
 evals/refs/
-src/fenwick.h
 evals/evals-table.tex
 release/shmap
 release_flag
@@ -47,3 +46,4 @@ out_small
 profile.txt
 debug/
 release/
+test/

@@ -33,6 +33,16 @@ RELOBJS = $(addprefix $(RELDIR)/, $(OBJS))
 RELCFLAGS = -O3 -DNDEBUG
 RELDEPS = $(RELOBJS:.o=.d)
 
+# Test build settings	
+TESTSRCS = test_shmap.cpp
+TESTSRCS += mapper.cpp io.cpp
+TESTOBJSFILES = $(TESTSRCS:.cpp=.o)
+TESTDIR = test
+TESTBIN = $(TESTDIR)/test_shmap
+TESTOBJS = $(addprefix $(TESTDIR)/, $(TESTOBJSFILES))
+TESTCFLAGS =
+TESTDEPS = $(TESTOBJS:.o=.d)
+
 #SHMAP_BIN = ./release/$(BIN)
 LIBS = -lz
 DEPFLAGS = -MMD -MP
@@ -123,9 +133,9 @@ WINNOWMAP_PREF     = $(ALLOUT_DIR)/winnowmap/$(READS_PREFIX)/winnowmap
 all: prep release
 	
 prep:
-	@mkdir -p $(DBGDIR) $(RELDIR)
+	mkdir -p $(DBGDIR) $(RELDIR) $(TESTDIR)
 	
-debug: $(DBGBIN)
+debug: prep $(DBGBIN)
 	
 $(DBGDIR)/$(BIN): $(DBGOBJS)
 	$(CC) $(CFLAGS) $(DBGCFLAGS) -o $(DBGDIR)/$(BIN) $^ $(LIBS)
@@ -133,7 +143,7 @@ $(DBGDIR)/$(BIN): $(DBGOBJS)
 $(DBGDIR)/%.o: src/%.cpp
 	$(CC) -c $(CFLAGS) $(DBGCFLAGS) $(DEPFLAGS) -o $@ $<
 
-release: $(RELBIN)
+release: prep $(RELBIN)
 	
 $(RELBIN): $(RELOBJS)
 	$(CC) $(CFLAGS) $(RELCFLAGS) -o $(RELBIN) $^ $(LIBS)
@@ -141,10 +151,21 @@ $(RELBIN): $(RELOBJS)
 $(RELDIR)/%.o: src/%.cpp
 	$(CC) -c $(CFLAGS) $(RELCFLAGS) $(DEPFLAGS) -o $@ $<
 
+test: prep $(TESTBIN)
+
+$(TESTBIN): $(TESTOBJS)
+	$(CC) $(CFLAGS) $(TESTCFLAGS) -o $(TESTBIN) $^ $(LIBS)
+
+$(TESTDIR)/%.o: src/%.cpp
+	$(CC) -c $(CFLAGS) $(TESTCFLAGS) $(DEPFLAGS) -o $@ $<
+
 remake: clean all
 
 clean:
-	rm -f $(RELEXE) $(RELOBJS) $(DBGEXE) $(DBGOBJS)
+	rm -fr $(DBGDIR) $(RELDIR) $(TESTDIR)
+#	rm -f $(RELEXE) $(RELOBJS)
+#	rm -f $(DBGEXE) $(DBGOBJS)
+#	rm -f $(TESTBIN) $(TESTOBJS)
 
 # Add the flag file as a prerequisite and create it if needed
 #$(SHMAP_BIN): $(OBJS) | $(FLAG_FILE)
@@ -358,7 +379,6 @@ clean_evals:
 #	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -a extend_equally -z $(DIR)/out/sweep-b-a.params >out/sweep-b-a.out
 #	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -z $(DIR)/out/sweep-b-e.params >out/sweep-b-e.out
 #	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -b highAbundKmersMiniK15w10Lrgr100BtStrnds.txt -e consecutive -a extend_equally -z $(DIR)/out/sweep-b-e-a.params >out/sweep-b-e-a.out
-
 #	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -z $(DIR)/out/sweep.params >out/sweep.out
 #	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -a extend_equally -z $(DIR)/out/sweep-a.params >out/sweep-a.out
 #	$(SHMAP_BIN) -s $(REF) -p $(READS) -k 15 -e consecutive -z $(DIR)/out/sweep-e.params >out/sweep-e.out
@@ -384,22 +404,28 @@ clean_evals:
 #
 
 # Test-specific variables
-TEST_SRCS = src/test_shmap.cpp
-TEST_OBJS = src/mapper.o src/io.o ext/edlib.o src/test_shmap.o  # Remove map.o as it contains main()
-TEST_EXEC = ./test_shmap
+#TEST_SRCS = src/test_shmap.cpp
+#TEST_OBJS = src/mapper.o src/io.o ext/edlib.o src/test_shmap.o  # Remove map.o as it contains main()
+#TEST_EXEC = test_shmap
 
-# Test target
-test: $(TEST_OBJS)
-	$(CXX) $(CXX_STANDARD) $(CFLAGS) -o $(TEST_EXEC) $(TEST_OBJS) $(LIBS)
-	./$(TEST_EXEC) --no-intro --no-version 2>/dev/null
+#$(DBGDIR)/$(BIN): $(DBGOBJS)
+#	$(CC) $(CFLAGS) $(DBGCFLAGS) -o $(DBGDIR)/$(BIN) $^ $(LIBS)
 
-# Compile test objects with TESTING defined
-src/test_shmap.o: src/test_shmap.cpp
-	$(CXX) $(CXX_STANDARD) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+#test: $(TEST_EXEC)
+#
+## Test target
+#$(TEST_EXEC): $(TEST_OBJS)
+#	$(CC) $(CFLAGS) -o $(TEST_EXEC) $(TEST_OBJS) $^ $(LIBS)
+#	./$(TEST_EXEC) --no-intro --no-version 2>/dev/null
+#
+## Compile test objects with TESTING defined
+#src/test_shmap.o: src/test_shmap.cpp
+#	$(CXX) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
-clean_test:
-	rm -f $(TEST_OBJS) $(TEST_EXEC)
+#clean_test:
+#	rm -f $(TEST_OBJS) $(TEST_EXEC)
 
 # Include generated dependency files
 -include $(DBGDEPS)
 -include $(RELDEPS)
+-include $(TESTDEPS)
