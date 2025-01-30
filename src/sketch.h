@@ -234,8 +234,9 @@ public:
 		} else if (frac < min_diff/2) {
 			return 0;
 		} else {
-			frac -= min_diff/2;
-			return std::min(int(60*frac/(min_diff/2)), mapq_strand);
+			return std::min(60, mapq_strand);
+			//frac -= min_diff/2;
+			//return std::min(int(60*frac/(min_diff/2)), mapq_strand);
 		}
 	}
 

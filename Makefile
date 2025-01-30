@@ -69,7 +69,7 @@ DEPTH ?= 1
 MEANLEN ?= ?
 
 K ?= 25
-R ?= 0.05
+R ?= 0.01
 T ?= 0.5
 MIN_DIFF ?= 0.15
 MAX_OVERLAP ?= 0.1

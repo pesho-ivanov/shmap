@@ -636,8 +636,8 @@ public:
 			cerr << ORANGE << "Runtime bottleneck: match_seeds takes " << H->T.perc("match_seeds", "mapping") << "% of the mapping time." << RESET << endl;
 		if (H->T.perc("match_rest", "mapping") > 90.0)
 			cerr << ORANGE << "Runtime bottleneck: match_rest takes " << H->T.perc("match_rest", "mapping") << "% of the mapping time." << RESET << endl;
-		if (H->T.perc("match_rest_for_best2", "match_rest") > 30.0)
-			cerr << ORANGE << "Runtime bottleneck: match_rest_for_best2 takes: " << H->T.perc("match_rest_for_best2", "match_rest") << "% > 30\% of the match_rest time." << RESET << endl;
+		if (H->T.perc("match_rest_for_best2", "match_rest") > 40.0)
+			cerr << ORANGE << "Runtime bottleneck: match_rest_for_best2 takes: " << H->T.perc("match_rest_for_best2", "match_rest") << "% > 40\% of the match_rest time." << RESET << endl;
 	}
 };
 
