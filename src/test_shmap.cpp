@@ -294,3 +294,75 @@ TEST_CASE("Indexing") {
 //	for (size_t i = 1; i < kmers.size(); i++)
 //		CHECK(kmers[i-1].hits_in_T == kmers[i].hits_in_T);
 //}
+
+TEST_CASE("test_select_kmers_pmatches") {
+	params_t params;
+	params.k = 25;
+	params.hFrac = 0.05;
+	params.theta = 0.7;
+
+	auto H = new Handler(params);
+	auto tidx = new SketchIndex(H);
+	auto mapper = new SHMapper<false, false, false, false>(*tidx, H);
+
+    sketch_t p;
+    p.emplace_back(60, 0x111111, false);
+    p.emplace_back(70, 0x222222, false);
+    p.emplace_back(10, 0x111111, true);
+    p.emplace_back(20, 0x222222, true);
+    p.emplace_back(30, 0x111111, true);
+    p.emplace_back(40, 0x444444, false);
+    p.emplace_back(50, 0x555555, false);
+
+    set< vector<qpos_t> > pmatches_gt;
+    pmatches_gt.insert({60, 30, 10});
+    pmatches_gt.insert({70, 20});
+    pmatches_gt.insert({40});
+    pmatches_gt.insert({50});
+
+    set< vector<qpos_t> > pmatches_res;
+    Seeds S = mapper->select_kmers(p);
+    for (auto s : S) {
+        //for (auto m : s.pmatches)
+        //    std::cout << m << " ";
+        //std::cout << std::endl;
+        pmatches_res.insert(s.pmatches);
+    }
+
+    CHECK(pmatches_res.size() == pmatches_gt.size());
+    CHECK(pmatches_res == pmatches_gt);
+}
+
+TEST_CASE("lcs") {
+    sketch_t t;
+    t.emplace_back(10, 0x111111, true);
+    t.emplace_back(20, 0x222222, true);
+    t.emplace_back(30, 0x111111, true);
+    t.emplace_back(40, 0x444444, false);
+    t.emplace_back(50, 0x555555, false);
+    t.emplace_back(60, 0x111111, false);
+    t.emplace_back(70, 0x222222, false);
+
+    const Buckets<false> B(2);
+    segm_t segm_id = 0;
+    rpos_t block = 1;  // t[2..6) including kmers (30, 0x111111), (40, 0x444444), (50, 0x555555), (60, 0x111111)
+                       // result:                      1,              3,              4,              5
+    const BucketLoc bucket(segm_id, block);
+    h2seed_t p_ht;
+    // Seed(kmer, hits_in_T, occs_in_p, seed_num, pmatches)
+    p_ht.insert(std::make_pair(hash_t(0x111111), Seed(Kmer(1, 0x111111, false), 99,  3, 0, vector<qpos_t>{5, 1})));
+    p_ht.insert(std::make_pair(hash_t(0x222222), Seed(Kmer(2, 0x222222, false), 999, 2, 1, vector<qpos_t>{4, 2})));
+    p_ht.insert(std::make_pair(hash_t(0x444444), Seed(Kmer(3, 0x444444, false), 9,   1, 2, vector<qpos_t>{3})));
+    // => seq = {5,1,3,5,1}  -- kmers from p in bucket t[2..6)
+    // => lis = {1,3,5}
+
+    params_t params;
+    params.k = 25;
+    params.hFrac = 0.05;
+    params.theta = 0.7;
+    auto H = new Handler(params);
+    auto tidx = new SketchIndex(H);
+    auto mapper = new SHMapper<false, false, false, false>(*tidx, H);
+    qpos_t lcs_cnt = mapper->lcs(t, B, bucket, p_ht);
+    CHECK(lcs_cnt == 3);
+}

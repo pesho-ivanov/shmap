@@ -45,8 +45,9 @@ struct Seed {
 	rpos_t hits_in_T;
 	qpos_t occs_in_p;
 	qpos_t seed_num;
-	Seed(const Kmer &kmer, rpos_t hits_in_T, qpos_t occs_in_p, qpos_t seed_num) :
-		kmer(kmer), hits_in_T(hits_in_T), occs_in_p(occs_in_p), seed_num(seed_num) {}	
+	std::vector<qpos_t> pmatches;   // positions in `p' of all occurences of `kmer'; sorted in decreasing order
+	Seed(const Kmer &kmer, rpos_t hits_in_T, qpos_t occs_in_p, qpos_t seed_num, const std::vector<qpos_t> &pmatches) :
+		kmer(kmer), hits_in_T(hits_in_T), occs_in_p(occs_in_p), seed_num(seed_num), pmatches(pmatches) {}	
 	friend std::ostream& operator<<(std::ostream& os, const Seed& seed) {
 		os << "Seed(" << seed.kmer << ", hits_in_T=" << seed.hits_in_T << ", occs_in_p=" << seed.occs_in_p << ", seed_num=" << seed.seed_num << ")";
 		return os;
