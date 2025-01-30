@@ -74,6 +74,10 @@ public:
 	Buckets() : len(-1), i(0), seeds(0) {}
 	Buckets(qpos_t len) : len(len), i(0), seeds(0) {}
 
+	qpos_t get_bucket_halflen() const {
+		return len;
+	}
+
 	void set_bucket_halflen(qpos_t len) {
 		this->len = len;
 	}
@@ -109,10 +113,6 @@ public:
 
 	bool delete_bucket(BucketLoc b) {
 		return buckets.erase(b);
-	}
-
-	qpos_t get_bucket_len() const {
-		return len;
 	}
 
 	qpos_t get_matches(const BucketLoc& b) const {
