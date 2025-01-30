@@ -14,7 +14,7 @@ public:
 
 class MapperFactory {
 public:
-    static Mapper* createMapper(const std::string& type, const SketchIndex& tidx, Handler* H);
+    static Mapper* createMapper(const SketchIndex& tidx, Handler* H);
 };
 
 } // namespace sweepmap

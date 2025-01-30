@@ -16,7 +16,7 @@
 
 namespace sweepmap {
 	
-template <bool no_bucket_pruning, bool one_sweep, bool only_sh, bool abs_pos>
+template <bool no_bucket_pruning, bool one_sweep, bool abs_pos>
 class SHMapper : public Mapper {
 	using BucketsType = Buckets<abs_pos>;
 
@@ -282,10 +282,6 @@ public:
 		
 		Mapping best;
 		for(; l < end; ++l) {
-			//for(;  r != t.begin() + end  && l-> hit.tpos <= l->hit.tpos + m; ++r) {
-				//&& l->hit.segm_id == r->hit.segm_id   // make sure they are in the same segment since we sweep over all matches
-				//&& r->hit.tpos + H->params.k <= l->hit.tpos + P_sz
-				//&& r->hit.r + H->params.k <= l->hit.r + P_sz
 			for(;  r < end; ++r) {
 				if (abs_pos) {
 					if (!(t[r].r < t[l].r + m)) break;
@@ -333,16 +329,25 @@ public:
 				T.start("refine");
 
 				Mapping best_in_bucket;
-				if (only_sh) {
-					best_in_bucket.update(0, P_sz-1, content.r_min, content.r_max, tidx.T[b.segm_id], content.matches, sh, content.codirection, content.r_max - content.r_min); // TODO: should it be prev(r) instead?
-				//} else {
-				//	qpos_t lcs_cnt = lcs(tidx.T[b.segm_id].kmers, B, b, p_ht);
-				//	ASSERT(content.matches >= lcs_cnt, "matches in bucket: " << content.matches << ", lcs_cnt: " << lcs_cnt);
-				//	double lcs_score = 1.0 * lcs_cnt / m;
-				//	assert(lcs_score >= 0.0 && lcs_score <= 1.0);
-				//	best_in_bucket.update(0, P_sz-1, content.r_min, content.r_max, tidx.T[b.segm_id], content.matches, lcs_score, content.codirection, content.r_max - content.r_min); // TODO: should it be prev(r) instead?
-				} else {
-					best_in_bucket = bestFixedLength(tidx.T[b.segm_id], B, b, p_ht, diff_hist, P_sz-H->params.k, m);
+				switch (H->params.metric) {
+					case Metric::bucket_SH: {
+						best_in_bucket.update(0, P_sz-1, content.r_min, content.r_max, tidx.T[b.segm_id], content.matches, sh, content.codirection, content.r_max - content.r_min); // TODO: should it be prev(r) instead?
+						break;
+					}
+					case Metric::bucket_LCS: {
+						qpos_t lcs_cnt = lcs(tidx.T[b.segm_id].kmers, B, b, p_ht);
+						ASSERT(content.matches >= lcs_cnt, "matches in bucket: " << content.matches << ", lcs_cnt: " << lcs_cnt);
+						double lcs_score = 1.0 * lcs_cnt / m;
+						assert(lcs_score >= 0.0 && lcs_score <= 1.0);
+						best_in_bucket.update(0, P_sz-1, content.r_min, content.r_max, tidx.T[b.segm_id], content.matches, lcs_score, content.codirection, content.r_max - content.r_min); // TODO: should it be prev(r) instead?
+						break;
+					}
+					case Metric::fixed_C: {
+						best_in_bucket = bestFixedLength(tidx.T[b.segm_id], B, b, p_ht, diff_hist, P_sz-H->params.k, m);
+						break;
+					}
+					default:
+						throw std::runtime_error("Invalid metric for bucket mapping");
 				}
 				best_in_bucket.set_bucket(b);
 				best_in_bucket.set_sh(sh);
@@ -603,8 +608,8 @@ public:
         cerr << " |  | match seeds:            " << setw(5) << right << H->T.secs("match_seeds")  << " (" << setw(4) << right << H->T.perc("match_seeds", "mapping")   << "\%, " << setw(6) << right << H->T.range_ratio("match_seeds") << "x)" << endl;
 //		cerr << " |  |  | match seeds single:     " << setw(5) << right << H->T.secs("match_seeds_single")  << " (" << setw(4) << right << H->T.perc("match_seeds_single", "match_seeds")   << "\%, " << setw(6) << right << H->T.range_ratio("match_seeds_single") << "x)" << endl;
         cerr << " |  | match rest:             " << setw(5) << right << H->T.secs("match_rest")   << " (" << setw(4) << right << H->T.perc("match_rest", "mapping")     << "\%, " << setw(6) << right << H->T.range_ratio("match_rest") << "x): " << H->T.perc("match_rest_for_best2", "match_rest") << "% for second best" << endl;
-        cerr << " |  |  | seed heuristic:         " << setw(5) << right << H->T.secs("seed_heuristic")    << " (" << setw(4) << right << H->T.perc("seed_heuristic", "match_rest")     << "\%, " << setw(6) << right << H->T.range_ratio("seed_heuristic") << "x)" << endl;
-        cerr << " |  |  | matches collect:        " << setw(5) << right << H->T.secs("match_collect")     << " (" << setw(4) << right << H->T.perc("match_collect", "match_rest")      << "\%, " << setw(6) << right << H->T.range_ratio("match_collect") << "x)" << endl;
+//        cerr << " |  |  | seed heuristic:         " << setw(5) << right << H->T.secs("seed_heuristic")    << " (" << setw(4) << right << H->T.perc("seed_heuristic", "match_rest")     << "\%, " << setw(6) << right << H->T.range_ratio("seed_heuristic") << "x)" << endl;
+//        cerr << " |  |  | matches collect:        " << setw(5) << right << H->T.secs("match_collect")     << " (" << setw(4) << right << H->T.perc("match_collect", "match_rest")      << "\%, " << setw(6) << right << H->T.range_ratio("match_collect") << "x)" << endl;
         cerr << " |  |  | refine:                 " << setw(5) << right << H->T.secs("refine")            << " (" << setw(4) << right << H->T.perc("refine", "match_rest")              << "\%, " << setw(6) << right << H->T.range_ratio("refine") << "x)" << endl;
 
 //        cerr << " |  |  | get intervals:           " << setw(5) << right << H->T.secs("get_intervals")     << " (" << setw(4) << right << H->T.perc("get_intervals", "mapping")      << "\%, " << setw(5) << right << H->T.range_ratio("get_intervals") << "x)" << endl;
@@ -616,9 +621,9 @@ public:
 };
 
 // Initialize static member
-template <bool no_bucket_pruning, bool one_sweep, bool only_sh, bool abs_pos>
-SHMapper<no_bucket_pruning, one_sweep, only_sh, abs_pos>* 
-	SHMapper<no_bucket_pruning, one_sweep, only_sh, abs_pos>::current_instance = nullptr;
+template <bool no_bucket_pruning, bool one_sweep, bool abs_pos>
+SHMapper<no_bucket_pruning, one_sweep, abs_pos>* 
+	SHMapper<no_bucket_pruning, one_sweep, abs_pos>::current_instance = nullptr;
 
 }  // namespace sweepmap
 

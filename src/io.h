@@ -22,7 +22,29 @@ using std::pair;
 using std::ifstream;
 using std::endl;
 
-#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:d:z:v:o:anhPBOF"
+#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:d:z:v:o:anhPBF"
+
+enum Metric {
+	bucket_SH,
+	bucket_LCS,
+	fixed_C
+};
+
+inline string mapping_metric_str(Metric metric) {
+	switch (metric) {
+		case Metric::bucket_SH: return "bucket_SH";
+		case Metric::bucket_LCS: return "bucket_LCS";
+		case Metric::fixed_C: return "fixed_C";
+	}
+	throw std::runtime_error("Invalid mapping metric: " + std::to_string(static_cast<int>(metric)));
+}
+
+inline Metric mapping_metric_from_str(const string& str) {
+	if (str == "bucket_SH") return Metric::bucket_SH;
+	if (str == "bucket_LCS") return Metric::bucket_LCS;
+	if (str == "fixed_C") return Metric::fixed_C;
+	throw std::runtime_error("Invalid mapping metric: " + str);
+}
 
 struct params_t {
 	// required
@@ -38,7 +60,7 @@ struct params_t {
 	double max_overlap;			    // The maximal overlap between the best and second best mapping
 
 	string paramsFile;
-	string mapper;                  // The name of the mapper
+	Metric metric;           // Optimization metric
 	int verbose;					// Outputs debug information: 0 for no, 1 for some, 2 for all (warning: take time)
 
 	// no arguments
@@ -49,13 +71,12 @@ struct params_t {
 	// for degradation evals; templated in compile-time
 	bool no_bucket_pruning; // Disables bucket pruning
 	bool one_sweep;         // Disregards the seed heuristic and runs one sweepmap on all matches
-	bool only_sh;           // Only compute SH (do not refine using sweepline). Warning: This make the mappings approximate!
 	bool abs_pos;           // Use absolute positions instead of kmer positions
 
 	params_t() :
-		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), min_diff(0.02), max_overlap(0.5), mapper("shmap"), verbose(0),
+		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), min_diff(0.02), max_overlap(0.5), metric(Metric::fixed_C), verbose(0),
 		sam(false), normalize(false), /*onlybest(false),*/
-		no_bucket_pruning(false), one_sweep(false), only_sh(false), abs_pos(false) {}
+		no_bucket_pruning(false), one_sweep(false), abs_pos(false) {}
 
 	void print(std::ostream& out, bool human) const {
 		std::vector<pair<string, string>> m;
@@ -69,7 +90,7 @@ struct params_t {
 		m.push_back({"min_diff", std::to_string(min_diff)});
 		m.push_back({"max_overlap", std::to_string(max_overlap)});
 		m.push_back({"paramsFile", paramsFile});
-		m.push_back({"mapper", mapper});
+		m.push_back({"metric", mapping_metric_str(metric)});
 
 		m.push_back({"sam", std::to_string(sam)});
 		m.push_back({"normalize", std::to_string(normalize)});
@@ -78,7 +99,6 @@ struct params_t {
 
 		m.push_back({"no-bucket-pruning", std::to_string(no_bucket_pruning)});
 		m.push_back({"one-sweep", std::to_string(one_sweep)});
-		m.push_back({"only-sh", std::to_string(only_sh)});
 		m.push_back({"abs-pos", std::to_string(abs_pos)});
 
 		if (human) {
@@ -98,7 +118,7 @@ struct params_t {
 		out << "Params:" << endl;
 		out << " | reference:             " << tFile << endl;
 		out << " | reads:                 " << pFile << endl;
-		out << " | algorithm:             " << mapper << endl;
+		out << " | metric:                " << mapping_metric_str(metric) << endl;
 		out << " | k:                     " << k << endl;
 		out << " | hFrac:                 " << hFrac << endl;
 		out << " | max_seeds              " << max_seeds << endl;
@@ -112,7 +132,6 @@ struct params_t {
 
 		out << " | no-bucket-pruning:     " << no_bucket_pruning << endl;
 		out << " | one-sweep:             " << one_sweep << endl;
-		out << " | only-sh:               " << only_sh << endl;
 		out << " | abs-pos:               " << abs_pos << endl;
 	}
 
@@ -127,7 +146,7 @@ struct params_t {
 		cerr << "   -s   --text              Text sequence file (FASTA format)" << endl;
 		cerr << endl;
 		cerr << "Optional parameters with an argument:" << endl;
-		cerr << "   -m   --mapper            Mapper name {sweep, bucket} (default: sweep)" << endl;
+		cerr << "   -m   --metric            Optimization metric: 'bucket_SH' for seed heuristic in bucket, 'bucket_LCS' for longest common substring in bucket, 'fixed_C' for containment index in fixed-length sketch subinterval (default: 'fixed_C')" << endl;
 		cerr << "   -k   --ksize             K-mer length to be used for sketches" << endl;
 		cerr << "   -r   --ratio   			 FracMinHash ratio in [0; 1] [0.1]" << endl;
 		cerr << "   -S   --max_seeds         Max seeds in a sketch" << endl;
@@ -144,7 +163,6 @@ struct params_t {
 		//cerr << "   -x   --onlybest          Output the best alignment if above threshold (otherwise none)" << endl;
 		cerr << "   -P   --no-bucket-pruning Disables bucket pruning" << endl;
 		cerr << "   -B   --one-sweep         Disregards the seed heuristic and runs one sweepmap on all matches" << endl;
-		cerr << "   -O   --only-sh           Only compute SH (do not refine using sweepline). Warning: This make the mappings approximate!" << endl;
 		cerr << "   -F   --abs-pos           Use absolute positions instead of kmer positions" << endl;
 		cerr << "   -h   --help              Display this help message" << endl;
 	}
@@ -160,7 +178,7 @@ struct params_t {
 			{"max_matches",        required_argument,  0, 'M'},
 			{"hom_thres",          required_argument,  0, 't'},
 			{"params",             required_argument,  0, 'z'},
-			{"mapper",             required_argument,  0, 'm'},
+			{"metric",             required_argument,  0, 'm'},
 			{"threshold",          required_argument,  0, 't'},
 			{"verbose",            required_argument,  0, 'v'},
 			{"normalize",          no_argument,        0, 'n'},
@@ -183,7 +201,7 @@ struct params_t {
 					tFile = optarg;
 					break;
 				case 'm':
-					mapper = optarg;
+					metric = mapping_metric_from_str(optarg);
 					break;
 				case 'k':
 					if(atoi(optarg) <= 0) {
@@ -255,9 +273,6 @@ struct params_t {
 					break;
 				case 'B':
 					one_sweep = true;
-					break;
-				case 'O':
-					only_sh = true;
 					break;
 				case 'F':
 					abs_pos = true;

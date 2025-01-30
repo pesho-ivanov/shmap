@@ -8,7 +8,7 @@
 
 namespace sweepmap {
 
-enum class Metric {
+enum class MappingMetric {
 	JACCARD,
 	CONTAINMENT_INDEX
 };
@@ -155,7 +155,7 @@ public:
 		return best;
 	}
 
-	Mapping bestFixedLength(const gtl::vector<Match> &M, const qpos_t P_sz, qpos_t lmax, const qpos_t m, Metric metric) {
+	Mapping bestFixedLength(const gtl::vector<Match> &M, const qpos_t P_sz, qpos_t lmax, const qpos_t m, MappingMetric metric) {
 		qpos_t intersection = 0;
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 		Mapping best;
@@ -181,10 +181,10 @@ public:
 			}
 
 			double J;
-			if (metric == Metric::JACCARD) {
+			if (metric == MappingMetric::JACCARD) {
 				int s_sz = prev(r)->hit.tpos - l->hit.tpos + 1;
 				J = Jaccard(intersection, m, s_sz);
-			} else if (metric == Metric::CONTAINMENT_INDEX) {
+			} else if (metric == MappingMetric::CONTAINMENT_INDEX) {
 				J = ContainmentIndex(intersection, m);
 			} else {
 				J = -1.0;

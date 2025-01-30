@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
 	Handler H(params);
 	SketchIndex tidx(&H);
 	tidx.build_index(H.params.tFile);
-	Mapper* mapper = MapperFactory::createMapper(H.params.mapper, tidx, &H);
+	Mapper* mapper = MapperFactory::createMapper(tidx, &H);
 	if (mapper == nullptr) return 1;
 	mapper->map_reads(H.params.pFile);
 

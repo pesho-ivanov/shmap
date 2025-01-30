@@ -83,7 +83,7 @@ public:
 		for (auto &b: buckets) {
 			auto M = matcher.collect_matches(b, p_ht);
 			auto best_J_mapping	= matcher.bestIncludedJaccard(M, P_sz, m-2, m+2, m);
-			auto best_C_mapping = matcher.bestFixedLength(M, P_sz, 2*bucket_l, m, Metric::CONTAINMENT_INDEX);
+			auto best_C_mapping = matcher.bestFixedLength(M, P_sz, 2*bucket_l, m, MappingMetric::CONTAINMENT_INDEX);
 			res << "(" << tidx.T[b.segm_id].name << ", " << b.b << ", " << best_J_mapping.score() << ", " << best_C_mapping.score() << "),";
 
 			max_J = max(max_J, best_J_mapping.score());
@@ -115,10 +115,10 @@ public:
 		gt_J_l 		= matcher.bestIncludedJaccard(gt_M_l, P_sz, end-start-2, end-start+2, m);
 		gt_J_r 		= matcher.bestIncludedJaccard(gt_M_r, P_sz, end-start-2, end-start+2, m);
 		gt_J_next 	= matcher.bestIncludedJaccard(gt_M_next, P_sz, end-start-2, end-start+2, m);
-		gt_C_l 		= matcher.bestFixedLength(gt_M_l, P_sz, 2*bucket_l, m, Metric::CONTAINMENT_INDEX);
-		gt_C_r 		= matcher.bestFixedLength(gt_M_r, P_sz, 2*bucket_l, m, Metric::CONTAINMENT_INDEX);
-		gt_C_next 	= matcher.bestFixedLength(gt_M_next, P_sz, 2*bucket_l, m, Metric::CONTAINMENT_INDEX);
-		gt_C_l_lmax = matcher.bestFixedLength(gt_M_l, P_sz, bucket_l, m, Metric::CONTAINMENT_INDEX);
+		gt_C_l 		= matcher.bestFixedLength(gt_M_l, P_sz, 2*bucket_l, m, MappingMetric::CONTAINMENT_INDEX);
+		gt_C_r 		= matcher.bestFixedLength(gt_M_r, P_sz, 2*bucket_l, m, MappingMetric::CONTAINMENT_INDEX);
+		gt_C_next 	= matcher.bestFixedLength(gt_M_next, P_sz, 2*bucket_l, m, MappingMetric::CONTAINMENT_INDEX);
+		gt_C_l_lmax = matcher.bestFixedLength(gt_M_l, P_sz, bucket_l, m, MappingMetric::CONTAINMENT_INDEX);
 		
 		// Buckets with Jaccard and Containment index >= theta
 		vector<BucketLoc> J_buckets;
@@ -127,7 +127,7 @@ public:
 		for (auto &[b, content] : sorted_buckets) {
 			auto M = matcher.collect_matches(b, p_ht);
 			auto mapping_J = matcher.bestIncludedJaccard(M, P_sz, end-start-2, end-start+2, m);
-			auto mapping_C = matcher.bestFixedLength(M, P_sz, 2*bucket_l, m, Metric::CONTAINMENT_INDEX);
+			auto mapping_C = matcher.bestFixedLength(M, P_sz, 2*bucket_l, m, MappingMetric::CONTAINMENT_INDEX);
 			mapping_J.set_bucket(b);
 			if (mapping_J.score() >= theta) J_buckets.push_back(b);
 			if (mapping_C.score() >= theta) C_buckets.push_back(b);
