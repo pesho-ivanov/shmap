@@ -274,9 +274,9 @@ fdr_per_theta: $(SHMAP_BIN) gen_reads
 
 eval_shmap: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_PREF))
-#	if [ $(SHMAP_NOINDEX) -ne 1 ]; then \
-#		$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) -m $(METRIC) $(SHMAP_ARGS) 2>/dev/null >/dev/null; \
-#	fi
+	if [ $(SHMAP_NOINDEX) -ne 1 ]; then \
+		$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) -m $(METRIC) $(SHMAP_ARGS) 2>/dev/null >/dev/null; \
+	fi
 	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) -m $(METRIC) $(SHMAP_ARGS)    2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
 	$(PAFTOOLS) mapeval -r 0.1 $(SHMAP_PREF).paf 2>/dev/null | tee $(SHMAP_PREF).eval || true
 	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_PREF).paf > $(SHMAP_PREF).wrong 2>/dev/null || true
@@ -344,6 +344,11 @@ eval_shmap_on_datasets:
 	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13 	READSIM_REFNAME=hg002 	DEPTH=1
 	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READSIM_REFNAME=chm13   DEPTH=1
 	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READS_PREFIX=HG002_small
+
+eval_shmap_on_datasets_on_metrics:
+	make eval_shmap_on_datasets METRIC=bucket_SH
+	make eval_shmap_on_datasets METRIC=bucket_LCS
+	make eval_shmap_on_datasets METRIC=fixed_C
 
 #SHMAP_PREF         = $(ALLOUT_DIR)/pauls_experiment/$(READS_PREFIX)/
 pauls_experiment: $(SHMAP_BIN) gen_reads

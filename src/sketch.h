@@ -283,7 +283,7 @@ public:
 		//local_stats.segm_name = segm.name;
 	}
 
-	double mapq() const {
+	int mapq() const {
 		return paf.mapq;
 	}
 

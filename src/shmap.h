@@ -376,7 +376,7 @@ public:
 
 		C.init("seeds_limit_reached", "mapped_reads", "kmers", "kmers_notmatched", "seeds", "matches",
 			   "seed_matches", "max_seed_matches", "matches_freq", "spurious_matches", "mappings", "J_best",
-			   "sketched_kmers", "total_edit_distance", "intersection_diff", "mapq60", "matches_in_reported_mappings",
+			   "sketched_kmers", "total_edit_distance", "intersection_diff", "mapq60", "mapq0", "matches_in_reported_mappings",
 			   "lost_on_seeding", "lost_on_pruning", "final_buckets");
 
 		T.init("seed_heuristic", "match_collect", "refine");
@@ -486,7 +486,6 @@ public:
 				if (best2)
 					best->set_second_best(best2.value());
 
-				if (best->mapq() == 60) C.inc("mapq60");
 				C.inc("matches_in_reported_mappings", best->intersection());
 				C.inc("J_best", rpos_t(10000.0*best->score()));
 				C.inc("mappings");
@@ -497,6 +496,8 @@ public:
 			}
 			best->set_global_stats(params.theta, params.min_diff, m, query_id.c_str(), P.size(), params.k, S, C.count("total_matches"), C.count("max_seed_matches"), C.count("seed_matches"), C.count("seeded_buckets"), C.count("final_buckets"), FPTP, T.secs("query_mapping"));  // TODO: disable by flag
 			best->print_paf(*os);
+			if (best->mapq() == 60) C.inc("mapq60");
+			if (best->mapq() == 0)  C.inc("mapq0");
 
 			if (params.verbose >= 2) {
 				AnalyseSimulatedReads<abs_pos> gt(query_id, P, P.size(), diff_hist, m, p_ht, tidx, B, params.theta);
@@ -552,22 +553,23 @@ public:
 
 		print_stats();
 		print_time_stats();
+		print_warnings();
 	}
 	
 	void print_stats() {
 		cerr << std::fixed << std::setprecision(1);
 		//cerr << "Mapping:" << endl;
-		cerr << " | Total reads:           " << H->C.count("reads") << " (~" << 1.0*H->C.count("read_len") / H->C.count("reads") << " nb p/ read)" << endl;
+		cerr << " | Total reads:           " << H->C.count("reads") << " (~" << 1.0*H->C.count("read_len") / H->C.count("reads") << " nb/read)" << endl;
 		cerr << " |  | lost on seeding:      " << H->C.count("lost_on_seeding") << " (" << H->C.perc("lost_on_seeding", "reads") << "%)" << endl;
 		cerr << " |  | lost on pruning:      " << H->C.count("lost_on_pruning") << " (" << H->C.perc("lost_on_pruning", "reads") << "%)" << endl;
 		cerr << " |  | mapped:               " << H->C.count("mapped_reads") << " (" << H->C.perc("mapped_reads", "reads") << "%)" << endl;
-//		cerr << " |  |  | intersect. diff:     " << H->C.frac("intersection_diff", "mapped_reads") << " p/ mapped read" << endl;
-		cerr << " | Kmers:                 " << H->C.frac("kmers", "reads") << " p/ read" << endl;
+//		cerr << " |  |  | intersect. diff:     " << H->C.frac("intersection_diff", "mapped_reads") << "/mapped read" << endl;
+		cerr << " | Kmers:                 " << H->C.frac("kmers", "reads") << "/read" << endl;
 		cerr << " |  | sketched:               " << H->C.frac("kmers_sketched", "reads") << " (" << H->C.perc("kmers_sketched", "kmers") << "%)" << endl;
 		cerr << " |  | not matched:            " << H->C.frac("kmers_notmatched", "reads") << " (" << H->C.perc("kmers_notmatched", "kmers") << "%)" << endl;
 		cerr << " |  | unique:                 " << H->C.frac("kmers_unique", "reads") << " (" << H->C.perc("kmers_unique", "kmers") << "%)" << endl;
 		cerr << " |  | seeds:                  " << H->C.frac("kmers_seeds", "reads") << " (" << H->C.perc("kmers_seeds", "kmers") << "%)" << endl;
-		cerr << " | Matches:               " << H->C.frac("total_matches", "reads") << " p/ read" << endl;
+		cerr << " | Matches:               " << H->C.frac("total_matches", "reads") << "/read" << endl;
 		cerr << " |  | seed matches:           " << H->C.frac("seed_matches", "reads") << " (" << H->C.perc("seed_matches", "total_matches") << "%)" << endl;
 		cerr << " |  | in reported mappings:   " << H->C.frac("matches_in_reported_mappings", "reads") << " (match inefficiency: " << H->C.frac("total_matches", "matches_in_reported_mappings") << "x)" << endl;
 		cerr << " |  | possible matches:       " << H->C.frac("possible_matches", "reads") << " (" <<H->C.frac("possible_matches", "total_matches") << "x)" << endl;
@@ -584,6 +586,7 @@ public:
 //		cerr << " | | Final mappings:          " << H->C.frac("final_mappings", "mappings") << " /mapping" << endl;
 		cerr << " | | Average best sim.:       " << std::fixed << std::setprecision(3) << H->C.frac("J_best", "mappings") / 10000.0 << endl;
 		cerr << " | | mapq=60:                 " << H->C.count("mapq60") << " (" << H->C.perc("mapq60", "mappings") << "\% of mappings)" << endl;
+		cerr << " | | mapq=0:                 " << H->C.count("mapq0") << " (" << H->C.perc("mapq0", "mappings") << "\% of mappings)" << endl;
 		//cerr << " | | FDR:                     " << H->C.perc("FP", "PP") << "%" << " = " << H->C.frac("FP", "reads") << " / " << H->C.frac("PP", "reads") << " per reads" << endl;
 
 		//cerr << " | Average edit dist:     " << H->C.frac("total_edit_distance", "mappings") << endl;
@@ -593,7 +596,7 @@ public:
 
     void print_time_stats() {
         cerr << std::fixed << std::setprecision(1);
-        cerr << " | Runtime:                "    << setw(5) << right << H->T.secs("mapping")       << " sec, " << 1.0 * H->C.count("reads") / H->T.secs("mapping")  << " reads/sec (" << setw(5) << right << H->T.range_ratio("query_mapping") << "x)" << endl; //setw(4) << right << H->C.count("reads") / H->T.secs("total") << " reads p/ sec)" << endl;
+        cerr << " | Runtime:                "    << setw(5) << right << H->T.secs("mapping")       << " sec, " << 1.0 * H->C.count("reads") / H->T.secs("mapping")  << " reads/sec (" << setw(5) << right << H->T.range_ratio("query_mapping") << "x)" << endl; //setw(4) << right << H->C.count("reads") / H->T.secs("total") << " reads/sec)" << endl;
         cerr << " |  | load reads:             " << setw(5) << right << H->T.secs("query_reading")     << " (" << setw(4) << right << H->T.perc("query_reading", "mapping")       << "\%, " << setw(6) << right << H->T.range_ratio("query_reading") << "x)" << endl;
         cerr << " |  | sketch reads:           " << setw(5) << right << H->T.secs("sketching")         << " (" << setw(4) << right << H->T.perc("sketching", "mapping")           << "\%, " << setw(6) << right << H->T.range_ratio("sketching") << "x)" << endl;
 //        cerr << " |  | prepare:                " << setw(5) << right << H->T.secs("prepare")           << " (" << setw(4) << right << H->T.perc("prepare", "mapping")             << "\%, " << setw(6) << right << H->T.range_ratio("prepare") << "x)" << endl;
@@ -618,6 +621,24 @@ public:
         cerr << " |  | output:                 " << setw(5) << right << H->T.secs("output")            << " (" << setw(4) << right << H->T.perc("output", "mapping")              << "\%, " << setw(6) << right << H->T.range_ratio("output") << "x)" << endl;
 //        cerr << " |  | post proc:              "     << setw(5) << right << H->T.secs("postproc")          << " (" << setw(4) << right << H->T.perc("postproc", "mapping")            << "\%, " << setw(6) << right << H->T.range_ratio("postproc") << "x)" << endl;
     }
+
+	void print_warnings() {
+		string ORANGE = "\033[38;5;214m";
+		string RESET = "\033[0m";
+
+		if (H->C.frac("mapped_reads", "reads") < 0.95)
+			cerr << ORANGE << "Mapped reads = " << H->C.frac("mapped_reads", "reads") << " < 0.95." << RESET << endl;
+		if (H->C.frac("possible_matches", "total_matches") < 10.0)
+			cerr << ORANGE << "Possible matches = " << H->C.frac("possible_matches", "total_matches") << "x < 10.0 => seed heuristic not effective." << RESET << endl;
+		if (H->C.count("mapq60") < H->C.count("mapq0"))
+			cerr << ORANGE << "Reads mapped with mapq=60: " << H->C.count("mapq60") << " < mapq=0: " << H->C.count("mapq0") << "." << RESET << endl;
+		if (H->T.perc("match_seeds", "mapping") > 90.0)
+			cerr << ORANGE << "Runtime bottleneck: match_seeds takes " << H->T.perc("match_seeds", "mapping") << "% of the mapping time." << RESET << endl;
+		if (H->T.perc("match_rest", "mapping") > 90.0)
+			cerr << ORANGE << "Runtime bottleneck: match_rest takes " << H->T.perc("match_rest", "mapping") << "% of the mapping time." << RESET << endl;
+		if (H->T.perc("match_rest_for_best2", "match_rest") > 30.0)
+			cerr << ORANGE << "Runtime bottleneck: match_rest_for_best2 takes: " << H->T.perc("match_rest_for_best2", "match_rest") << "% > 30\% of the match_rest time." << RESET << endl;
+	}
 };
 
 // Initialize static member

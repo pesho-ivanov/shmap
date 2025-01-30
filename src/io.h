@@ -121,17 +121,16 @@ struct params_t {
 		out << " | metric:                " << mapping_metric_str(metric) << endl;
 		out << " | k:                     " << k << endl;
 		out << " | hFrac:                 " << hFrac << endl;
-		out << " | max_seeds              " << max_seeds << endl;
-		out << " | max_matches:           " << max_matches << endl;
-		out << " | sam:                   " << sam << endl;
+		//out << " | max_seeds              " << max_seeds << endl;
+		//out << " | max_matches:           " << max_matches << endl;
+		//out << " | sam:                   " << sam << endl;
 		//out << " | onlybest:              " << onlybest << endl;
 		out << " | verbose:               " << verbose << endl;
 		out << " | tThres:                " << theta << endl;
 		out << " | min_diff:              " << min_diff << endl;
 		out << " | max_overlap:           " << max_overlap << endl;
-
 		out << " | no-bucket-pruning:     " << no_bucket_pruning << endl;
-		out << " | one-sweep:             " << one_sweep << endl;
+		//out << " | one-sweep:             " << one_sweep << endl;
 		out << " | abs-pos:               " << abs_pos << endl;
 	}
 
