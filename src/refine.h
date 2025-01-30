@@ -80,8 +80,14 @@ public:
 		assert(b.segm_id >= 0 && b.segm_id < (rpos_t)tidx.T.size());
 
 		const auto &segm = tidx.T[b.segm_id];
-		qpos_t start = lower_bound(segm.kmers.begin(), segm.kmers.end(), B.begin(b), [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
-		qpos_t end  = lower_bound(segm.kmers.begin(), segm.kmers.end(), B.end(b), [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
+		rpos_t start, end;
+		if (abs_pos) {
+			start = lower_bound(segm.kmers.begin(), segm.kmers.end(), B.begin(b), [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
+			end  = lower_bound(segm.kmers.begin(), segm.kmers.end(), B.end(b), [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
+		} else {
+			start = B.begin(b);
+			end = B.end(b);
+		}
 		for (rpos_t i = start; i < end; i++) {
 		//for (rpos_t i = b.begin(); i < std::min(b.end(), (rpos_t)tidx.T[b.segm_id].kmers.size()); i++) {
 			assert(i < (rpos_t)segm.kmers.size());
