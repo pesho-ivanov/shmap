@@ -114,7 +114,7 @@ PBSIM3     = ~/libs/pbsim3/src/pbsim
 PAFTOOLS   = ./ext/paftools.js
 SEQKIT     = ~/miniconda3/bin/seqkit
 
-LIFT_FASTA = $(DIR)/convert_fasta_with_args.py
+#LIFT_FASTA = $(DIR)/convert_fasta_with_args.py
 STREAM_LIFT_FASTA = $(DIR)/stream_fasta.py
 CHAIN_FILE = $(DIR)/refs/hg002v1.1_to_CHM13v2.0.chain
 

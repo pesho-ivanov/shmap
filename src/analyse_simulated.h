@@ -27,9 +27,10 @@ public:
 
 	Matcher<abs_pos> matcher;
 
+	rpos_t gt_start_nucl, gt_end_nucl;
 	// calculated
 	int bucket_l;
-	qpos_t start, end;
+	rpos_t start, end;
 	int segm_id;
 	string segm_name;
 	vector<BucketLoc> J_buckets;
@@ -51,7 +52,7 @@ public:
 	Mapping gt_C_l_lmax;
 	Mapping gt_C_r_lmax;
 
-	tuple<qpos_t, qpos_t, int, string> GT_start_end(const string& query_id) {
+	tuple<rpos_t, rpos_t, rpos_t, rpos_t, int, string> GT_start_end(const string& query_id) {
 		auto parsed = ParsedQueryId::parse(query_id);
 		assert(parsed.valid);
 		
@@ -64,13 +65,13 @@ public:
 			}
 		assert(segm_id >= 0 && segm_id < (rpos_t)tidx.T.size());
 
-		if constexpr (abs_pos)
-			return {parsed.start_pos, parsed.end_pos, segm_id, parsed.segm_id};
+		if (abs_pos)
+			return {parsed.start_pos, parsed.end_pos, parsed.start_pos, parsed.end_pos, segm_id, parsed.segm_id};
 		else {
 			const auto &segm = tidx.T[segm_id];
 			qpos_t start = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.start_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
 			qpos_t end  = lower_bound(segm.kmers.begin(), segm.kmers.end(), parsed.end_pos, [](const auto &kmer, const auto &pos) { return kmer.r < pos; }) - segm.kmers.begin();
-			return {start, end, segm_id, parsed.segm_id};
+			return {parsed.start_pos, parsed.end_pos, start, end, segm_id, parsed.segm_id};
 		}
 	}
 
@@ -96,14 +97,14 @@ public:
 public:
 	AnalyseSimulatedReads(const string& query_id, const string &P, int P_sz, const h2cnt &diff_hist, int m, const h2seed_t &p_ht, const SketchIndex &tidx, Buckets<abs_pos> &B, const double theta)
 	 : query_id(query_id), P(P), P_sz(P_sz), diff_hist(diff_hist), m(m), p_ht(p_ht), tidx(tidx), B(B), theta(theta), matcher(tidx, B, diff_hist) {
-		bucket_l = B.get_bucket_len();
+		bucket_l = B.get_bucket_halflen();
 
 		// Ground-truth
 		auto parsed_orig = ParsedQueryId::parse(query_id);
 		const auto &segm = tidx.get_segment(parsed_orig.segm_id);
 		gt_mapping.paf = MappingPAF(0, P_sz, parsed_orig.strand, segm.name.c_str(), segm.sz, segm.id, parsed_orig.start_pos, parsed_orig.end_pos);
 
-		tie(start, end, segm_id, segm_name) = GT_start_end(query_id);
+		tie(gt_start_nucl, gt_end_nucl, start, end, segm_id, segm_name) = GT_start_end(query_id);
 		//update(0, P_sz-1, start, end, tidx.T[segm_id], -1, -1, -1, nullptr, nullptr); // TODO: should it be prev(r) instead?
 		gt_b_l 		= BucketLoc(segm_id, max(0, start/bucket_l-1));
 		gt_b_r 		= BucketLoc(segm_id, start/bucket_l);
@@ -204,7 +205,12 @@ public:
 	}
 
 	void print_paf(ostream &out) {
-		out << "\tgt_b_l:s:" << gt_b_l
+		out 
+			<< "\tgt_segm:s:" << segm_name
+			<< "\tgt_start_nucl:i:" << gt_start_nucl
+			<< "\tgt_end_nucl:i:" << gt_end_nucl
+			<< "\tbucket_l:i:" << bucket_l
+			<< "\tgt_b_l:s:" << gt_b_l
 			<< "\tgt_b_r:s:" << gt_b_r
 			<< "\tgt_b_next:s:" << gt_b_next
 			<< "\tgt_M_l:i:" << gt_M_l.size()					
