@@ -317,7 +317,7 @@ public:
 		return best;
 	}
 	
-	std::optional<Mapping> match_rest(qpos_t P_sz, qpos_t m, const Seeds &p_unique, const BucketsType &B, vector<typename BucketsType::bucket_map_t::value_type> &sorted_buckets, h2cnt &diff_hist, const h2seed_t &p_ht,
+	std::optional<Mapping> match_rest(qpos_t P_sz, qpos_t m, qpos_t lmax, const Seeds &p_unique, const BucketsType &B, vector<typename BucketsType::bucket_map_t::value_type> &sorted_buckets, h2cnt &diff_hist, const h2seed_t &p_ht,
 			double thr, std::optional<Mapping> forbidden, const string &query_id, int *lost_on_pruning, double max_overlap) {
 		int lost_on_seeding = (0);
 		std::optional<Mapping> best;
@@ -343,7 +343,7 @@ public:
 						break;
 					}
 					case Metric::fixed_C: {
-						best_in_bucket = bestFixedLength(tidx.T[b.segm_id], B, b, p_ht, diff_hist, P_sz-H->params.k, m);
+						best_in_bucket = bestFixedLength(tidx.T[b.segm_id], B, b, p_ht, diff_hist, P_sz-H->params.k, lmax);
 						break;
 					}
 					default:
@@ -429,7 +429,7 @@ public:
 				if (abs_pos)
 					B.set_bucket_halflen(P.size());
 				else
-					B.set_bucket_halflen(m/params.theta);
+					B.set_bucket_halflen(m); ///params.theta);
 
 				C.inc("kmers_sketched", m);
 				C.inc("kmers", m);
@@ -456,16 +456,17 @@ public:
 			
 			auto sorted_buckets = B.get_sorted_buckets();
 
+			auto lmax = m;// / params.theta;
 			int lost_on_pruning = 1;
 			std::optional<Mapping> best, best2;
 			T.start("match_rest");
 				T.start("match_rest_for_best");
-					best = match_rest(P.size(), m, p_unique, B, sorted_buckets, diff_hist, p_ht, params.theta, std::nullopt, query_id, &lost_on_pruning, params.max_overlap);
+					best = match_rest(P.size(), m, lmax, p_unique, B, sorted_buckets, diff_hist, p_ht, params.theta, std::nullopt, query_id, &lost_on_pruning, params.max_overlap);
 				T.stop("match_rest_for_best");
 				T.start("match_rest_for_best2");
 					if (best) {
 						double second_best_thr = best->score() * (1.0 - params.min_diff);
-						best2 = match_rest(P.size(), m, p_unique, B, sorted_buckets, diff_hist, p_ht, second_best_thr, best, query_id, &lost_on_pruning, params.max_overlap);
+						best2 = match_rest(P.size(), m, lmax, p_unique, B, sorted_buckets, diff_hist, p_ht, second_best_thr, best, query_id, &lost_on_pruning, params.max_overlap);
 					}
 				T.stop("match_rest_for_best2");
 			T.stop("match_rest");

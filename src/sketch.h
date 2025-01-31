@@ -231,12 +231,12 @@ public:
 		int mapq_strand = (abs(local_stats.same_strand_seeds) < local_stats.intersection/2) ? 5 : 60;
 		if (frac > min_diff) {
 			return std::min(60, mapq_strand);
-		} else if (frac < min_diff/2) {
-			return 0;
 		} else {
-			return std::min(60, mapq_strand);
-			//frac -= min_diff/2;
-			//return std::min(int(60*frac/(min_diff/2)), mapq_strand);
+			return 0;
+		//} else {
+		//	return std::min(60, mapq_strand);
+		//	//frac -= min_diff/2;
+		//	//return std::min(int(60*frac/(min_diff/2)), mapq_strand);
 		}
 	}
 
