@@ -268,8 +268,16 @@ public:
 		vector<qpos_t> lcs_reverse = lcs_get_lis(ppos_in_t);
 		return max(lcs.size(), lcs_reverse.size());
 	}
+
+	double mappingScore(const qpos_t intersection, const qpos_t m, const qpos_t s_sz, const Metric metric) const {
+		switch (metric) {
+			case Metric::Jaccard:	return 1.0 * intersection / (m + s_sz - intersection);
+			case Metric::Containment:	return 1.0 * intersection / m;
+			default: 				throw std::runtime_error("Invalid metric for bucket mapping");
+		}
+	}
 	
-	Mapping bestFixedLength(const RefSegment &segm, const BucketsType &B, const BucketLoc &b, const h2seed_t &p_ht, h2cnt &diff_hist, const qpos_t P_sz, const qpos_t m) {
+	Mapping bestFixedLength(const RefSegment &segm, const BucketsType &B, const BucketLoc &b, const h2seed_t &p_ht, h2cnt &diff_hist, const qpos_t P_sz, const qpos_t m, const Metric metric) {
 		qpos_t intersection = 0;
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 		const auto &t = segm.kmers;
@@ -298,10 +306,12 @@ public:
 				assert (l <= r);
 			}
 
-			double C = 1.0 * intersection / m;
-			assert(C >= -0.0 && C <= 1.0);
-			if (l < r && C > best.score())
-				best.update(0, P_sz-1, t[l].r, t[r-1].r, segm, intersection, C, same_strand_seeds, t[r-1].r-t[l].r+1);
+			qpos_t s_kmers = r - l;
+			double score = mappingScore(intersection, m, s_kmers, metric);
+			//cerr << "score: " << fixed << setprecision(3) << score << " intersection: " << intersection << " m: " << m << " s: " << s_kmers << endl;
+			assert(score >= -0.0 && score <= 1.0);
+			if (l < r && score > best.score())
+				best.update(0, P_sz-1, t[l].r, t[r-1].r, segm, intersection, score, same_strand_seeds, t[r-1].r - t[l].r + 1);
 
 			if (auto it = p_ht.find(t[l].h); it != p_ht.end()) {
 				same_strand_seeds -= codirection(it->second.kmer, t[l]);
@@ -316,6 +326,34 @@ public:
 		
 		return best;
 	}
+
+	Mapping findBestMapping(const BucketsType &B, const BucketLoc &b, const BucketContent &content, const h2seed_t &p_ht, h2cnt &diff_hist, const qpos_t P_sz, const qpos_t m, const qpos_t lmax, const double &sh, const Metric metric) {
+		Mapping best_in_bucket;
+		switch (metric) {
+			case Metric::bucket_SH: {
+				best_in_bucket.update(0, P_sz-1, content.r_min, content.r_max, tidx.T[b.segm_id], content.matches, sh, content.codirection, content.r_max - content.r_min); // TODO: should it be prev(r) instead?
+				break;
+			}
+			case Metric::bucket_LCS: {
+				qpos_t lcs_cnt = lcs(tidx.T[b.segm_id].kmers, B, b, p_ht);
+				ASSERT(content.matches >= lcs_cnt, "matches in bucket: " << content.matches << ", lcs_cnt: " << lcs_cnt);
+				double lcs_score = 1.0 * lcs_cnt / m;
+				assert(lcs_score >= 0.0 && lcs_score <= 1.0);
+				best_in_bucket.update(0, P_sz-1, content.r_min, content.r_max, tidx.T[b.segm_id], content.matches, lcs_score, content.codirection, content.r_max - content.r_min); // TODO: should it be prev(r) instead?
+				break;
+			}
+			case Metric::Containment:
+			case Metric::Jaccard: {
+				best_in_bucket = bestFixedLength(tidx.T[b.segm_id], B, b, p_ht, diff_hist, P_sz-H->params.k, lmax, metric);
+				break;
+			}
+			default:
+				throw std::runtime_error("Invalid metric for bucket mapping");
+		}
+		best_in_bucket.set_bucket(b);
+		best_in_bucket.set_sh(sh);
+		return best_in_bucket;
+	}
 	
 	std::optional<Mapping> match_rest(qpos_t P_sz, qpos_t m, qpos_t lmax, const Seeds &p_unique, const BucketsType &B, vector<typename BucketsType::bucket_map_t::value_type> &sorted_buckets, h2cnt &diff_hist, const h2seed_t &p_ht,
 			double thr, std::optional<Mapping> forbidden, const string &query_id, int *lost_on_pruning, double max_overlap) {
@@ -328,29 +366,7 @@ public:
 			if (seed_heuristic_pass(B, p_unique, m, b, &content, &sh, thr)) {
 				T.start("refine");
 
-				Mapping best_in_bucket;
-				switch (H->params.metric) {
-					case Metric::bucket_SH: {
-						best_in_bucket.update(0, P_sz-1, content.r_min, content.r_max, tidx.T[b.segm_id], content.matches, sh, content.codirection, content.r_max - content.r_min); // TODO: should it be prev(r) instead?
-						break;
-					}
-					case Metric::bucket_LCS: {
-						qpos_t lcs_cnt = lcs(tidx.T[b.segm_id].kmers, B, b, p_ht);
-						ASSERT(content.matches >= lcs_cnt, "matches in bucket: " << content.matches << ", lcs_cnt: " << lcs_cnt);
-						double lcs_score = 1.0 * lcs_cnt / m;
-						assert(lcs_score >= 0.0 && lcs_score <= 1.0);
-						best_in_bucket.update(0, P_sz-1, content.r_min, content.r_max, tidx.T[b.segm_id], content.matches, lcs_score, content.codirection, content.r_max - content.r_min); // TODO: should it be prev(r) instead?
-						break;
-					}
-					case Metric::fixed_C: {
-						best_in_bucket = bestFixedLength(tidx.T[b.segm_id], B, b, p_ht, diff_hist, P_sz-H->params.k, lmax);
-						break;
-					}
-					default:
-						throw std::runtime_error("Invalid metric for bucket mapping");
-				}
-				best_in_bucket.set_bucket(b);
-				best_in_bucket.set_sh(sh);
+				Mapping best_in_bucket = findBestMapping(B, b, content, p_ht, diff_hist, P_sz, m, lmax, sh, H->params.metric);
 
 				if (best_in_bucket.score() > thr) {
 					if (H->params.verbose >= 2) {

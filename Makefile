@@ -73,7 +73,7 @@ R ?= 0.01
 T ?= 0.4
 MIN_DIFF ?= 0.075
 MAX_OVERLAP ?= 0.3
-METRIC ?= fixed_C
+METRIC ?= Containment
 
 THETAS = 0.95 0.9 0.85 0.8 0.75 0.7 0.65 0.6 0.55 0.5  
 PAUL_THETAS = 1.0 0.9 0.8 0.7 0.6 0.5 0.4 0.3

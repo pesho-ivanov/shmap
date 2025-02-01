@@ -25,24 +25,27 @@ using std::endl;
 #define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:d:z:v:o:anhPBF"
 
 enum Metric {
+	Containment,
+	Jaccard,
 	bucket_SH,
 	bucket_LCS,
-	fixed_C
 };
 
 inline string mapping_metric_str(Metric metric) {
 	switch (metric) {
+		case Metric::Containment: return "Containment";
+		case Metric::Jaccard: return "Jaccard";
 		case Metric::bucket_SH: return "bucket_SH";
 		case Metric::bucket_LCS: return "bucket_LCS";
-		case Metric::fixed_C: return "fixed_C";
 	}
 	throw std::runtime_error("Invalid mapping metric: " + std::to_string(static_cast<int>(metric)));
 }
 
 inline Metric mapping_metric_from_str(const string& str) {
+	if (str == "Containment") return Metric::Containment;
+	if (str == "Jaccard") return Metric::Jaccard;
 	if (str == "bucket_SH") return Metric::bucket_SH;
 	if (str == "bucket_LCS") return Metric::bucket_LCS;
-	if (str == "fixed_C") return Metric::fixed_C;
 	throw std::runtime_error("Invalid mapping metric: " + str);
 }
 
@@ -74,7 +77,7 @@ struct params_t {
 	bool abs_pos;           // Use absolute positions instead of kmer positions
 
 	params_t() :
-		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), min_diff(0.02), max_overlap(0.5), metric(Metric::fixed_C), verbose(0),
+		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), min_diff(0.02), max_overlap(0.5), metric(Metric::Containment), verbose(0),
 		sam(false), normalize(false), /*onlybest(false),*/
 		no_bucket_pruning(false), one_sweep(false), abs_pos(false) {}
 
@@ -145,7 +148,11 @@ struct params_t {
 		cerr << "   -s   --text              Text sequence file (FASTA format)" << endl;
 		cerr << endl;
 		cerr << "Optional parameters with an argument:" << endl;
-		cerr << "   -m   --metric            Optimization metric: 'bucket_SH' for seed heuristic in bucket, 'bucket_LCS' for longest common substring in bucket, 'fixed_C' for containment index in fixed-length sketch subinterval (default: 'fixed_C')" << endl;
+		cerr << "   -m   --metric            Optimization metric (default: 'Containment'). Options:\n"
+			   	"             bucket_SH  -- seed heuristic in bucket,\n"
+			   	"             bucket_LCS -- longest common substring in bucket,\n"
+			   	"             Containment    -- containment index in fixed-length sketch subinterval,\n"
+			   	"             Jaccard    -- Jaccard index in fixed-length sketch subinterval." << endl;
 		cerr << "   -k   --ksize             K-mer length to be used for sketches" << endl;
 		cerr << "   -r   --ratio   			 FracMinHash ratio in [0; 1] [0.1]" << endl;
 		cerr << "   -S   --max_seeds         Max seeds in a sketch" << endl;
