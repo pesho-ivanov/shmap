@@ -232,7 +232,7 @@ public:
 		if (frac > min_diff) {
 			return std::min(60, mapq_strand);
 		} else {
-			return 0;
+			//return std::min(int(60*frac/min_diff), mapq_strand);
 		//} else {
 		//	return std::min(60, mapq_strand);
 		//	//frac -= min_diff/2;
