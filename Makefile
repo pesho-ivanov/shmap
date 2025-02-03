@@ -55,6 +55,7 @@ BLEND_BIN = ~/libs/blend/bin/blend
 MAPQUIK_BIN = ~/libs/mapquik/target/release/mapquik
 MERYL_BIN = ~/libs/Winnowmap/bin/meryl
 WINNOWMAP_BIN = ~/libs/Winnowmap/bin/winnowmap
+MASHMAP_BIN = ~/libs/MashMap/build/bin/mashmap
 SURVIVOR_BIN = ~/libs/SURVIVOR/Debug/SURVIVOR
 
 INF = 999999
@@ -125,11 +126,12 @@ MM2_PREF           = $(ALLOUT_DIR)/mm2-fast/$(READS_PREFIX)/mm2-fast
 BLEND_PREF         = $(ALLOUT_DIR)/blend/$(READS_PREFIX)/blend
 MAPQUIK_PREF       = $(ALLOUT_DIR)/mapquik/$(READS_PREFIX)/mapquik
 WINNOWMAP_PREF     = $(ALLOUT_DIR)/winnowmap/$(READS_PREFIX)/winnowmap
+MASHMAP_PREF       = $(ALLOUT_DIR)/mashmap/$(READS_PREFIX)/mashmap
 
 #SHMAP_NOPRUNE_PREF = $(ALLOUT_DIR)/shmap-noprune/$(READS_PREFIX)/shmap-noprune
 #SHMAP_ONESWEEP_PREF= $(ALLOUT_DIR)/shmap-onesweep/$(READS_PREFIX)/shmap-onesweep
 
-.PHONY: all clean clean_evals simulate_SVs gen_reads eval_sketching eval_thinning fdr_per_theta eval_shmap eval_shmap_noprune eval_shmap_onesweep eval_winnowmap eval_minimap eval_mm2 eval_blend eval_mapquik eval_tools eval_tools_on_datasets eval_shmap_on_datasets pauls_experiment eval_tools_on_SV clean_evals
+.PHONY: all clean clean_evals simulate_SVs gen_reads eval_sketching eval_thinning fdr_per_theta eval_shmap eval_mashmap eval_shmap_noprune eval_shmap_onesweep eval_winnowmap eval_minimap eval_mm2 eval_blend eval_mapquik eval_tools eval_tools_on_datasets eval_shmap_on_datasets pauls_experiment eval_tools_on_SV clean_evals
 
 all: prep release
 	
@@ -305,9 +307,15 @@ eval_winnowmap: gen_reads
 	$(TIME_CMD) -o $(WINNOWMAP_PREF).time $(WINNOWMAP_BIN) -W $(REF_DIR)/winnowmap_$(REFNAME)_repetitive_k15.txt -x map-pb -t 1 --secondary=no --sv-off -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(WINNOWMAP_PREF).log) >$(WINNOWMAP_PREF).paf 
 	-$(PAFTOOLS) mapeval $(WINNOWMAP_PREF).paf | tee $(WINNOWMAP_PREF).eval
 
+eval_mashmap: gen_reads
+	@mkdir -p $(shell dirname $(MASHMAP_PREF))
+	$(TIME_CMD) -o $(MASHMAP_PREF).index.time $(MASHMAP_BIN) -t 1 --noSplit -r $(REF) -q $(ONE_READ) -o $(MASHMAP_PREF).paf >/dev/null 2>/dev/null
+	$(TIME_CMD) -o $(MASHMAP_PREF).time $(MASHMAP_BIN)       -t 1 --noSplit -r $(REF) -q $(READS)    -o $(MASHMAP_PREF).paf
+	-$(PAFTOOLS) mapeval $(MASHMAP_PREF).paf | tee $(MASHMAP_PREF).eval
+
 eval_minimap: gen_reads
 	@mkdir -p $(shell dirname $(MINIMAP_PREF))
-	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level -a $(REF) $(ONE_READ) >/dev/null 2>/dev/null
+	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(ONE_READ) >/dev/null 2>/dev/null
 	$(TIME_CMD) -o $(MINIMAP_PREF).time       $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(READS) 2> >(tee $(MINIMAP_PREF).log) >$(MINIMAP_PREF).paf
 	-$(PAFTOOLS) mapeval $(MINIMAP_PREF).paf | tee $(MINIMAP_PREF).eval
 	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(MINIMAP_PREF).paf >$(MINIMAP_PREF).wrong 2>/dev/null || true
@@ -331,7 +339,7 @@ eval_mapquik: gen_reads
 	-$(PAFTOOLS) mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
 #eval_tools: eval_shmap eval_shmap_noprune eval_minimap eval_mapquik eval_blend #eval_winnowmap #eval_shmap_onesweep #eval_mm2 
-eval_tools: eval_mm2 #eval_shmap eval_blend eval_mapquik eval_minimap #eval_winnowmap 
+eval_tools: eval_mashmap #eval_mm2 #eval_shmap eval_blend eval_mapquik eval_minimap #eval_winnowmap 
 
 eval_tools_on_datasets:
 	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chrY 	READSIM_REFNAME=chrY    DEPTH=2

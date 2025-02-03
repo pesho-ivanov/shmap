@@ -57,10 +57,11 @@ where
 - [hg002v1.1_to_CHM13v2.0.chain](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/changes/hg002v1.1_to_CHM13v2.0.chain.gz) [12M] -- chain file to lift read coordinates from **HG002** to **CHM13**; reads that cannot be lifted are discarded (~5.3% of the reads)
 
 ## Compared mappers
-- [minimap2](https://github.com/lh3/minimap2) (commit [618d335](https://github.com/lh3/minimap2/commit/618d335))
-- [winnowmap](https://github.com/marbl/winnowmap) (commit [ddf7257](https://github.com/marbl/Winnowmap/commit/ddf7257))
+- [minimap2](https://github.com/lh3/minimap2) (v2.28-r1221-dirty, commit [618d335](https://github.com/lh3/minimap2/commit/618d335))
+- [winnowmap](https://github.com/marbl/winnowmap) (v2.03, commit [ddf7257](https://github.com/marbl/Winnowmap/commit/ddf7257))
 - [mapquik](https://github.com/ekimb/mapquik) (commit [d304b38](https://github.com/ekimb/mapquik/commit/d304b38))
-- [BLEND](https://github.com/CMU-SAFARI/BLEND) (commit [6f19e37](https://github.com/CMU-SAFARI/BLEND/commit/6f19e37))
+- [BLEND](https://github.com/CMU-SAFARI/BLEND) (v1.0.0, commit [6f19e37](https://github.com/CMU-SAFARI/BLEND/commit/6f19e37))
+- [MashMap3](https://github.com/marbl/MashMap) (v3.1.3, commit [1a07d0e](https://github.com/marbl/MashMap/commit/1a07d0e))
 - [shmap](https://github.com/pesho-ivanov/shmap) (commit **TODO**)
 
 The reference $(REF) and the reads $(READS) are in fasta format:
