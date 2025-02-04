@@ -57,6 +57,7 @@ MERYL_BIN = ~/libs/Winnowmap/bin/meryl
 WINNOWMAP_BIN = ~/libs/Winnowmap/bin/winnowmap
 MASHMAP1_BIN = ~/libs/mashmap
 MASHMAP3_BIN = ~/libs/MashMap/build/bin/mashmap
+ASTARIX_BIN = ~/libs/astarix/release/astarix
 SURVIVOR_BIN = ~/libs/SURVIVOR/Debug/SURVIVOR
 
 INF = 999999
@@ -80,8 +81,9 @@ METRIC ?= Containment
 THETAS = 0.95 0.9 0.85 0.8 0.75 0.7 0.65 0.6 0.55 0.5  
 PAUL_THETAS = 1.0 0.9 0.8 0.7 0.6 0.5 0.4 0.3
 
-Ks = 14 16 18 20 22 24 26
-Rs = 0.01 0.05 0.1 0.15 0.2
+# eval sketching
+Ks = 17 21 25 29 33
+Rs = 0.001 0.005 0.1 #0.01 0.05
 
 M ?= 100000
 S ?= 30000
@@ -129,7 +131,7 @@ MAPQUIK_PREF       = $(ALLOUT_DIR)/mapquik/$(READS_PREFIX)/mapquik
 WINNOWMAP_PREF     = $(ALLOUT_DIR)/winnowmap/$(READS_PREFIX)/winnowmap
 MASHMAP1_PREF     = $(ALLOUT_DIR)/mashmap/$(READS_PREFIX)/mashmap
 MASHMAP3_PREF     = $(ALLOUT_DIR)/mashmap3/$(READS_PREFIX)/mashmap3
-
+ASTARIX_PREF       = $(ALLOUT_DIR)/astarix/$(READS_PREFIX)/astarix
 #SHMAP_NOPRUNE_PREF = $(ALLOUT_DIR)/shmap-noprune/$(READS_PREFIX)/shmap-noprune
 #SHMAP_ONESWEEP_PREF= $(ALLOUT_DIR)/shmap-onesweep/$(READS_PREFIX)/shmap-onesweep
 
@@ -240,16 +242,13 @@ ifeq ($(wildcard $(ONE_READ)),)
 	head -n 2 $(READS) >$(ONE_READ)
 endif
 
-eval_sketching: sweepmap gen_reads
-	@DIR=$(OUTDIR)/sketching; \
+eval_sketching: gen_reads
+	DIR=$(OUTDIR)/eval_sketching; \
 	mkdir -p $${DIR}; \
 	for k in $(Ks); do \
 		for r in $(Rs); do \
-			f=$${DIR}/"sweepmap-K$${k}-R$${r}"; \
-			echo "Processing $${f}"; \
-			$(TIME_CMD) -o $${f}.index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -x -t $(T) -k $${k} -r $${r} -S $(S) -M $(M) 2>&1 >/dev/null; \
-			$(TIME_CMD) -o $${f}.time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $${f}.params -x -t $(T) -k $${k} -r $${r} -S $(S) -M $(M) 2> >(tee $${f}.log) >$${f}.paf; \
-			-paftools.js mapeval $${f}.paf | tee $${f}.eval; \
+			echo "eval_sketching: $${k} $${r}"; \
+			make eval_shmap ALLOUT_DIR=$(DIR)/out_small/sketching K=$${k} R=$${r}; \
 		done \
     done
 
@@ -321,6 +320,12 @@ eval_mashmap3: gen_reads
 	$(TIME_CMD) -o $(MASHMAP3_PREF).time $(MASHMAP3_BIN)       -t 1 --noSplit -r $(REF) -q $(READS)    -o $(MASHMAP3_PREF).paf
 	-$(PAFTOOLS) mapeval $(MASHMAP3_PREF).paf | tee $(MASHMAP3_PREF).eval
 
+eval_astarix: gen_reads
+	@mkdir -p $(shell dirname $(ASTARIX_PREF))
+	$(TIME_CMD) -o $(ASTARIX_PREF).index.time $(ASTARIX_BIN) align-optimal -g $(REF) -q $(ONE_READ) -o $(ASTARIX_PREF).paf >/dev/null 2>/dev/null
+	$(TIME_CMD) -o $(ASTARIX_PREF).time $(ASTARIX_BIN)       align-optimal -g $(REF) -q $(READS)    -o $(ASTARIX_PREF).paf
+	-$(PAFTOOLS) mapeval $(ASTARIX_PREF).paf | tee $(ASTARIX_PREF).eval
+
 eval_minimap: gen_reads
 	@mkdir -p $(shell dirname $(MINIMAP_PREF))
 	$(TIME_CMD) -o $(MINIMAP_PREF).index.time $(MINIMAP_BIN) -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level $(REF) $(ONE_READ) >/dev/null 2>/dev/null
@@ -347,13 +352,13 @@ eval_mapquik: gen_reads
 	-$(PAFTOOLS) mapeval $(MAPQUIK_PREF).paf | tee $(MAPQUIK_PREF).eval
 
 #eval_tools: eval_shmap eval_shmap_noprune eval_minimap eval_mapquik eval_blend #eval_winnowmap #eval_shmap_onesweep #eval_mm2 
-eval_tools: eval_mashmap1 #eval_mashmap3 #eval_mm2 #eval_shmap eval_blend eval_mapquik eval_minimap #eval_winnowmap 
+eval_tools: eval_mashmap1 #eval_astarix #eval_mashmap3 #eval_mm2 #eval_shmap eval_blend eval_mapquik eval_minimap #eval_winnowmap 
 
 eval_tools_on_datasets:
 	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chrY 	READSIM_REFNAME=chrY    DEPTH=2
-	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READSIM_REFNAME=chm13   DEPTH=1
-	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READSIM_REFNAME=hg002   DEPTH=1
-	make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READS_PREFIX=HG002_small
+	#make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READSIM_REFNAME=chm13   DEPTH=1
+	#make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READSIM_REFNAME=hg002   DEPTH=1
+	#make eval_tools ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READS_PREFIX=HG002_small
 
 eval_shmap_on_datasets:
 	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chrY 	READSIM_REFNAME=chrY 	DEPTH=2
