@@ -78,20 +78,20 @@ MIN_DIFF ?= 0.075
 MAX_OVERLAP ?= 0.3
 METRIC ?= Containment
 
+M ?= 100000
+S ?= 30000
+
 PAUL_THETAS = 1.0 0.9 0.8 0.7 0.6 0.5 0.4 0.3
 
 # eval sketching
-#Ks = 17 21 25 29 33
-Ks = 19 23 27 31
+Ks = 17 19 21 23 25 27 29 31 33
 Rs = 0.001 0.005 0.01 0.05
-# eval params
+# eval SH
 THETAS = 0.95 0.9 0.85 0.8 0.75 0.7 0.65 0.6 0.55 0.5 0.45 0.4 0.35
-MIN_DIFFS = 0.025 0.05 0.075 0.1 0.125 0.15
-MAX_OVERLAPS = 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0
 METRICS = Containment Jaccard bucket_SH bucket_LCS
-
-M ?= 100000
-S ?= 30000
+# eval MAPQ
+MIN_DIFFS = 0.025 0.05 0.075 0.1 0.125 0.15 0.175 0.2 0.225 0.25
+MAX_OVERLAPS = 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0
 
 MAX_SEEDS = 10 30 100 300 1000 3000 10000
 MAX_MATCHES = 100 300 1000 3000 10000 30000 100000 300000
@@ -258,12 +258,28 @@ eval_sketching: gen_reads
     done
 
 eval_thetas: gen_reads
-	DIR=$(OUTDIR)/eval_params; \
+	DIR=$(OUTDIR)/eval_mapq; \
 	mkdir -p $${DIR}; \
 	for T in $(THETAS); do \
 		echo "eval_params: $${T}"; \
 		make eval_shmap ALLOUT_DIR=$(DIR)/out_small/params T=$${T}; \
     done
+
+eval_min_diffs: gen_reads
+	DIR=$(OUTDIR)/eval_mapq; \
+	mkdir -p $${DIR}; \
+	for MIN_DIFF in $(MIN_DIFFS); do \
+		echo "eval_min_diffs: $${MIN_DIFF}"; \
+		make eval_shmap ALLOUT_DIR=$(DIR)/out_small/min_diffs MIN_DIFF=$${MIN_DIFF}; \
+	done
+
+eval_max_overlaps: gen_reads
+	DIR=$(OUTDIR)/eval_mapq; \
+	mkdir -p $${DIR}; \
+	for MAX_OVERLAP in $(MAX_OVERLAPS); do \
+		echo "eval_max_overlaps: $${MAX_OVERLAP}"; \
+		make eval_shmap ALLOUT_DIR=$(DIR)/out_small/max_overlaps MAX_OVERLAP=$${MAX_OVERLAP}; \
+	done
 
 eval_sketching_on_datasets:
 	make eval_sketching ALLOUT_DIR=$(DIR)/out_small	REFNAME=chm13   READSIM_REFNAME=hg002   DEPTH=0.1
