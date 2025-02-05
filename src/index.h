@@ -65,19 +65,19 @@ public:
 		return from <= hit.r && hit.r < to;
 	}
 
-	//void erase_frequent_kmers() {
-	//	assert(H->params.max_matches != -1);
-	//	std::vector<hash_t> blacklisted_h;
-	//	for (const auto &[h, hits]: h2multi)
-	//		if (rpos_t(hits.size()) > H->params.max_matches) {
-	//			blacklisted_h.push_back(h);
-	//			H->C.inc("blacklisted_kmers");
-	//			H->C.inc("blacklisted_hits", hits.size());
-	//		}
+	void erase_frequent_kmers() {
+		assert(H->params.max_matches != -1);
+		std::vector<hash_t> blacklisted_h;
+		for (const auto &[h, hits]: h2multi)
+			if (rpos_t(hits.size()) > H->params.max_matches) {
+				blacklisted_h.push_back(h);
+				H->C.inc("blacklisted_kmers");
+				H->C.inc("blacklisted_hits", hits.size());
+			}
 
-	//	for (auto h: blacklisted_h)
-	//		h2multi.erase(h);
-	//}
+		for (auto h: blacklisted_h)
+			h2multi.erase(h);
+	}
 
 	void populate_h2pos(const sketch_t& sketch, segm_t segm_id) {
 		// TODO: skip creating the sketch structure
@@ -146,8 +146,8 @@ public:
 		get_kmer_stats();
         H->C.inc("blacklisted_kmers", 0);
         H->C.inc("blacklisted_hits", 0);
-		//if (H->params.max_matches != -1)
-		//	erase_frequent_kmers();
+		if (H->params.max_matches != -1)
+			erase_frequent_kmers();
 		print_stats();
 	}
 

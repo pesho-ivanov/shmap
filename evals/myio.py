@@ -156,7 +156,6 @@ def read_paf(pref, reads, experiment, tool, ax):
             #df['read_sv'] = 'none'
             no_GT = True
     df = df.sort_values(['read_name', 'residue_matches'], ascending=[True, False], ignore_index=True)
-    #display(df)
 
     df = df[['read_name', 'mapping_quality', 'is_correct', 'alignment_block_length']]  # speeding up and freeing memory
 
@@ -195,9 +194,9 @@ def read_paf(pref, reads, experiment, tool, ax):
     #    all_correct=('is_correct', 'all')# True if every row in the group is correct
     #)
     mapped_reads = len(df_max)  # total number of read_name groups
-    mapped_q60 = (df_max['mapping_quality'] == 60).sum()
+    mapped_q60 = (df_max['mapping_quality'] >= 60).sum()
     mapped_ql60 = (df_max['mapping_quality'] < 60).sum()
-    wrong_q60 = ((df_max['mapping_quality'] == 60) & (df_max['is_correct'] == False)).sum()
+    wrong_q60 = ((df_max['mapping_quality'] >= 60) & (df_max['is_correct'] == False)).sum()
     #wrong = (df_max['is_correct'] == False).sum()
 
     paf['Mapped Q60'] = int(mapped_q60)
@@ -217,7 +216,6 @@ def read_paf(pref, reads, experiment, tool, ax):
     res = pd.Series(paf, dtype='object')
     with open(serialize_file, 'wb') as f:
         pickle.dump(res, f)
-        #pickle.dump(df_max, f)
 
     return res
     
