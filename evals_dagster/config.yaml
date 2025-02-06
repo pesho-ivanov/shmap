@@ -1,0 +1,15 @@
+ops:
+  run_shmap:
+    config:
+      shmap_bin: "../release/shmap"
+      ref: "refs/chm13.fa"
+      reads: "reads/chm13-readshg002-a?-d1-l?.fa"
+      one_read: "reads/chm13-readshg002-a?-d1-l?.oneread.fa"
+      output_prefix: "output/shmap_eval"
+      k: 25
+      r: 0.01
+      t: 0.4
+      min_diff: 0.075
+      max_overlap: 0.3
+      metric: "Containment"
+      shmap_args: ""  # Any additional SHMAP flags
