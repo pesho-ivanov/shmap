@@ -1,0 +1,3 @@
+[submodule "ext/cmd_line_parser"]
+	path = ext/cmd_line_parser
+	url = https://github.com/jermp/cmd_line_parser
