@@ -271,4 +271,48 @@ public:
     }
 };
 
+struct ParsedQueryId {
+	bool valid;
+	std::string segm_id;
+	rpos_t start_pos;
+	rpos_t end_pos;
+	char strand;
+	
+	static ParsedQueryId parse(const std::string& query_id) {
+		// query_id is in the form "S1_21!NC_060948.1!57693539!57715501!+"
+		ParsedQueryId result{false, "", 0, 0, '?'};
+		
+		// Skip if query_id doesn't contain correct mapping info
+		if (query_id.find('!') == std::string::npos) return result;
+
+		// Split query_id on '!' character
+		std::vector<std::string> parts;
+		size_t start = 0;
+		size_t end = query_id.find('!');
+		while (end != std::string::npos) {
+			parts.push_back(query_id.substr(start, end - start));
+			start = end + 1;
+			end = query_id.find('!', start);
+		}
+		parts.push_back(query_id.substr(start));
+
+		// Need 5 parts: read_id, segment, start, end, strand
+		if (parts.size() != 5) return result;
+
+		try {
+			result.segm_id = parts[1];
+			result.start_pos = stoll(parts[2]);
+			result.end_pos = stoll(parts[3]);
+			result.strand = parts[4][0];
+			result.valid = true;
+		} catch (const std::exception& e) {
+			std::cerr << "Error parsing query_id with start_pos " << parts[2] << " and end_pos " << parts[3] << ": " << e.what() << std::endl;
+			result.valid = false;
+			throw;
+		}
+		
+		return result;
+	}
+};
+
 } // namespace sweepmap

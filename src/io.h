@@ -295,51 +295,30 @@ struct params_t {
 	}
 };
 
-struct ParsedQueryId {
-	bool valid;
-	string segm_id;
-	rpos_t start_pos;
-	rpos_t end_pos;
-	char strand;
-	
-	static ParsedQueryId parse(const string& query_id) {
-		// query_id is in the form "S1_21!NC_060948.1!57693539!57715501!+"
-		ParsedQueryId result{false, "", 0, 0, '?'};
-		
-		// Skip if query_id doesn't contain correct mapping info
-		if (query_id.find('!') == string::npos) return result;
-
-		// Split query_id on '!' character
-		std::vector<string> parts;
-		size_t start = 0;
-		size_t end = query_id.find('!');
-		while (end != string::npos) {
-			parts.push_back(query_id.substr(start, end - start));
-			start = end + 1;
-			end = query_id.find('!', start);
-		}
-		parts.push_back(query_id.substr(start));
-
-		// Need 5 parts: read_id, segment, start, end, strand
-		if (parts.size() != 5) return result;
-
-		try {
-			result.segm_id = parts[1];
-			result.start_pos = stoll(parts[2]);
-			result.end_pos = stoll(parts[3]);
-			result.strand = parts[4][0];
-			result.valid = true;
-		} catch (const std::exception& e) {
-			cerr << "Error parsing query_id with start_pos " << parts[2] << " and end_pos " << parts[3] << ": " << e.what() << endl;
-			result.valid = false;
-			throw;
-		}
-		
-		return result;
-	}
-};
-
 // seq->name.s, seq->comment.l, seq->comment.s, seq->seq.s, seq->qual.l
-void read_fasta_klib(const std::string& filename, std::function<void(const std::string&, const std::string&, float)> callback);
+inline void read_fasta_klib(const std::string& filename, std::function<void(const std::string&, const std::string&, float)> callback) {
+    gzFile fp = gzopen(filename.c_str(), "r");
+    kseq_t *seq = kseq_init(fp);
+    int l;
+
+    std::ifstream in_for_size(filename, std::ifstream::ate | std::ifstream::binary);
+    auto total_bytes = in_for_size.tellg(); 
+
+    while ((l = kseq_read(seq)) >= 0) {
+        string query_id = seq->name.s;
+        string P = seq->seq.s;
+        //print_progress_bar(cerr, 1.0 * gztell(fp) / total_bytes);
+        //std::cerr << "Mapping progress:" << 100.0 * gztell(fp) / total_bytes << "%\r";
+        float percentage = 1.0 * gztell(fp) / total_bytes;
+        callback(query_id, P, percentage);
+    }
+
+    //if (l != -1)  // -1  end of file; do nothing
+    if (l == -2) cerr << "ERROR: truncated quality string" << endl;  // -2   truncated quality string
+    else if (l == -3) cerr << "ERROR: error reading stream" << endl;  // -3   error reading stream
+
+    kseq_destroy(seq);
+    gzclose(fp);
+}
 
 } // namespace sweepmap

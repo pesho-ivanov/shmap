@@ -7,7 +7,7 @@ else
 	SHMAP_BIN = ./release/shmap
 endif
 
-SRCS = map.cpp mapper.cpp io.cpp 
+SRCS = map.cpp mapper.cpp
 #edlib.cpp
 OBJS = $(SRCS:.cpp=.o)
 DEPS = $(OBJS:.o=.d)
@@ -35,7 +35,7 @@ RELDEPS = $(RELOBJS:.o=.d)
 
 # Test build settings	
 TESTSRCS = test_shmap.cpp
-TESTSRCS += test_shmap.cpp mapper.cpp io.cpp
+TESTSRCS += test_shmap.cpp mapper.cpp
 TESTOBJSFILES = $(TESTSRCS:.cpp=.o)
 TESTDIR = test
 TESTBIN = $(TESTDIR)/test_shmap
