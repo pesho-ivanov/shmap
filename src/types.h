@@ -83,4 +83,29 @@ inline int codirection(const Kmer &kmer1, const Kmer &kmer2) {
 	return kmer1.strand == kmer2.strand ? +1 : -1;
 }
 
+enum Metric {
+	Containment,
+	Jaccard,
+	bucket_SH,
+	bucket_LCS,
+};
+
+inline std::string mapping_metric_str(Metric metric) {
+	switch (metric) {
+		case Metric::Containment: return "Containment";
+		case Metric::Jaccard: return "Jaccard";
+		case Metric::bucket_SH: return "bucket_SH";
+		case Metric::bucket_LCS: return "bucket_LCS";
+	}
+	throw std::runtime_error("Invalid mapping metric: " + std::to_string(static_cast<int>(metric)));
+}
+
+inline Metric mapping_metric_from_str(const std::string& str) {
+	if (str == "Containment") return Metric::Containment;
+	if (str == "Jaccard") return Metric::Jaccard;
+	if (str == "bucket_SH") return Metric::bucket_SH;
+	if (str == "bucket_LCS") return Metric::bucket_LCS;
+	throw std::runtime_error("Invalid mapping metric: " + str);
+}
+
 }  // namespace sweepmap
