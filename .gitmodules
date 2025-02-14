@@ -4,3 +4,6 @@
 [submodule "ext/klib"]
 	path = ext/klib
 	url = https://github.com/attractivechaos/klib
+[submodule "ext/pdqsort"]
+	path = ext/pdqsort
+	url = https://github.com/orlp/pdqsort
