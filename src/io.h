@@ -10,7 +10,7 @@
 #include <cassert>
 
 #include <zlib.h>
-#include "kseq.h"
+#include "klib/kseq.h"
 #include "utils.h"
 #include "cmd_line_parser/include/parser.hpp"  // use Giulio's custom command line parser
 
