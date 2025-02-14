@@ -2,19 +2,21 @@
 
 #include <fstream>
 #include <functional>
-#include <getopt.h>
 #include <iomanip>
 #include <string>
 #include <vector>
+#include <iostream>
+#include <sstream>
+#include <cassert>
 
-#include <zlib.h>  
+#include <zlib.h>
 #include "kseq.h"
-//#include "cxxopts.hpp"
 #include "utils.h"
+#include "cmd_line_parser/include/parser.hpp"  // use Giulio's custom command line parser
 
 namespace sweepmap {
 
-KSEQ_INIT(gzFile, gzread)  
+KSEQ_INIT(gzFile, gzread)
 
 using std::cerr;
 using std::string;
@@ -22,256 +24,210 @@ using std::pair;
 using std::ifstream;
 using std::endl;
 
-#define T_HOM_OPTIONS "p:s:k:r:S:M:m:t:d:z:v:o:anhPBF"
-
+// The options supported by sweepmap are now described by params_t.
 struct params_t {
-	// required
-	string pFile, tFile;
+    // Required file names.
+    string pFile, tFile;
 
-	// with an argument:
-	int k;							// The k-mer length
-	double hFrac;					// The FracMinHash ratio
-	int max_seeds; 					// Maximum seeds in a sketch
-	int max_matches; 				// Maximum seed matches in a sketch
-	double theta; 					// The t-homology threshold
-	double min_diff;				// The minimum difference between the best and second best mapping
-	double max_overlap;			    // The maximal overlap between the best and second best mapping
+    // Options with an argument:
+    int k;             // K-mer length
+    double hFrac;      // FracMinHash ratio
+    int max_seeds;     // Maximum seeds in a sketch
+    int max_matches;   // Maximum seed matches in a sketch
+    double theta;      // Homology threshold
+    double min_diff;   // Minimum difference between the best and second best mapping
+    double max_overlap;// Maximum overlap between the best and second best mapping
+    string paramsFile; // File to output parameters (TSV)
+    Metric metric;     // Optimization metric (see utils.h)
+    int verbose;       // Verbosity level
 
-	string paramsFile;
-	Metric metric;           // Optimization metric
-	int verbose;					// Outputs debug information: 0 for no, 1 for some, 2 for all (warning: take time)
+    // Boolean options (default false)
+    bool sam;              // Output in SAM format (default: PAF)
+    bool normalize;        // Normalize scores by length
+    bool no_bucket_pruning;// Disables bucket pruning
+    bool one_sweep;        // Run one sweep on all matches
+    bool abs_pos;          // Use absolute positions instead of kmer positions
 
-	// no arguments
-	bool sam; 				// Output in SAM format (PAF by default)
-	bool normalize; 		// Flag to save that scores are to be normalized
-	//bool onlybest;			// Output up to one (best) mapping (if above the threshold)
+    params_t() :
+        k(15), hFrac(0.05), max_seeds(-1), max_matches(-1),
+        theta(0.9), min_diff(0.02), max_overlap(0.5),
+        metric(Metric::Containment), verbose(0),
+        sam(false), normalize(false),
+        no_bucket_pruning(false), one_sweep(false), abs_pos(false)
+    {}
 
-	// for degradation evals; templated in compile-time
-	bool no_bucket_pruning; // Disables bucket pruning
-	bool one_sweep;         // Disregards the seed heuristic and runs one sweepmap on all matches
-	bool abs_pos;           // Use absolute positions instead of kmer positions
+    // Prints the parameters in either human-readable or TSV format.
+    void print(std::ostream& out, bool human) const {
+        std::vector<pair<string, string>> m;
+        m.push_back({"pFile", pFile});
+        m.push_back({"tFile", tFile});
+        m.push_back({"k", std::to_string(k)});
+        m.push_back({"hFrac", std::to_string(hFrac)});
+        m.push_back({"max_seeds", std::to_string(max_seeds)});
+        m.push_back({"max_matches", std::to_string(max_matches)});
+        m.push_back({"tThres", std::to_string(theta)});
+        m.push_back({"min_diff", std::to_string(min_diff)});
+        m.push_back({"max_overlap", std::to_string(max_overlap)});
+        m.push_back({"paramsFile", paramsFile});
+        m.push_back({"metric", mapping_metric_str(metric)});
 
-	params_t() :
-		k(15), hFrac(0.05), max_seeds(-1), max_matches(-1), theta(0.9), min_diff(0.02), max_overlap(0.5), metric(Metric::Containment), verbose(0),
-		sam(false), normalize(false), /*onlybest(false),*/
-		no_bucket_pruning(false), one_sweep(false), abs_pos(false) {}
+        m.push_back({"sam", std::to_string(sam)});
+        m.push_back({"normalize", std::to_string(normalize)});
+        m.push_back({"verbose", std::to_string(verbose)});
 
-	void print(std::ostream& out, bool human) const {
-		std::vector<pair<string, string>> m;
-		m.push_back({"pFile", pFile});
-		m.push_back({"tFile", tFile});
-		m.push_back({"k", std::to_string(k)});
-		m.push_back({"hFrac", std::to_string(hFrac)});
-		m.push_back({"max_seeds", std::to_string(max_seeds)});
-		m.push_back({"max_matches", std::to_string(max_matches)});
-		m.push_back({"tThres", std::to_string(theta)});
-		m.push_back({"min_diff", std::to_string(min_diff)});
-		m.push_back({"max_overlap", std::to_string(max_overlap)});
-		m.push_back({"paramsFile", paramsFile});
-		m.push_back({"metric", mapping_metric_str(metric)});
+        m.push_back({"no-bucket-pruning", std::to_string(no_bucket_pruning)});
+        m.push_back({"one-sweep", std::to_string(one_sweep)});
+        m.push_back({"abs-pos", std::to_string(abs_pos)});
 
-		m.push_back({"sam", std::to_string(sam)});
-		m.push_back({"normalize", std::to_string(normalize)});
-		//m.push_back({"onlybest", std::to_string(onlybest)});
-		m.push_back({"verbose", std::to_string(verbose)});
+        if (human) {
+            out << "Parameters:" << endl;
+            for (auto& p : m)
+                out << std::setw(20) << std::right << p.first << ": " << p.second << endl;
+        } else {
+            for (auto& p : m)
+                out << p.first << "\t";
+            out << endl;
+            for (auto& p : m)
+                out << p.second << "\t";
+        }
+    }
 
-		m.push_back({"no-bucket-pruning", std::to_string(no_bucket_pruning)});
-		m.push_back({"one-sweep", std::to_string(one_sweep)});
-		m.push_back({"abs-pos", std::to_string(abs_pos)});
+    // A short display of key parameters.
+    void print_display(std::ostream& out) {
+        out << "Params:" << endl;
+        out << " | reference:             " << tFile << endl;
+        out << " | reads:                 " << pFile << endl;
+        out << " | metric:                " << mapping_metric_str(metric) << endl;
+        out << " | k:                     " << k << endl;
+        out << " | hFrac:                 " << hFrac << endl;
+        out << " | verbose:               " << verbose << endl;
+        out << " | tThres:                " << theta << endl;
+        out << " | min_diff:              " << min_diff << endl;
+        out << " | max_overlap:           " << max_overlap << endl;
+        out << " | no-bucket-pruning:     " << no_bucket_pruning << endl;
+        out << " | abs-pos:               " << abs_pos << endl;
+    }
 
-		if (human) {
-			out << "Parameters:" << endl;
-			for (auto& p : m)
-				out << std::setw(20) << std::right << p.first << ": " << p.second << endl;
-		} else {
-			for (auto& p : m)
-				out << p.first << "\t";
-			out << endl;
-			for (auto& p : m)
-				out << p.second << "\t";
-		}
-	}
+    // This method replaces the getopt-based parsing with the parser.hpp based parser.
+    bool prsArgs(int argc, char** argv) {
+        using namespace cmd_line_parser;
+        parser p(argc, argv);
 
-	void print_display(std::ostream& out) {
-		out << "Params:" << endl;
-		out << " | reference:             " << tFile << endl;
-		out << " | reads:                 " << pFile << endl;
-		out << " | metric:                " << mapping_metric_str(metric) << endl;
-		out << " | k:                     " << k << endl;
-		out << " | hFrac:                 " << hFrac << endl;
-		//out << " | max_seeds              " << max_seeds << endl;
-		//out << " | max_matches:           " << max_matches << endl;
-		//out << " | sam:                   " << sam << endl;
-		//out << " | onlybest:              " << onlybest << endl;
-		out << " | verbose:               " << verbose << endl;
-		out << " | tThres:                " << theta << endl;
-		out << " | min_diff:              " << min_diff << endl;
-		out << " | max_overlap:           " << max_overlap << endl;
-		out << " | no-bucket-pruning:     " << no_bucket_pruning << endl;
-		//out << " | one-sweep:             " << one_sweep << endl;
-		out << " | abs-pos:               " << abs_pos << endl;
-	}
+        // Required options.
+        // name, description, shorthand, required argument, boolean option (default is false)
+        p.add("pattern",    "Pattern sequences file (FASTA format)",                            "-p", true, false);
+        p.add("text",       "Text sequence file (FASTA format)",                                "-s", true, false);
 
-	void dsHlp() {
-		cerr << "sweep [-hn] [-p PATTERN_FILE] [-s TEXT_FILE] [-k KMER_LEN] [-r HASH_RATIO] [-b BLACKLIST] [-c COM_HASH_WGHT] [-u UNI\
-		_HASH_WGHT] [-t HOMOLOGY_THRESHOLD]" << endl;
-		cerr << endl;
-		cerr << "Find sketch-based pattern similarity in text." << endl;
-		cerr << endl;
-		cerr << "Required parameters:" << endl;
-		cerr << "   -p   --pattern           Pattern sequences file (FASTA format)" << endl;
-		cerr << "   -s   --text              Text sequence file (FASTA format)" << endl;
-		cerr << endl;
-		cerr << "Optional parameters with an argument:" << endl;
-		cerr << "   -m   --metric            Optimization metric (default: 'Containment'). Options:\n"
-			   	"             bucket_SH  -- seed heuristic in bucket,\n"
-			   	"             bucket_LCS -- longest common substring in bucket,\n"
-			   	"             Containment    -- containment index in fixed-length sketch subinterval,\n"
-			   	"             Jaccard    -- Jaccard index in fixed-length sketch subinterval." << endl;
-		cerr << "   -k   --ksize             K-mer length to be used for sketches" << endl;
-		cerr << "   -r   --ratio   			 FracMinHash ratio in [0; 1] [0.1]" << endl;
-		cerr << "   -S   --max_seeds         Max seeds in a sketch" << endl;
-		cerr << "   -M   --max_matches       Max seed matches in a sketch" << endl;
-		cerr << "   -t   --threshold         Homology percentage threshold [0, 1]" << endl;
-		cerr << "   -d   --min_diff          Minimum difference between the best and second best mapping" << endl;
-		cerr << "   -o   --max_overlap       Maximum overlap between the best and second best mapping" << endl;
-		cerr << "   -z   --params     		 Output file with parameters (tsv)" << endl;
-		cerr << "   -v   --verbose           Outputs debug information: 0 for no, 1 for some, 2 for all (warning: take time)" << endl;
-		cerr << endl;
-		cerr << "Optional parameters without an argument:" << endl;
-		cerr << "   -a                       Output in SAM format (PAF by default)" << endl;
-		cerr << "   -n   --normalize         Normalize scores by length" << endl;
-		//cerr << "   -x   --onlybest          Output the best alignment if above threshold (otherwise none)" << endl;
-		cerr << "   -P   --no-bucket-pruning Disables bucket pruning" << endl;
-		cerr << "   -B   --one-sweep         Disregards the seed heuristic and runs one sweepmap on all matches" << endl;
-		cerr << "   -F   --abs-pos           Use absolute positions instead of kmer positions" << endl;
-		cerr << "   -h   --help              Display this help message" << endl;
-	}
+        // Options with an argument.
+        p.add("ksize",      "K-mer length to be used for sketches (positive integer)",          "-k", false, false);
+        p.add("hashratio",  "FracMinHash ratio in (0,1]",                                       "-r", false, false);
+        p.add("max_seeds",  "Maximum seeds in a sketch (positive integer)",                     "-S", false, false);
+        p.add("max_matches","Maximum seed matches in a sketch (positive integer)",              "-M", false, false);
+        p.add("threshold",  "Homology threshold in [0,1]",                                      "-t", false, false);
+        p.add("min_diff",   "Minimum difference between best and second best mapping",          "-d", false, false);
+        p.add("max_overlap","Maximum overlap between best and second best mapping (0,1]",       "-o", false, false);
+        p.add("metric",     "Optimization metric: bucket_SH, bucket_LCS, Containment, Jaccard", "-m", false, false);
+        p.add("params",     "Output file with parameters (tsv)",                                "-z", false, false);
+        p.add("verbose",    "Verbosity level: 0 for none, 1 for some, 2 for all",               "-v", false, false);
 
-	//This function parses the program parameters. Returns false if given arguments are not valid
-	bool prsArgs(int& nArgs, char** argList) {
-		static struct option long_options[] = {
-			{"pattern",            required_argument,  0, 'p'},
-			{"text",               required_argument,  0, 's'},
-			{"ksize",              required_argument,  0, 'k'},
-			{"hashratio",          required_argument,  0, 'r'},
-			{"max_seeds",          required_argument,  0, 'S'},
-			{"max_matches",        required_argument,  0, 'M'},
-			{"hom_thres",          required_argument,  0, 't'},
-			{"params",             required_argument,  0, 'z'},
-			{"metric",             required_argument,  0, 'm'},
-			{"threshold",          required_argument,  0, 't'},
-			{"verbose",            required_argument,  0, 'v'},
-			{"normalize",          no_argument,        0, 'n'},
-//			{"onlybest",           no_argument,        0, 'x'},
-			{"no-bucket-pruning",  no_argument,        0, 'P'},
-			{"one-sweep",          no_argument,        0, 'B'},
-			{"only-sh",            no_argument,        0, 'O'},
-			{"abs-pos",            no_argument,        0, 'F'},
-			{"help",               no_argument,        0, 'h'},
-			{0,                    0,                  0,  0 }
-		};
+        // Boolean (flag) options.
+        p.add("sam",        "Output in SAM format (PAF by default)",                            "-a", false, true);
+        p.add("normalize",  "Normalize scores by length",                                       "-n", false, true);
+        p.add("no_bucket_pruning", "Disables bucket pruning",                                   "-P", false, true);
+        p.add("one_sweep",  "Disregards seed heuristic and runs one sweep on all matches",      "-B", false, true);
+        p.add("abs_pos",    "Use absolute positions instead of kmer positions",                 "-F", false, true);
 
-		int option_index = 0, a;
-		while ((a = getopt_long(nArgs, argList, T_HOM_OPTIONS, long_options, &option_index)) != -1) {
-			switch(a) {
-				case 'p':
-					pFile = optarg;
-					break;
-				case 's':
-					tFile = optarg;
-					break;
-				case 'm':
-					metric = mapping_metric_from_str(optarg);
-					break;
-				case 'k':
-					if(atoi(optarg) <= 0) {
-						cerr << "ERROR: K-mer length (-k) should be positive." << "You provided " << optarg << "." << endl;
-						return false;
-					}
-					k = atoi(optarg);
-					break;
-				case 'r':
-					if(atof(optarg) <= 0 || atof(optarg) > 1.0) {
-						cerr << "ERROR: Given hash ratio (-r) should be between 0 and 1." << "You provided " << optarg << "." << endl;
-						return false;
-					}
-					hFrac = atof(optarg);
-					break;
-				case 'S':
-					if(atoi(optarg) <= 0) {
-						cerr << "ERROR: The number of seeds (-S) should be positive." << "You provided " << optarg << "." << endl;
-						return false;
-					}
-					max_seeds = atoi(optarg);
-					break;
-				case 'M':
-					if(atoi(optarg) <= 0) {
-						cerr << "ERROR: The number of seed matches (-M) should be positive." << "You provided " << optarg << "." << endl;
-						return false;
-					}
-					max_matches = atoi(optarg);
-					break;
-				case 't':
-					theta = atof(optarg);
-					if(theta < 0.0 || theta > 1.0) {
-						cerr << "ERROR: The threshold (-t) should be between 0 and 1." << "You provided " << optarg << "." << endl;
-						return false;
-					}
-					break;
-				case 'd':
-					min_diff = atof(optarg);
-					if(min_diff < 0.0) {
-						cerr << "ERROR: The minimum difference (-d) should be >=0." << "You provided " << optarg << "." << endl;
-						return false;
-					}
-					break;
-				case 'o':
-					max_overlap = atof(optarg);
-					if(max_overlap < 0.0 || max_overlap > 1.0) {
-						cerr << "ERROR: The maximum overlap (-o) should be between 0 and 1." << "You provided " << optarg << "." << endl;
-						return false;
-					}
-					break;
-				case 'v':
-					verbose = atoi(optarg);
-					if(verbose < 0 || verbose > 2) {
-						cerr << "ERROR: --verbose (-v) should be 0, 1 or 2. " << "You provided " << optarg << "." << endl;
-						return false;
-					}
-					break;
-				case 'z':
-					paramsFile = optarg;
-					break;
-				case 'a':
-					sam = true;
-					break;
-				case 'n':
-					normalize = true;
-					break;
-				case 'P':
-					no_bucket_pruning = true;
-					break;
-				case 'B':
-					one_sweep = true;
-					break;
-				case 'F':
-					abs_pos = true;
-					break;
-				case 'h':
-					return false;
-				default:
-					cerr << "Unknown option " << a << " '" << char(a) << "', " << optarg << endl ;
-					break;
-			}
-		}
+        if (!p.parse())
+            return false;
 
-		return !pFile.empty() && !tFile.empty();
-	}
+        try {
+            // Retrieve required parameters.
+            pFile = p.get<std::string>("pattern");
+            tFile = p.get<std::string>("text");
+
+            // Retrieve optional options if provided (otherwise the defaults remain).
+            if (p.parsed("ksize")) {
+                k = p.get<int>("ksize");
+                if (k <= 0) {
+                    std::cerr << "ERROR: K-mer length (-k) should be positive. You provided " << k << "." << std::endl;
+                    return false;
+                }
+            }
+            if (p.parsed("hashratio")) {
+                hFrac = p.get<double>("hashratio");
+                if (hFrac <= 0 || hFrac > 1.0) {
+                    std::cerr << "ERROR: Given hash ratio (-r) should be between 0 and 1. You provided " << hFrac << "." << std::endl;
+                    return false;
+                }
+            }
+            if (p.parsed("max_seeds")) {
+                max_seeds = p.get<int>("max_seeds");
+                if (max_seeds <= 0) {
+                    std::cerr << "ERROR: The number of seeds (-S) should be positive. You provided " << max_seeds << "." << std::endl;
+                    return false;
+                }
+            }
+            if (p.parsed("max_matches")) {
+                max_matches = p.get<int>("max_matches");
+                if (max_matches <= 0) {
+                    std::cerr << "ERROR: The number of seed matches (-M) should be positive. You provided " << max_matches << "." << std::endl;
+                    return false;
+                }
+            }
+            if (p.parsed("threshold")) {
+                theta = p.get<double>("threshold");
+                if (theta < 0.0 || theta > 1.0) {
+                    std::cerr << "ERROR: The threshold (-t) should be between 0 and 1. You provided " << theta << "." << std::endl;
+                    return false;
+                }
+            }
+            if (p.parsed("min_diff")) {
+                min_diff = p.get<double>("min_diff");
+                if (min_diff < 0.0) {
+                    std::cerr << "ERROR: The minimum difference (-d) should be >= 0. You provided " << min_diff << "." << std::endl;
+                    return false;
+                }
+            }
+            if (p.parsed("max_overlap")) {
+                max_overlap = p.get<double>("max_overlap");
+                if (max_overlap < 0.0 || max_overlap > 1.0) {
+                    std::cerr << "ERROR: The maximum overlap (-o) should be between 0 and 1. You provided " << max_overlap << "." << std::endl;
+                    return false;
+                }
+            }
+            if (p.parsed("verbose")) {
+                verbose = p.get<int>("verbose");
+                if (verbose < 0 || verbose > 2) {
+                    std::cerr << "ERROR: --verbose (-v) should be 0, 1, or 2. You provided " << verbose << "." << std::endl;
+                    return false;
+                }
+            }
+            if (p.parsed("params")) {
+                paramsFile = p.get<std::string>("params");
+            }
+            if (p.parsed("metric")) {
+                std::string metric_str = p.get<std::string>("metric");
+                metric = mapping_metric_from_str(metric_str);
+            }
+
+            // For boolean options, simply retrieve the flags.
+            sam              = p.get<bool>("sam");
+            normalize        = p.get<bool>("normalize");
+            no_bucket_pruning= p.get<bool>("no_bucket_pruning");
+            one_sweep        = p.get<bool>("one_sweep");
+            abs_pos          = p.get<bool>("abs_pos");
+        } catch (std::runtime_error const& e) {
+            std::cerr << "ERROR: " << e.what() << std::endl;
+            return false;
+        }
+        return true;
+    }
 };
 
-// seq->name.s, seq->comment.l, seq->comment.s, seq->seq.s, seq->qual.l
-inline void read_fasta_klib(const std::string& filename, std::function<void(const std::string&, const std::string&, float)> callback) {
+// This function remains unchanged: it reads a FASTA file using kseq.
+inline void read_fasta_klib(const std::string& filename,
+    std::function<void(const std::string&, const std::string&, float)> callback)
+{
     gzFile fp = gzopen(filename.c_str(), "r");
     kseq_t *seq = kseq_init(fp);
     int l;
@@ -282,15 +238,13 @@ inline void read_fasta_klib(const std::string& filename, std::function<void(cons
     while ((l = kseq_read(seq)) >= 0) {
         string query_id = seq->name.s;
         string P = seq->seq.s;
-        //print_progress_bar(cerr, 1.0 * gztell(fp) / total_bytes);
-        //std::cerr << "Mapping progress:" << 100.0 * gztell(fp) / total_bytes << "%\r";
         float percentage = 1.0 * gztell(fp) / total_bytes;
         callback(query_id, P, percentage);
     }
-
-    //if (l != -1)  // -1  end of file; do nothing
-    if (l == -2) cerr << "ERROR: truncated quality string" << endl;  // -2   truncated quality string
-    else if (l == -3) cerr << "ERROR: error reading stream" << endl;  // -3   error reading stream
+    if (l == -2)
+        cerr << "ERROR: truncated quality string" << endl;
+    else if (l == -3)
+        cerr << "ERROR: error reading stream" << endl;
 
     kseq_destroy(seq);
     gzclose(fp);

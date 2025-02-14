@@ -6,10 +6,8 @@ using namespace sweepmap;
 
 int main(int argc, char **argv) {
 	params_t params;
-	if(!params.prsArgs(argc, argv)) {
-		params.dsHlp();
+	if(!params.prsArgs(argc, argv))
 		return 1;
-	}
 
 	Handler H(params);
 	SketchIndex tidx(&H);
