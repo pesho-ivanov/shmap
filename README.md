@@ -9,6 +9,7 @@ Map-SHmap is an algorithm for sketch-based read mapping of genomic sequences.
 ## Dependencies
 
 * [ankerl/unordered_dense](https://github.com/martinus/unordered_dense) -- fast hashmap
+* [cmd_line_parser](https://github.com/jermp/cmd_line_parser) -- command line parser
 
 ## Evaluation
 * [PBSIM](https://github.com/pfaucon/PBSIM-PacBio-Simulator) -- long read simulator
