@@ -7,3 +7,6 @@
 [submodule "ext/pdqsort"]
 	path = ext/pdqsort
 	url = https://github.com/orlp/pdqsort
+[submodule "ext/tensor-sketching"]
+	path = ext/tensor-sketching
+	url = https://github.com/ratschlab/Project2020-seq-tensor-sketching
