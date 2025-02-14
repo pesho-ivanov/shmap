@@ -282,11 +282,11 @@ public:
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 		const auto &t = segm.kmers;
 
-		assert(B.begin(b) < t.size());
+		assert(B.begin(b) < static_cast<int>(t.size()));
 		auto l = B.begin(b);
 		auto r = l;
 		auto end = min(rpos_t(t.size()), B.end(b));
-		assert(l < t.size());
+		assert(l < static_cast<int>(t.size()));
 		
 		Mapping best;
 		for(; l < end; ++l) {

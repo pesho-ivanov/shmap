@@ -18,6 +18,7 @@ TEST_SUITE("Counting") {
     }
     TEST_CASE("Counters") {
         Counters C;
+        //C.init("c1", "c2", "c3", "c4");
         CHECK_THROWS(C.count("c1"));
         C.inc("c1");
         CHECK(C.count("c1") == 1);
@@ -303,7 +304,7 @@ TEST_CASE("test_select_kmers_pmatches") {
 
 	auto H = new Handler(params);
 	auto tidx = new SketchIndex(H);
-	auto mapper = new SHMapper<false, false, false, false>(*tidx, H);
+	auto mapper = new SHMapper<false, false, false>(*tidx, H);
 
     sketch_t p;
     p.emplace_back(60, 0x111111, false);
@@ -362,7 +363,41 @@ TEST_CASE("lcs") {
     params.theta = 0.7;
     auto H = new Handler(params);
     auto tidx = new SketchIndex(H);
-    auto mapper = new SHMapper<false, false, false, false>(*tidx, H);
+    auto mapper = new SHMapper<false, false, false>(*tidx, H);
     qpos_t lcs_cnt = mapper->lcs(t, B, bucket, p_ht);
     CHECK(lcs_cnt == 3);
 }
+
+std::string exec(const std::string& cmd) {
+    std::array<char, 128> buffer;
+    std::string result;
+    #ifdef _WIN32
+      FILE* pipe = _popen(cmd.c_str(), "r");
+    #else
+      FILE* pipe = popen(cmd.c_str(), "r");
+    #endif
+    if (!pipe) {
+        throw std::runtime_error("popen() failed!");
+    }
+    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+        result += buffer.data();
+    }
+    #ifdef _WIN32
+      _pclose(pipe);
+    #else
+      pclose(pipe);
+    #endif
+    return result;
+}
+
+TEST_CASE("test_execute_sweepmap_from_terminal") {
+    std::string make_res = exec("make");
+//    std::cout << make_res << std::endl;
+//    CHECK(make_res.empty());
+    std::string tool = "./release/shmap";
+    std::string cmd = tool + " -p test.fa -t test.fa -k 25 -hFrac 0.05 -theta 0.7 -metric bucket_LCS -o test.sam";
+    std::string result = exec(cmd);
+    std::cout << result << std::endl;
+//    CHECK(result.empty());
+}
+
