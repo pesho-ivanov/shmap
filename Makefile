@@ -121,7 +121,7 @@ REAL_READS = $(ALLREADS_DIR)/HG002.fq
 PBSIM3     = ~/libs/pbsim3/src/pbsim
 #PBSIM1     = pbsim
 #SAMTOOLS   = samtools
-PAFTOOLS   = ./ext/paftools.js
+PAFTOOLS   = $(DIR)/ext/paftools.js
 SEQKIT     = ~/miniconda3/bin/seqkit
 
 #LIFT_FASTA = $(DIR)/convert_fasta_with_args.py
