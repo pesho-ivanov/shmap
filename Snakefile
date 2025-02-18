@@ -2,82 +2,98 @@
 import os
 from collections import OrderedDict
 
-# Directories and Files
-OUTDIR    = "evals/snake_out"
-REF_DIR   = "evals/refs"
-READS_DIR = "evals/reads"
-REFNAME   = "chm13-chr1"
-REF       = "{REF_DIR}/{REFNAME}.fa"
-
-#READS_PREFIX ?= $(REFNAME)-reads$(READSIM_REFNAME)-a$(ACCURACY)-d$(DEPTH)-l$(MEANLEN)
-ACCURACY  = '?'
-DEPTH     = 1
-MEANLEN   = '?'
-READSIM_REFNAME = {REFNAME}
-ONE_READ  = "{READS_DIR}/{REFNAME}-reads{READSIM_REFNAME}-a{ACCURACY}-d{DEPTH}-l{MEANLEN}.oneread.fa"
-ALL_READS = "{READS_DIR}/{REFNAME}-reads{READSIM_REFNAME}-a{ACCURACY}-d{DEPTH}-l{MEANLEN}.fa"
-
-# Timing and evaluation tool
-TIME_CMD  = "/usr/bin/time -f '%U\t%M'"
-PAFTTOOLS = "evals/ext/paftools.js"
-
-# Mapping parameters
-K  = 25
-R  = 0.01
-T  = 0.4
-
-# Executable paths (adjust as needed)
-SHMAP     = "./release/shmap"
-MINIMAP   = "~/libs/minimap2/minimap2"
-MM2       = "~/libs/mm2-fast/minimap2"
-BLEND     = "~/libs/blend/bin/blend"
-MAPQUIK   = "~/libs/mapquik/target/release/mapquik"
-MERYL     = "~/libs/Winnowmap/bin/meryl"
-WINNOWMAP = "~/libs/Winnowmap/bin/winnowmap"
-MASHMAP1  = "~/libs/mashmap"
-MASHMAP3  = "~/libs/MashMap/build/bin/mashmap"
-ASTARIX   = "~/libs/astarix/release/astarix"
-
-tools = {
-    "shmap":    f"{SHMAP} -s {{ref}} -p {{reads}} -k {{k}} -r {{r}} -t {{t}} -z {{out_pref}}.params > {{out_pref}}.paf",
-    "mm2":      f"{MM2} -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level {{ref}} {{reads}} > {{out_pref}}.paf",
-    "blend":    f"{BLEND} -x map-hifi -t 1 -N 0 {{ref}} {{reads}} > {{out_pref}}.paf",
-    "mashmap3": f"{MASHMAP3} -t 1 --noSplit --pi 90 -r {{ref}} -q {{reads}} -o {{out_pref}}.paf",
-    "mapquik":  f"{MAPQUIK} {{reads}} --reference {{ref}} --threads 1 -p {{out_pref}}",
-    "minimap":  f"{MINIMAP} -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level {{ref}} {{reads}} > {{out_pref}}.paf",
-#    "winnowmap":f"{MERYL} count k=15 output merylDB {{ref}}; {MERYL} print greater-than distinct=0.9998 merylDB > {{ref_dir}}/winnowmap_{{REFNAME}}_repetitive_k15.txt; {WINNOWMAP} -W {{ref_dir}}/winnowmap_{{REFNAME}}_repetitive_k15.txt -x map-pb -t 1 --secondary=no --sv-off {{ref}} {{reads}} > {{out_pref}}.paf",
-#    "mashmap1": f"{MASHMAP1} -s {{ref}} -q {{reads}} -o {{out_pref}}.paf",
-#    "astarix":  f"{ASTARIX} align-optimal -g {{ref}} -q {{reads}} -o {{out_pref}}.paf",
+# Configuration and constants
+config = {
+    # Directories
+    "outdir": "evals/snake_out",
+    "ref_dir": "evals/refs",
+    "reads_dir": "evals/reads",
+    
+    # Reference settings
+    "refname": "chm13-chr1",
+    
+    # Read simulation parameters
+    "accuracy": "?",
+    "depth": 1,
+    "meanlen": "?",
+    
+    # Mapping parameters
+    "k": 25,
+    "r": 0.01,
+    "t": 0.4,
+    
+    # Tools and paths
+    "time_cmd": "/usr/bin/time -f '%U\t%M'",
+    "paftools": "evals/ext/paftools.js",
+    
+    # Tool executables
+    "tools": {
+        "shmap": "./release/shmap",
+        "minimap": "~/libs/minimap2/minimap2",
+        "mm2": "~/libs/mm2-fast/minimap2",
+        "blend": "~/libs/blend/bin/blend",
+        "mapquik": "~/libs/mapquik/target/release/mapquik",
+        "meryl": "~/libs/Winnowmap/bin/meryl",
+        "winnowmap": "~/libs/Winnowmap/bin/winnowmap", 
+        "mashmap3": "~/libs/MashMap/build/bin/mashmap",
+    }
 }
 
-tool_list = list(tools.keys())
+# Derived paths
+REF = f"{config['ref_dir']}/{config['refname']}.fa"
 
-all_eval_files = expand("{outdir}/{tool}/{tool}.eval", outdir=OUTDIR, tool=tool_list)
+def get_reads_path(single_read=False):
+    suffix = "oneread.fa" if single_read else "fa"
+    return (f"{config['reads_dir']}/{config['refname']}-reads{config['refname']}-"
+            f"a{config['accuracy']}-d{config['depth']}-l{config['meanlen']}.{suffix}")
 
+# Tool command templates
+tool_commands = {
+    "shmap": "{tool} -s {ref} -p {reads} -k {k} -r {r} -t {t} -z {out_pref}.params > {out_pref}.paf",
+    "mm2": "{tool} -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level {ref} {reads} > {out_pref}.paf",
+    "blend": "{tool} -x map-hifi -t 1 -N 0 {ref} {reads} > {out_pref}.paf",
+    "mashmap3": "{tool} -t 1 --noSplit --pi 90 -r {ref} -q {reads} -o {out_pref}.paf",
+    "mapquik": "{tool} {reads} --reference {ref} --threads 1 -p {out_pref}",
+    "minimap": "{tool} -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level {ref} {reads} > {out_pref}.paf",
+}
+
+# Rules
 rule all:
     input:
-        all_eval_files
+        expand("{outdir}/{tool}/{tool}.eval", 
+               outdir=config["outdir"], 
+               tool=tool_commands.keys())
 
 rule eval_tool:
-    input:
-    wildcard_constraints:
-        tool = "|".join(tool_list)
     output:
         eval = "{outdir}/{tool}/{tool}.eval"
+    wildcard_constraints:
+        tool = "|".join(tool_commands.keys())
     run:
-        outdir = os.path.join(OUTDIR, wildcards.tool)
-        out_pref = os.path.join(outdir, wildcards.tool)
+        outdir = os.path.dirname(output.eval)
+        out_pref = os.path.splitext(output.eval)[0]
         shell(f"mkdir -p {outdir}")
-        context_index = {
-            "ref": REF, "reads": ONE_READ, "out_pref": out_pref,
-            "outdir": outdir, "tool": wildcards.tool, "ref_dir": REF_DIR, "REFNAME": REFNAME,
-            "k": K, "r": R, "t": T,
+
+        # Prepare context for command formatting
+        context = {
+            "tool": config["tools"][wildcards.tool],
+            "ref": REF,
+            "out_pref": out_pref,
+            "k": config["k"],
+            "r": config["r"],
+            "t": config["t"]
         }
-        tool_index_cmd = tools[wildcards.tool].format(**context_index)
-        context_map = context_index.copy()
-        context_map["reads"] = ALL_READS
-        tool_map_cmd = tools[wildcards.tool].format(**context_map)
-        shell(f"{TIME_CMD} -o {outdir}/{wildcards.tool}.index.time " + tool_index_cmd + " > /dev/null 2>&1")
-        shell(f"{TIME_CMD} -o {outdir}/{wildcards.tool}.time " + tool_map_cmd + " 2> {out_pref}.log")
-        shell(f"{PAFTTOOLS} mapeval -r 0.1 {out_pref}.paf | tee {out_pref}.eval")
-        shell(f"{PAFTTOOLS} mapeval -r 0.1 -Q 0 {out_pref}.paf > {out_pref}.wrong")
+
+        # Index phase
+        context["reads"] = get_reads_path(single_read=True)
+        index_cmd = tool_commands[wildcards.tool].format(**context)
+        shell(f"{config['time_cmd']} -o {outdir}/{wildcards.tool}.index.time {index_cmd} > /dev/null 2>&1")
+
+        # Mapping phase
+        context["reads"] = get_reads_path(single_read=False)
+        map_cmd = tool_commands[wildcards.tool].format(**context)
+        shell(f"{config['time_cmd']} -o {outdir}/{wildcards.tool}.time {map_cmd} 2> {out_pref}.log")
+
+        # Evaluation
+        shell(f"{config['paftools']} mapeval -r 0.1 {out_pref}.paf | tee {out_pref}.eval")
+        shell(f"{config['paftools']} mapeval -r 0.1 -Q 0 {out_pref}.paf > {out_pref}.wrong")
