@@ -11,8 +11,9 @@ config = {
     
     # Reference settings
     "refname": "chm13-chr1",
-    
+
     # Read simulation parameters
+    "readsim_refname": "chm13-chr1",
     "accuracy": "?",
     "depth": 1,
     "meanlen": "?",
@@ -39,14 +40,6 @@ config = {
     }
 }
 
-# Derived paths
-REF = f"{config['ref_dir']}/{config['refname']}.fa"
-
-def get_reads_path(single_read=False):
-    suffix = "oneread.fa" if single_read else "fa"
-    return (f"{config['reads_dir']}/{config['refname']}-reads{config['refname']}-"
-            f"a{config['accuracy']}-d{config['depth']}-l{config['meanlen']}.{suffix}")
-
 # Tool command templates
 tool_commands = {
     "shmap": "{tool} -s {ref} -p {reads} -k {k} -r {r} -t {t} -z {out_pref}.params > {out_pref}.paf",
@@ -57,18 +50,28 @@ tool_commands = {
     "minimap": "{tool} -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level {ref} {reads} > {out_pref}.paf",
 }
 
+run_tools = ["shmap"] #, "mm2", "blend", "mashmap3", "mapquik", "minimap"]
+
 # Rules
 rule all:
     input:
-        expand("{outdir}/{tool}/{tool}.eval", 
+        expand("{outdir}/{tool}/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}/{tool}.eval", 
                outdir=config["outdir"], 
-               tool=tool_commands.keys())
+#               reads_dir=config["reads_dir"],
+               refname=config["refname"],
+               readsim_refname=config["readsim_refname"],
+               accuracy=config["accuracy"],
+               depth=config["depth"],
+               meanlen=config["meanlen"],
+               tool=run_tools)
 
 rule eval_tool:
+    input:
+        reads = multiext(config["reads_dir"] + "/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}", ".oneread.fa", ".fa")
     output:
-        eval = "{outdir}/{tool}/{tool}.eval"
+        eval = "{outdir}/{tool}/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}/{tool}.eval"
     wildcard_constraints:
-        tool = "|".join(tool_commands.keys())
+        tool = '|'.join(tool_commands.keys())
     run:
         outdir = os.path.dirname(output.eval)
         out_pref = os.path.splitext(output.eval)[0]
@@ -77,20 +80,20 @@ rule eval_tool:
         # Prepare context for command formatting
         context = {
             "tool": config["tools"][wildcards.tool],
-            "ref": REF,
+            "ref": f"{config['ref_dir']}/{config['refname']}.fa",
             "out_pref": out_pref,
             "k": config["k"],
             "r": config["r"],
-            "t": config["t"]
+            "t": config["t"],
         }
 
         # Index phase
-        context["reads"] = get_reads_path(single_read=True)
+        context["reads"] = input.reads[0]
         index_cmd = tool_commands[wildcards.tool].format(**context)
         shell(f"{config['time_cmd']} -o {outdir}/{wildcards.tool}.index.time {index_cmd} > /dev/null 2>&1")
 
         # Mapping phase
-        context["reads"] = get_reads_path(single_read=False)
+        context["reads"] = input.reads[1]
         map_cmd = tool_commands[wildcards.tool].format(**context)
         shell(f"{config['time_cmd']} -o {outdir}/{wildcards.tool}.time {map_cmd} 2> {out_pref}.log")
 
