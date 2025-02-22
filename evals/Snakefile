@@ -9,9 +9,9 @@ from collections import OrderedDict
 # Configuration and constants
 config = {
     # Directories
-    "outdir": "evals/snake_out",
-    "ref_dir": "evals/refs",
-    "reads_dir": "evals/reads",
+    "outdir": "snake_out",
+    "ref_dir": "refs",
+    "reads_dir": "reads",
     
     # Reference settings
     "refname": "chm13-chr1",
@@ -29,11 +29,11 @@ config = {
     
     # Tools and paths
     "time_cmd": "/usr/bin/time -f '%U\t%M'",
-    "paftools": "evals/ext/paftools.js",
+    "paftools": "ext/paftools.js",
     
     # Tool executables
     "tool_bin": {
-        "shmap": "./release/shmap",
+        "shmap": "~/work/shmap/release/shmap",
         "minimap": "~/libs/minimap2/minimap2",
         "mm2": "~/libs/mm2-fast/minimap2",
         "blend": "~/libs/blend/bin/blend",
@@ -46,12 +46,12 @@ config = {
     # Add these to the config section
     "pbsim3": "~/libs/pbsim3/src/pbsim",
 #    "seqkit": "~/miniconda3/bin/seqkit",
-    "stream_lift_fasta": "evals/stream_fasta.py",
-    "chain_file": "evals/refs/hg002v1.1_to_CHM13v2.0.chain",
+    "stream_lift_fasta": "stream_fasta.py",
+    "chain_file": "refs/hg002v1.1_to_CHM13v2.0.chain",
 #    "seqtk": "~/miniconda3/bin/seqtk",
     "hg002": {
-        "fq": "evals/reads/HG002.fq",
-        "fa": "evals/reads/HG002.fa",
+        "fq": "reads/HG002.fq",
+        "fa": "reads/HG002.fa",
         "url": "https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/scratch/HG002/sequencing/hifirevio/m84005_220827_014912_s1.hifi_reads.fastq.gz"
     }
 }
@@ -140,11 +140,11 @@ rule gen_reads:
         ref = config["ref_dir"] + "/{readsim_refname}.fa",
         real_reads = config["hg002"]["fq"]
     output:
-        reads = "evals/reads/{readsim_refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}.fa",
-        one_read = "evals/reads/{readsim_refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}.oneread.fa"
+        reads = "reads/{readsim_refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}.fa",
+        one_read = "reads/{readsim_refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}.oneread.fa"
     params:
         reads_prefix = lambda w: f"{w.readsim_refname}-reads{w.readsim_refname}-a{w.accuracy}-d{w.depth}-l{w.meanlen}",
-        real_reads_tmp = "evals/reads/HG002.fq.tmp"
+        real_reads_tmp = "reads/HG002.fq.tmp"
     conda:
         "envs/simulate.yaml"
     shell:
