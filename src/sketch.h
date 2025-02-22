@@ -50,7 +50,7 @@ struct MappingPAF {
 		: P_start(P_start), P_end(P_end), strand(strand), segm_name(segm_name), segm_sz(segm_sz), segm_id(segm_id), T_l(T_l), T_r(T_r), mapq(255), query_id(""), P_sz(-1) {}
 
 	friend std::ostream& operator<<(std::ostream& os, const MappingPAF& paf) {
-		if (paf.P_sz == 0) throw std::runtime_error("MappingPAF is not set at time of output.");
+		//if (paf.P_sz == 0) throw std::runtime_error("MappingPAF is not set at time of output.");
 		os << std::fixed << std::setprecision(3);
 		os  << paf.query_id				// query sequence name
 			<< "\t" << paf.P_sz			// query sequence length
