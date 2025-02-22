@@ -28,7 +28,7 @@ config = {
     "paftools": "evals/ext/paftools.js",
     
     # Tool executables
-    "tools": {
+    "tool_bin": {
         "shmap": "./release/shmap",
         "minimap": "~/libs/minimap2/minimap2",
         "mm2": "~/libs/mm2-fast/minimap2",
@@ -41,21 +41,28 @@ config = {
 }
 
 # Tool command templates
-tool_commands = {
-    "shmap": "{tool} -s {ref} -p {reads} -k {k} -r {r} -t {t} -z {out_pref}.params > {out_pref}.paf",
-    "mm2": "{tool} -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level {ref} {reads} > {out_pref}.paf",
-    "blend": "{tool} -x map-hifi -t 1 -N 0 {ref} {reads} > {out_pref}.paf",
-    "mashmap3": "{tool} -t 1 --noSplit --pi 90 -r {ref} -q {reads} -o {out_pref}.paf",
-    "mapquik": "{tool} {reads} --reference {ref} --threads 1 -p {out_pref}",
-    "minimap": "{tool} -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level {ref} {reads} > {out_pref}.paf",
+tool_pattern = {
+    "shmap": "{tool_bin} -s {ref} -p {reads} -k {k} -r {r} -t {t} -z {out_pref}.params > {out_pref}.paf",
+    "mm2": "{tool_bin} -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level {ref} {reads} > {out_pref}.paf",
+    "blend": "{tool_bin} -x map-hifi -t 1 -N 0 {ref} {reads} > {out_pref}.paf",
+    "mashmap3": "{tool_bin} -t 1 --noSplit --pi 90 -r {ref} -q {reads} -o {out_pref}.paf",
+    "mapquik": "{tool_bin} {reads} --reference {ref} --threads 1 -p {out_pref}",
+    "minimap": "{tool_bin} -x map-hifi -t 1 --secondary=no -M 0 --hard-mask-level {ref} {reads} > {out_pref}.paf",
 }
 
-run_tools = ["shmap"] #, "mm2", "blend", "mashmap3", "mapquik", "minimap"]
+run_tools = [
+    ("shmap", "k25-r0.01-t0.4-d0.075-o0.3-mJaccard"),
+#    ("mm2", "default"),
+    ("blend", "default"),
+#    ("mashmap3", "default"),
+#    ("mapquik", "default"),
+#    ("minimap", "default"),
+]
 
 # Rules
 rule all:
     input:
-        expand("{outdir}/{tool}/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}/{tool}.eval", 
+        expand("{outdir}/{tool_params[0]}/{tool_params[1]}/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}/{tool_params[0]}.eval", 
                outdir=config["outdir"], 
 #               reads_dir=config["reads_dir"],
                refname=config["refname"],
@@ -63,15 +70,15 @@ rule all:
                accuracy=config["accuracy"],
                depth=config["depth"],
                meanlen=config["meanlen"],
-               tool=run_tools)
+               tool_params=run_tools),
 
 rule eval_tool:
     input:
         reads = multiext(config["reads_dir"] + "/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}", ".oneread.fa", ".fa")
     output:
-        eval = "{outdir}/{tool}/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}/{tool}.eval"
-    wildcard_constraints:
-        tool = '|'.join(tool_commands.keys())
+        eval = "{outdir}/{tool}/{params}/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}/{tool}.eval"
+    #wildcard_constraints:
+    #    tool = '|'.join([k.split("-")[0] for k in tool_pattern.keys()])
     run:
         outdir = os.path.dirname(output.eval)
         out_pref = os.path.splitext(output.eval)[0]
@@ -79,23 +86,28 @@ rule eval_tool:
 
         # Prepare context for command formatting
         context = {
-            "tool": config["tools"][wildcards.tool],
+            "tool": wildcards.tool,
+            "tool_bin": config["tool_bin"][wildcards.tool],
             "ref": f"{config['ref_dir']}/{config['refname']}.fa",
             "out_pref": out_pref,
-            "k": config["k"],
-            "r": config["r"],
-            "t": config["t"],
         }
+        
+        # Tool parameters, e.g. "k25-r0.01-t0.4-d0.075-o0.3-mJaccard"
+        for part in wildcards.params.split("-"):
+            param = part[0]
+            value = part[1:]
+            context[param] = value
 
         # Index phase
         context["reads"] = input.reads[0]
-        index_cmd = tool_commands[wildcards.tool].format(**context)
-        shell(f"{config['time_cmd']} -o {outdir}/{wildcards.tool}.index.time {index_cmd} > /dev/null 2>&1")
+        print('context: ', context)
+        index_cmd = tool_pattern[context['tool']].format(**context)
+        shell(f"{config['time_cmd']} -o {outdir}/{context['tool']}.index.time {index_cmd} > /dev/null 2>&1")
 
         # Mapping phase
         context["reads"] = input.reads[1]
-        map_cmd = tool_commands[wildcards.tool].format(**context)
-        shell(f"{config['time_cmd']} -o {outdir}/{wildcards.tool}.time {map_cmd} 2> {out_pref}.log")
+        map_cmd = tool_pattern[context['tool']].format(**context)
+        shell(f"{config['time_cmd']} -o {outdir}/{context['tool']}.time {map_cmd} 2> {out_pref}.log")
 
         # Evaluation
         shell(f"{config['paftools']} mapeval -r 0.1 {out_pref}.paf | tee {out_pref}.eval")
