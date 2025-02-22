@@ -1,3 +1,7 @@
+from snakemake.utils import min_version
+
+min_version("6.15")
+
 # Snakefile
 import os
 from collections import OrderedDict
@@ -84,18 +88,16 @@ rule all:
                meanlen=config["meanlen"],
                tool_params=run_tools),
 
-rule eval_tool:
+rule run_tool:
     input:
         reads = multiext(config["reads_dir"] + "/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}", ".oneread.fa", ".fa")
     output:
-        eval = "{outdir}/{tool}/{params}/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}/{tool}.eval"
+        paf = "{outdir}/{tool}/{params}/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}/{tool}.paf"
     #wildcard_constraints:
     #    tool = '|'.join([k.split("-")[0] for k in tool_pattern.keys()])
-    #benchmark:
-    #    "benchmarks/{sample}.bwa.benchmark.txt"
     run:
-        outdir = os.path.dirname(output.eval)
-        out_pref = os.path.splitext(output.eval)[0]
+        outdir = os.path.dirname(output.paf)
+        out_pref = os.path.splitext(output.paf)[0]
         shell(f"mkdir -p {outdir}")
 
         # Prepare context for command formatting
@@ -106,11 +108,8 @@ rule eval_tool:
             "out_pref": out_pref,
         }
         
-        # Tool parameters, e.g. "k25-r0.01-t0.4-d0.075-o0.3-mJaccard"
-        for part in wildcards.params.split("-"):
-            param = part[0]
-            value = part[1:]
-            context[param] = value
+        # Tool parameters, e.g. "k25-r0.01-t0.4-d0.075-o0.3-mJaccard"; works only for single-letter parameters
+        [context.update({part[0]: part[1:]}) for part in wildcards.params.split("-")]
 
         # Index phase
         context["reads"] = input.reads[0]
@@ -123,9 +122,17 @@ rule eval_tool:
         map_cmd = tool_pattern[context['tool']].format(**context)
         shell(f"{config['time_cmd']} -o {outdir}/{context['tool']}.time {map_cmd} 2> {out_pref}.log")
 
-        # Evaluation
-        shell(f"{config['paftools']} mapeval -r 0.1 {out_pref}.paf | tee {out_pref}.eval")
-        shell(f"{config['paftools']} mapeval -r 0.1 -Q 0 {out_pref}.paf > {out_pref}.wrong")
+rule mapeval:
+    input:
+        paf = "{outdir}/{tool}/{params}/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}/{tool}.paf"
+    output:
+        eval = "{outdir}/{tool}/{params}/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}/{tool}.eval",
+        wrong = "{outdir}/{tool}/{params}/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}/{tool}.wrong"
+    shell:
+        """
+        {config[paftools]} mapeval -r 0.1 {input.paf} | tee {output.eval}
+        {config[paftools]} mapeval -r 0.1 -Q 0 {input.paf} > {output.wrong}
+        """
 
 # Add this rule after the existing rules
 rule gen_reads:
