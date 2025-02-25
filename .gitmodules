@@ -10,3 +10,6 @@
 [submodule "ext/tensor-sketching"]
 	path = ext/tensor-sketching
 	url = https://github.com/ratschlab/Project2020-seq-tensor-sketching
+[submodule "ext/tracy"]
+	path = ext/tracy
+	url = git@github.com:wolfpld/tracy.git

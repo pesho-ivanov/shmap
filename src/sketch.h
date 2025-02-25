@@ -8,6 +8,7 @@
 #include "cmath"
 
 #include "../ext/edlib.h"
+#include "../ext/tracy/public/tracy/Tracy.hpp"
 #include "io.h"
 #include "types.h"
 #include "utils.h"
@@ -430,6 +431,7 @@ public:
 	// TODO: use either only forward or only reverse
 	// TODO: accept char*
 	const sketch_t sketch(const std::string& s) const {
+		ZoneScoped;
 		sketch_t kmers;
 		kmers.reserve((rpos_t)(1.1 * (double)s.size() * hFrac));
 

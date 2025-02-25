@@ -4,6 +4,7 @@
 #include <functional>  // for std::hash
 #include <vector>
 #include "types.h"
+#include "../ext/tracy/public/tracy/Tracy.hpp"
 
 namespace sweepmap {
 
@@ -54,6 +55,7 @@ struct BucketContent {
 	}
 
 	BucketContent operator+=(const BucketContent &other) {
+		//ZoneScoped;
 		matches += other.matches;
 		seeds += other.seeds;
 		codirection += other.codirection;
@@ -91,6 +93,7 @@ public:
 	}
 
 	void propagate_seeds_to_buckets() {
+		ZoneScoped;
 		//cerr << "propagate: i=" << i << " seeds=" << seeds << endl;
 		for (auto &bucket : buckets) {
 			assert(bucket.second.i == -1);
@@ -102,20 +105,24 @@ public:
 	using bucket_map_t = ankerl::unordered_dense::map<BucketLoc, BucketContent, BucketHash, std::equal_to<BucketLoc> >;
 
     void add_to_pos(const Hit& hit, const BucketContent &content) {
+		ZoneScoped;
 		qpos_t b = (abs_pos ? hit.r : hit.tpos) / len;
         buckets[ BucketLoc(hit.segm_id, b) ] += content;
         if (b>0) buckets[ BucketLoc(hit.segm_id, b-1) ] += content;
     }
 
     void add_to_bucket(BucketLoc b, const BucketContent &content) {
+		ZoneScoped;
         buckets[b] += content;
     }
 
 	bool delete_bucket(BucketLoc b) {
+		ZoneScoped;
 		return buckets.erase(b);
 	}
 
 	qpos_t get_matches(const BucketLoc& b) const {
+		ZoneScoped;
 		auto it = buckets.find(b);
 		if (it == buckets.end()) return 0;
 		return it->second.matches;
@@ -126,6 +133,7 @@ public:
 	}
 
 	std::vector<typename bucket_map_t::value_type> get_sorted_buckets() {
+		ZoneScoped;
 		std::vector<typename bucket_map_t::value_type> sorted_buckets(buckets.begin(), buckets.end());
 		std::sort(sorted_buckets.begin(), sorted_buckets.end(), [](const auto &a, const auto &b) {
 			return a.second.matches > b.second.matches;

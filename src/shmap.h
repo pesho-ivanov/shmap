@@ -13,6 +13,7 @@
 #include "sketch.h"
 #include "types.h"
 #include "utils.h"
+#include "../ext/tracy/public/tracy/Tracy.hpp"
 
 namespace sweepmap {
 	
@@ -48,6 +49,7 @@ public:
 
 	// Returns unique kmers with at least one match in T
 	Seeds select_kmers(sketch_t& p) {
+		ZoneScoped;
 		T.start("group_kmers");
 			sort(p.begin(), p.end(), [](const Kmer &a, const Kmer &b) {
 				if (a.h != b.h)
@@ -387,6 +389,9 @@ public:
 	}
 
 	inline void map_read(const params_t &params, const FracMinHash &sketcher, ofstream &paulout, ofstream &unmapped_out, const string &query_id, const string &P) {
+		FrameMark;
+		ZoneScoped;
+
 		C.clear();
 		T.clear();
 

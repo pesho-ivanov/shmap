@@ -1,13 +1,20 @@
 SHELL := /bin/bash
 CC = g++
-CFLAGS = -std=c++20 -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
+CFLAGS = -g -std=c++20 -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
+#CFLAGS += -DTRACY_ENABLE #-DTRACY_NO_EXIT
+#CFLAGS += -DTRACY_NO_CALLSTACK
+#CFLAGS += -DTRACY_NO_FRAME_IMAGE
+#CFLAGS += -DTRACY_NO_SAMPLING
+#CFLAGS += -DTRACY_NO_NETWORK
+#CFLAGS += -DTRACY_NO_ALLOCS
+#CFLAGS += -DTRACY_NO_CONTEXT_SWITCH
 ifeq ($(DEBUG), 1)
 	SHMAP_BIN = ./debug/shmap
 else
 	SHMAP_BIN = ./release/shmap
 endif
 
-SRCS = map.cpp mapper.cpp
+SRCS = map.cpp mapper.cpp ext/tracy/public/TracyClient.cpp
 #edlib.cpp
 OBJS = $(SRCS:.cpp=.o)
 DEPS = $(OBJS:.o=.d)
@@ -23,7 +30,7 @@ BIN = shmap
 DBGDIR = debug
 DBGBIN = $(DBGDIR)/$(BIN)
 DBGOBJS = $(addprefix $(DBGDIR)/, $(OBJS))
-DBGCFLAGS = -g -O0 -DDEBUG
+DBGCFLAGS = -O0 -DDEBUG
 DBGDEPS = $(DBGOBJS:.o=.d)
 
 # Release build settings
@@ -144,6 +151,10 @@ ASTARIX_PREF       = $(ALLOUT_DIR)/astarix/$(READS_PREFIX)/astarix
 
 all: prep release
 	
+release/ext/tracy/public/%.o: ext/tracy/public/%.cpp
+	@mkdir -p $(dir $@)
+	$(CC) -c $(CFLAGS) $(RELCFLAGS) -o $@ $<
+
 prep:
 	@mkdir -p $(DBGDIR) $(RELDIR) $(TESTDIR)
 	
@@ -153,6 +164,7 @@ $(DBGDIR)/$(BIN): $(DBGOBJS)
 	$(CC) $(CFLAGS) $(DBGCFLAGS) -o $(DBGDIR)/$(BIN) $^ $(LIBS)
 
 $(DBGDIR)/%.o: src/%.cpp
+	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $(DBGCFLAGS) $(DEPFLAGS) -o $@ $<
 
 release: prep $(RELBIN)
@@ -161,6 +173,7 @@ $(RELBIN): $(RELOBJS)
 	$(CC) $(CFLAGS) $(RELCFLAGS) -o $(RELBIN) $^ $(LIBS)
 
 $(RELDIR)/%.o: src/%.cpp
+	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $(RELCFLAGS) $(DEPFLAGS) -o $@ $<
 
 test: prep $(TESTBIN) run_test
@@ -172,6 +185,7 @@ $(TESTBIN): $(TESTOBJS)
 	$(CC) $(CFLAGS) $(TESTCFLAGS) -o $(TESTBIN) $^ $(LIBS)
 
 $(TESTDIR)/%.o: src/%.cpp
+	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $(TESTCFLAGS) $(DEPFLAGS) -o $@ $<
 
 remake: clean all
