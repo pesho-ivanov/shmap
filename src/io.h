@@ -13,6 +13,7 @@
 #include "klib/kseq.h"
 #include "utils.h"
 #include "cmd_line_parser/include/parser.hpp"  // use Giulio's custom command line parser
+#include "../ext/tracy/public/tracy/Tracy.hpp"
 
 namespace sweepmap {
 
@@ -228,6 +229,7 @@ struct params_t {
 inline void read_fasta_klib(const std::string& filename,
     std::function<void(const std::string&, const std::string&, float)> callback)
 {
+    ZoneScoped;
     gzFile fp = gzopen(filename.c_str(), "r");
     kseq_t *seq = kseq_init(fp);
     int l;

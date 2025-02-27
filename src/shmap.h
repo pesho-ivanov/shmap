@@ -90,6 +90,7 @@ public:
 	}
 
 	void match_seeds(const Seeds &p_unique, BucketsType &B, qpos_t S) {
+		ZoneScoped;
 		rpos_t seed_matches(0), seeded_buckets(0);  // stats
 		for (; B.i < (qpos_t)p_unique.size() && B.seeds < S; B.i++) {
 			Seed seed = p_unique[B.i];
@@ -180,6 +181,7 @@ public:
 	}
 
 	void matches_in_bucket(const BucketsType &B, const BucketLoc &b, BucketContent *bucket, const Seed &s) const {
+		ZoneScoped;
 		bucket->seeds += s.occs_in_p;
 		if (s.hits_in_T == 0) {
 			;
@@ -217,6 +219,7 @@ public:
 	}
 
 	bool seed_heuristic_pass(const BucketsType &B, const Seeds &p_unique, qpos_t m, const BucketLoc &b, BucketContent *bucket, double *sh, double thr) {
+		ZoneScoped;
 		//T.start("seed_heuristic");
 		if (!no_bucket_pruning) {
 			while (1) {
@@ -359,6 +362,7 @@ public:
 	
 	std::optional<Mapping> match_rest(qpos_t P_sz, qpos_t m, qpos_t lmax, const Seeds &p_unique, const BucketsType &B, vector<typename BucketsType::bucket_map_t::value_type> &sorted_buckets, h2cnt &diff_hist, const h2seed_t &p_ht,
 			double thr, std::optional<Mapping> forbidden, const string &query_id, int *lost_on_pruning, double max_overlap) {
+		ZoneScoped;
 		int lost_on_seeding = (0);
 		std::optional<Mapping> best;
 		C.inc("lost_on_seeding", lost_on_seeding);
@@ -422,6 +426,7 @@ public:
 				h2cnt diff_hist;
 				rpos_t possible_matches(0);
 				for (const auto &kmer: p_unique) {
+					ZoneScoped;
 					p_ht.insert(make_pair(kmer.kmer.h, kmer));
 					diff_hist[kmer.kmer.h] = kmer.occs_in_p;
 					//if (params.verbose >= 2) {
@@ -536,6 +541,7 @@ public:
 
 			*os << endl;
 		T.stop("output");
+		FrameMark;
 	}
 
 	void map_reads(const string &pFile) {

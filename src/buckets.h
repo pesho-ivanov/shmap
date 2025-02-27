@@ -93,7 +93,7 @@ public:
 	}
 
 	void propagate_seeds_to_buckets() {
-		ZoneScoped;
+		//ZoneScoped;
 		//cerr << "propagate: i=" << i << " seeds=" << seeds << endl;
 		for (auto &bucket : buckets) {
 			assert(bucket.second.i == -1);
@@ -105,14 +105,14 @@ public:
 	using bucket_map_t = ankerl::unordered_dense::map<BucketLoc, BucketContent, BucketHash, std::equal_to<BucketLoc> >;
 
     void add_to_pos(const Hit& hit, const BucketContent &content) {
-		ZoneScoped;
+		//ZoneScoped;
 		qpos_t b = (abs_pos ? hit.r : hit.tpos) / len;
         buckets[ BucketLoc(hit.segm_id, b) ] += content;
         if (b>0) buckets[ BucketLoc(hit.segm_id, b-1) ] += content;
     }
 
     void add_to_bucket(BucketLoc b, const BucketContent &content) {
-		ZoneScoped;
+		//ZoneScoped;
         buckets[b] += content;
     }
 
@@ -122,7 +122,7 @@ public:
 	}
 
 	qpos_t get_matches(const BucketLoc& b) const {
-		ZoneScoped;
+		//ZoneScoped;
 		auto it = buckets.find(b);
 		if (it == buckets.end()) return 0;
 		return it->second.matches;

@@ -369,6 +369,7 @@ public:
 
 	// --- https://github.com/lh3/miniasm/blob/master/PAF.md ---
     void print_paf(std::ostream& os) const {
+		ZoneScoped;
 		os << *this;
 	}
 
