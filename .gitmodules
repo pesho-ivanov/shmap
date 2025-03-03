@@ -16,3 +16,6 @@
 [submodule "ext/unordered_dense"]
 	path = ext/unordered_dense
 	url = git@github.com:martinus/unordered_dense.git
+[submodule "ext/gtl"]
+	path = ext/gtl
+	url = git@github.com:greg7mdp/gtl.git
