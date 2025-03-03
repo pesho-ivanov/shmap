@@ -52,10 +52,47 @@ config = {
     }
 }
 
+best_shmap_params = "k25-r0.01-t0.4-d0.075-o0.3-mJaccard"
+robustness_config = {
+    "variations": { 
+        "k": [15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35],
+#        "r": [0.005, 0.01, 0.015, 0.02],
+#        "t": [0.2, 0.3, 0.4, 0.5],
+#        "d": [0.05, 0.075, 0.1, 0.15],
+#        "o": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+#        "m": ["Jaccard", "Hamming", "Levenshtein"],
+    },
+}
+
+#eval_shmap_on_datasets:
+#	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chrY 	READSIM_REFNAME=chrY 	DEPTH=2
+#	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13 	READSIM_REFNAME=hg002 	DEPTH=1
+#	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READSIM_REFNAME=chm13   DEPTH=1
+#	make eval_shmap ALLOUT_DIR=$(DIR)/out_small REFNAME=chm13   READS_PREFIX=HG002_small
+
+datasets = {
+    'refnames':         ['chrY', 'chm13', 'chm13'],
+    'readsim_refnames': ['chrY', 'hg002', 'chm13'],
+    'depths':           [     2,       1,       1],
+#    'reads_prefixes': ['', '', 'HG002_small']
+}    
+
 include: "workflow/rules/prepare.smk"
 include: "workflow/rules/run.smk"
 
 rule all:
+    input:
+        expand("{outdir}/shmap/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}/{params}/shmap.eval", 
+               outdir=config["outdir"], 
+               zip,
+               refname=datasets['refnames'],
+               readsim_refname=datasets['readsim_refnames'],
+               depth=datasets['depths'],
+               accuracy=[config["accuracy"]]*len(datasets['refnames']),
+               meanlen=[config["meanlen"]]*len(datasets['refnames']),
+               params=[best_shmap_params]*len(datasets['refnames']))
+
+rule some:
     input:
         expand("{outdir}/shmap/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}/{params}/shmap.eval", 
                outdir=config["outdir"], 

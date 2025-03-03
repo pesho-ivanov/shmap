@@ -6,6 +6,14 @@
 
 Map-SHmap is an algorithm for sketch-based read mapping of genomic sequences.
 
+## Usage
+
+Requirements: C++2a
+
+```
+git clone --recurse-submodules git@github.com:pesho-ivanov/shmap.git
+```
+
 ## Dependencies
 
 * [ankerl/unordered_dense](https://github.com/martinus/unordered_dense) -- fast hashmap

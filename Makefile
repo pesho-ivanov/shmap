@@ -1,8 +1,8 @@
 SHELL := /bin/bash
 CC = g++
-CFLAGS = -g -std=c++20 -march=native -lm -lpthread -Igtl/ -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
+CFLAGS = -g -std=c++2a -march=native -lm -lpthread -isystem ext/ -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
 #CFLAGS += -fno-omit-frame-pointer -fno-inline 
-CFLAGS += -DTRACY_ENABLE #-DTRACY_NO_EXIT
+#CFLAGS += -DTRACY_ENABLE #-DTRACY_NO_EXIT
 #CFLAGS += -DTRACY_NO_CALLSTACK
 #CFLAGS += -DTRACY_NO_FRAME_IMAGE
 #CFLAGS += -DTRACY_NO_SAMPLING

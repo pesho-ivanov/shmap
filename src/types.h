@@ -2,7 +2,7 @@
 
 #include <fstream>
 #include "../ext/gtl/vector.hpp"
-#include <ankerl/unordered_dense.h>
+#include "../ext/unordered_dense/include/ankerl/unordered_dense.h"
 
 namespace sweepmap {
 

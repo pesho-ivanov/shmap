@@ -17,18 +17,6 @@ run_tools = [
 #    ("minimap", "default"),
 ]
 
-best_shmap_params = "k25-r0.01-t0.4-d0.075-o0.3-mJaccard"
-robustness_config = {
-    "variations": { 
-        "k": [15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35],
-#        "r": [0.005, 0.01, 0.015, 0.02],
-#        "t": [0.2, 0.3, 0.4, 0.5],
-#        "d": [0.05, 0.075, 0.1, 0.15],
-#        "o": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
-#        "m": ["Jaccard", "Hamming", "Levenshtein"],
-    },
-}
-
 def substitute(params, var):
     pattern = var + r"([^-]+)"
     return [re.sub(pattern, var + str(val), params) for val in robustness_config["variations"][var]]

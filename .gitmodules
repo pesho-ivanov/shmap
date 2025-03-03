@@ -13,3 +13,6 @@
 [submodule "ext/tracy"]
 	path = ext/tracy
 	url = git@github.com:wolfpld/tracy.git
+[submodule "ext/unordered_dense"]
+	path = ext/unordered_dense
+	url = git@github.com:martinus/unordered_dense.git
