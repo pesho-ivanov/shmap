@@ -110,9 +110,10 @@ class Timers {
 public:
     std::unordered_map<std::string, Timer> timers_;
 
-    void init(std::convertible_to<std::string> auto&& ...s) {
-        for (auto v : std::initializer_list<std::string>{ s... })
-            timers_[v] = Timer();
+    // TODO: change to use std::convertible_to<std::string> when C++20 is available
+    template <typename... Args>
+    void init(Args&&... s) {
+        (void)std::initializer_list<std::string>{std::string(std::forward<Args>(s))...};
     }
 
     void start(const std::string& name) {
@@ -207,9 +208,9 @@ private:
     std::unordered_map<std::string, Counter> counters_;
 
 public:
-    void init(std::convertible_to<std::string> auto&& ...s) {
-        for (auto v : std::initializer_list<std::string>{ s... })
-            counters_[v] = Counter();
+    template <typename... Args>
+    void init(Args&&... s) {
+        (void)std::initializer_list<std::string>{std::string(std::forward<Args>(s))...};
     }
 
     void inc(const std::string& name, int64_t value = 1) {
