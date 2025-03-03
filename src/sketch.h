@@ -100,6 +100,7 @@ struct LocalMappingStats {
 
 	friend std::ostream& operator<<(std::ostream& os, const LocalMappingStats& stats) {
 		// per mapping stats
+		os << std::fixed << std::setprecision(5);
 		os	<< "\t" << "p:i:" 			<< stats.p_sz  // sketches
 			<< "\t" << "s:i:" 			<< stats.s_sz
 			<< "\t" << "I:i:" 			<< stats.intersection  // intersection of `p` and `s` [kmers]
@@ -224,9 +225,9 @@ public:
 	}
 	
 	// similar to minimap2: mapQ = 40 (1-f2/f1) min(1, m/10) log f1
-	int calc_mapq(double theta, double min_diff) {
-		if (score2() < theta)
-			set_score2(theta);
+	int calc_mapq(double theta2, double min_diff) {
+		if (score2() < theta2)
+			set_score2(theta2);
 		double frac = 1.0 - score2()/score();
 		//double diff = score() - score2();
 		int mapq_strand = (abs(local_stats.same_strand_seeds) < local_stats.intersection/2) ? 5 : 60;
@@ -312,12 +313,12 @@ public:
 	}
 
 	void set_global_stats(
-			double theta, double min_diff, qpos_t p_sz,
+			double theta2, double min_diff, qpos_t p_sz,
 			const char* query_id, qpos_t P_sz, qpos_t k, qpos_t seeds, rpos_t total_matches, rpos_t max_seed_matches, rpos_t seed_matches,
 			rpos_t seeded_buckets, rpos_t final_buckets, double FPTP, double map_time) {
 		paf.query_id = query_id;
 		paf.P_sz = P_sz;
-		paf.mapq = calc_mapq(theta, min_diff);
+		paf.mapq = calc_mapq(theta2, min_diff);
 
 		local_stats.p_sz = p_sz;
 		local_stats.map_time = map_time;
