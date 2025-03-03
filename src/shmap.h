@@ -13,7 +13,7 @@
 #include "sketch.h"
 #include "types.h"
 #include "utils.h"
-#include "../ext/tracy/public/tracy/Tracy.hpp"
+#include "tracy/public/tracy/Tracy.hpp"
 
 namespace sweepmap {
 	

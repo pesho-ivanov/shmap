@@ -13,7 +13,7 @@
 #include "klib/kseq.h"
 #include "utils.h"
 #include "cmd_line_parser/include/parser.hpp"  // use Giulio's custom command line parser
-#include "../ext/tracy/public/tracy/Tracy.hpp"
+#include "tracy/public/tracy/Tracy.hpp"
 
 namespace sweepmap {
 

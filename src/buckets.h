@@ -3,8 +3,8 @@
 #include <functional>  // for std::hash
 #include <vector>
 #include "types.h"
-#include "../ext/tracy/public/tracy/Tracy.hpp"
-#include "../ext/unordered_dense/include/ankerl/unordered_dense.h"
+#include "tracy/public/tracy/Tracy.hpp"
+#include "unordered_dense/include/ankerl/unordered_dense.h"
 
 namespace sweepmap {
 

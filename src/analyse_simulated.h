@@ -8,7 +8,7 @@
 #include "mapper.h"
 #include "refine.h"
 
-#include "../ext/gtl/vector.hpp"
+#include "gtl/vector.hpp"
 
 namespace sweepmap {
 

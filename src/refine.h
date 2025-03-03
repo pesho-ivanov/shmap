@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../ext/unordered_dense/include/ankerl/unordered_dense.h"
+#include "unordered_dense/include/ankerl/unordered_dense.h"
 #include "utils.h"
 #include "index.h"
 //#include "edlib.h"

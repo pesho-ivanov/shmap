@@ -1,4 +1,4 @@
-#include "../ext/klib/kseq.h"
+#include "klib/kseq.h"
 #include <zlib.h>
 #include <string>
 #include <iostream>

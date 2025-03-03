@@ -7,8 +7,8 @@
 #include <iomanip>
 #include "cmath"
 
-#include "../ext/edlib.h"
-#include "../ext/tracy/public/tracy/Tracy.hpp"
+#include "edlib.h"
+#include "tracy/public/tracy/Tracy.hpp"
 #include "io.h"
 #include "types.h"
 #include "utils.h"

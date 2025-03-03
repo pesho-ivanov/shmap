@@ -3,9 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "../ext/unordered_dense/include/ankerl/unordered_dense.h"
-#include "../ext/gtl/phmap.hpp"
-#include "../ext/gtl/vector.hpp"
+#include "unordered_dense/include/ankerl/unordered_dense.h"
+#include "gtl/phmap.hpp"
+#include "gtl/vector.hpp"
 
 #include "sketch.h"
 #include "utils.h"

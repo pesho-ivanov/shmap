@@ -7,8 +7,8 @@
 #include <set>
 #include <unordered_set>
 
-//#include "../ext/edlib.h"
-#include "../ext/pdqsort.h"
+//#include "edlib.h"
+#include "pdqsort.h"
 
 #include "index.h"
 #include "io.h"
