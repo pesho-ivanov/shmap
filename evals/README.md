@@ -3,12 +3,18 @@
 We ran all tools on a single thread of a mainstream laptop with a 13th Gen Intel
 Core i5-1335U x 12 processor, 40 GB memory, running Pop!_OS 22.04 LTS.
 
-## References
+## Requirements to run the evals
+- [snakemake](https://github.com/snakemake/snakemake) -- for running the workflow
+- [pbsim3](https://github.com/yukiteruono/pbsim3) (commit [8429f91](https://github.com/yukiteruono/pbsim3/commit/8429f91)) -- for simulating reads
+- [seqkit](https://github.com/shenwei356/seqkit) (v2.9.0) -- for indexing the reference and shuffling simulated reads
+- [paftools](https://github.com/lh3/minimap2/blob/master/misc/paftools.js) (v2.26-r1175) -- for generating read descriptions with ground truth locations (requires [k8](https://github.com/attractivechaos/k8))
+
+## References (downloaded automatically by `snakemake`):
 - **CHM13v2.0.fa** [3GB] ([repo](https://github.com/marbl/CHM13), [url](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/chm13v2.0.fa)) -- 
 - **CHM13v2.0chrY.fa** [61MB]: ChrY extracted from **CHM13v2.0.fa**
 - **hg002v1.1.fa** [5.7G] ([repo](https://github.com/marbl/HG002), [url](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.1.fasta.gz)) -- diploid with X, Y and mitochondria
 
-## Real reads                        
+## Real reads (downloaded automatically by `snakemake`):
 - **HG002.fa** [84GB, 28x coverage of CHM13v2.0] (**HG002-rep1** from [repo](https://github.com/marbl/HG002/blob/main/Sequencing_data.md)):
 ```bash
 wget -O HG002.fq.gz https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/scratch/HG002/sequencing/hifirevio/m84005_220827_014912_s1.hifi_reads.fastq.gz
@@ -35,10 +41,6 @@ Reads:
     HG002.fa                                 5,531,855  84,284,194,579      225  15,236.2   56,840
 
 ## Read simulation
-- [pbsim3](https://github.com/yukiteruono/pbsim3) (commit [8429f91](https://github.com/yukiteruono/pbsim3/commit/8429f91)) -- for simulating reads
-- [seqkit](https://github.com/shenwei356/seqkit) (v2.9.0) -- for indexing the reference and shuffling simulated reads
-- [paftools](https://github.com/lh3/minimap2/blob/master/misc/paftools.js) (v2.26-r1175) -- for generating read descriptions with ground truth locations (requires [k8](https://github.com/attractivechaos/k8))
-
 Simulate reads from **ChrY** of **CHM13** and map them on the same chromosome. The simulation is done by `pbsim3` by using the error profiles of **HG002.fq** (AvgQual=23.15, 96.01% reads with >= Q20, 90.52% reads with >= Q30)
 ```bash
 pbsim --strategy wgs --method sample --sample HG002.fa --genome CHM13v2.0chrY.fa --depth 20 --prefix HG002-readschm13-a0.99-d0.1-l10000
