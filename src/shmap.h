@@ -282,15 +282,14 @@ public:
 		}
 	}
 	
-	Mapping bestFixedLength(const RefSegment &segm, const BucketsType &B, const BucketLoc &b, const h2seed_t &p_ht, h2cnt &diff_hist, const qpos_t P_sz, const qpos_t m, const Metric metric) {
+	Mapping bestFixedLength(const RefSegment &segm, rpos_t from, rpos_t to, const h2seed_t &p_ht, h2cnt &diff_hist, const qpos_t P_sz, const qpos_t m, const Metric metric) {
+		ZoneScoped;
 		qpos_t intersection = 0;
 		qpos_t same_strand_seeds = 0;  // positive for more overlapping strands (fw/fw or bw/bw); negative otherwise
 		const auto &t = segm.kmers;
-
-		assert(B.begin(b) < static_cast<int>(t.size()));
-		auto l = B.begin(b);
+		auto l = max(from, 0);
 		auto r = l;
-		auto end = min(rpos_t(t.size()), B.end(b));
+		auto end = min(rpos_t(t.size()), to);
 		assert(l < static_cast<int>(t.size()));
 		
 		Mapping best;
@@ -349,7 +348,7 @@ public:
 			}
 			case Metric::Containment:
 			case Metric::Jaccard: {
-				best_in_bucket = bestFixedLength(tidx.T[b.segm_id], B, b, p_ht, diff_hist, P_sz-H->params.k, lmax, metric);
+				best_in_bucket = bestFixedLength(tidx.T[b.segm_id], B.begin(b), B.end(b), p_ht, diff_hist, P_sz-H->params.k, lmax, metric);
 				break;
 			}
 			default:
@@ -391,9 +390,20 @@ public:
 
 		return best;
 	}
+	
+	double find_theta_Containment(const Seeds &p_unique, qpos_t P_sz, qpos_t lmax, const h2seed_t &p_ht, h2cnt &diff_hist) {
+		auto p_it = std::find_if(p_unique.begin(), p_unique.end(), 
+			[](const Seed& seed) { return seed.hits_in_T > 0; });
+		if (p_it == p_unique.end()) return -1.0;
+		Hit hit = (p_it->hits_in_T == 1) ? tidx.h2single.at(p_it->kmer.h) : tidx.h2multi.at(p_it->kmer.h).front();
+		auto hit_pos = abs_pos ? hit.r : hit.tpos;
+		auto from = hit_pos - lmax;
+		auto to = hit_pos + lmax;
+		Mapping best_around_hit = bestFixedLength(tidx.T[hit.segm_id], from, to, p_ht, diff_hist, P_sz-H->params.k, lmax, H->params.metric);
+		return best_around_hit.score() - 0.01;
+	}
 
 	inline void map_read(const params_t &params, const FracMinHash &sketcher, ofstream &paulout, ofstream &unmapped_out, const string &query_id, const string &P) {
-		FrameMark;
 		ZoneScoped;
 
 		C.clear();
@@ -411,7 +421,7 @@ public:
 				//const char *P = seq->seq.s;
 				sketch_t p = sketcher.sketch(P);
 				qpos_t m = p.size();
-				T.stop("sketching");
+			T.stop("sketching");
 
 			T.start("prepare");
 				//char *query_id = seq->name.s;
@@ -436,19 +446,12 @@ public:
 				}
 				C.inc("possible_matches", possible_matches);
 
-				//qpos_t lmax = qpos_t(m / params.theta);					// maximum length of a similar mapping
-				//qpos_t lmin = qpos_t(ceil(p.size() * params.theta));					// maximum length of a similar mapping
-				//qpos_t lmax = qpos_t(p.size() / params.theta);					// maximum length of a similar mapping
-				//qpos_t lmax = p.size();					// maximum length of a similar mapping
-				//qpos_t bucket_l = lmax;
-
-				//double coef = 1.0;// * nonzero / p.size();
-				//cerr << "coef: " << coef << endl;
-				//double new_theta = params.theta;
-				//cerr << "theta: " << params.theta << " -> " << new_theta << endl;
-
-				//double theta2 = params.theta + params.min_diff;
-				double theta2 = params.theta - params.min_diff;
+				auto lmax = m;// / theta;
+				//auto theta = max(params.theta, find_theta_Containment(p_unique, P.size(), lmax, p_ht, diff_hist));
+				auto theta = params.theta;
+				//cerr << fixed << setprecision(3) << "theta: " << theta << endl;
+				//double theta2 = theta + params.min_diff;
+				double theta2 = theta - params.min_diff;
 				qpos_t S = qpos_t((1.0 - theta2) * m) + 1;			// any similar mapping includes at least 1 seed match
 
 				BucketsType B;
@@ -471,8 +474,10 @@ public:
 				cerr << "kmers: " << m << " seeds: " << S;
 				cerr << "seeded_buckets: " << C.count("seeded_buckets") << " total_matches: " << C.count("total_matches") << endl;
 				cerr << "B: bucket_halflen=" << B.get_bucket_halflen() << " i=" << B.i << " seeds=" << B.seeds << endl;
-				for (const auto &[b, content]: B.buckets)
-					cerr << "bucket: " << b << " [" << B.begin(b) << ", " << B.end(b) << "), seed matches: " << content.matches << ", lcs: " << lcs(tidx.T[b.segm_id].kmers, B, b, p_ht) << endl;
+//				for (const auto &[b, content]: B.buckets) {
+//					auto containment = find_theta_Containment(p_unique, P.size(), lmax, p_ht, diff_hist);
+//					cerr << "bucket: " << b << "t [" << B.begin(b) << ", " << B.end(b) << "), nucl [" << B.from_nucl(b, tidx) << ", " << B.to_nucl(b, tidx) << "), seed matches: " << content.matches << ", sh: " << sh << ", containment: " << containment << endl;
+//				}
 			}
 
 			B.propagate_seeds_to_buckets();
@@ -482,12 +487,11 @@ public:
 			
 			auto sorted_buckets = B.get_sorted_buckets();
 
-			auto lmax = m;// / params.theta;
 			int lost_on_pruning = 1;
 			std::optional<Mapping> best, best2;
 			T.start("match_rest");
 				T.start("match_rest_for_best");
-					best = match_rest(P.size(), m, lmax, p_unique, B, sorted_buckets, diff_hist, p_ht, params.theta, std::nullopt, query_id, &lost_on_pruning, params.max_overlap);
+					best = match_rest(P.size(), m, lmax, p_unique, B, sorted_buckets, diff_hist, p_ht, theta, std::nullopt, query_id, &lost_on_pruning, params.max_overlap);
 				T.stop("match_rest_for_best");
 				T.start("match_rest_for_best2");
 					if (best) {
@@ -521,7 +525,7 @@ public:
 			} else {
 				os = &unmapped_out;
 			}
-			best->set_global_stats(params.theta, params.min_diff, m, query_id.c_str(), P.size(), params.k, S, C.count("total_matches"), C.count("max_seed_matches"), C.count("seed_matches"), C.count("seeded_buckets"), C.count("final_buckets"), FPTP, T.secs("query_mapping"));  // TODO: disable by flag
+			best->set_global_stats(theta2, params.min_diff, m, query_id.c_str(), P.size(), params.k, S, C.count("total_matches"), C.count("max_seed_matches"), C.count("seed_matches"), C.count("seeded_buckets"), C.count("final_buckets"), FPTP, T.secs("query_mapping"));  // TODO: disable by flag
 			best->print_paf(*os);
 			if (best->mapq() == 60) C.inc("mapq60");
 			if (best->mapq() == 0)  C.inc("mapq0");

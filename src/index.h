@@ -33,6 +33,10 @@ public:
 		throw std::runtime_error("Segment not found: " + segm_id);
 	}
 
+	const RefSegment& get_segment(const segm_t segm_id) const {
+		return T[segm_id];
+	}
+
 	void get_kmer_stats() const {
 		std::vector<rpos_t> hist(10, 0);
 		rpos_t max_occ = 0;
