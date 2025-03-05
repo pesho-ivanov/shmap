@@ -6,9 +6,6 @@ scripts/__pycache__
 simulations
 src/eskemap
 src/sweep
-evals/out*
-evals/snake_out*
-evals/reads/
 .vscode/settings.json
 *.out
 *.err
@@ -29,14 +26,10 @@ callgrind.out.*
 simulations/
 *.fai
 map
-evals/refs/
-evals/evals-table.tex
 release/shmap
 release_flag
 debug/shmap
 test_shmap
-evals/chm13_gt.paf
-evals/simple_test_gt.paf
 debug_flag
 src/fa2tsv
 *.tsv
