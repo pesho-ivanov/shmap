@@ -1,6 +1,9 @@
 from snakemake.utils import min_version
 min_version("6.15")
 
+shell.executable("/bin/bash")  # Ensure shell compatibility
+print_shellcmds = True
+
 import os
 
 config = {
@@ -84,7 +87,7 @@ rule all:
     input:
         expand("{outdir}/shmap/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}/{params}/shmap.eval", 
                outdir=config["outdir"], 
-               zip,
+               zip_=True,
                refname=datasets['refnames'],
                readsim_refname=datasets['readsim_refnames'],
                depth=datasets['depths'],

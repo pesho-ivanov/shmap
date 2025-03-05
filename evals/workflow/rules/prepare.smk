@@ -4,8 +4,8 @@ rule gen_reads:
         ref = config["ref_dir"] + "/{readsim_refname}.fa",
         real_reads = config["hg002"]["fq"]
     output:
-        reads = "reads/{readsim_refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}.fa",
-        one_read = "reads/{readsim_refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}.oneread.fa"
+        reads = "reads/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}.fa",
+        one_read = "reads/{refname}-reads{readsim_refname}-a{accuracy}-d{depth}-l{meanlen}.oneread.fa"
     params:
         reads_prefix = lambda w: f"{w.readsim_refname}-reads{w.readsim_refname}-a{w.accuracy}-d{w.depth}-l{w.meanlen}",
         real_reads_tmp = "reads/HG002.fq.tmp"
@@ -41,8 +41,8 @@ rule gen_reads:
         rm -f "{params.reads_prefix}"_*.maf "{params.reads_prefix}"_*.ref "{params.reads_prefix}"_*.fastq {params.real_reads_tmp}
         
         # Perform liftover if needed
-        if [ "{wildcards.readsim_refname}" != "{config[refname]}" ]; then
-            echo "Lifting over reads from {wildcards.readsim_refname} to {config[refname]}"
+        if [ "{wildcards.readsim_refname}" != "{wildcards.refname}" ]; then
+            echo "Lifting over reads from {wildcards.readsim_refname} to {wildcards.refname}"
             python {config[stream_lift_fasta]} {output.reads} {config[chain_file]} > {output.reads}.lifted
             mv {output.reads}.lifted {output.reads}
         fi
