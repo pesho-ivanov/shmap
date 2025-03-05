@@ -1,7 +1,0 @@
-[90m[main 2025-01-23T00:14:00.004Z][0m [File Watcher (node.js)] Request to start watching: /home/pesho/.config/Cursor/User (excludes: <none>, includes: <all>, filter: <none>, correlationId: <none>),/home/pesho/.config/Cursor/User/settings.json (excludes: <none>, includes: <all>, filter: <none>, correlationId: <none>)
-[90m[main 2025-01-23T00:14:00.016Z][0m Sending env to running instance...
-[90m[main 2025-01-23T00:14:00.018Z][0m [File Watcher (node.js)] Started watching: '/home/pesho/.config/Cursor/User'
-[90m[main 2025-01-23T00:14:00.019Z][0m [File Watcher (node.js)] Started watching: '/home/pesho/.config/Cursor/User/settings.json'
-[90m[main 2025-01-23T00:14:00.061Z][0m Sent env to running instance. Terminating...
-[90m[main 2025-01-23T00:14:00.061Z][0m Lifecycle#kill()
-[90m[main 2025-01-23T00:14:00.061Z][0m Lifecycle#onWillShutdown.fire()
