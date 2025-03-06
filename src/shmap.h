@@ -48,7 +48,7 @@ public:
 	//using h2cnt = gtl::flat_hash_map<hash_t, qpos_t>;
 
 	// Returns unique kmers with at least one match in T
-	Seeds select_kmers(sketch_t& p) {
+	Seeds unique_elements_with_info(sketch_t& p) {
 		ZoneScoped;
 		T.start("group_kmers");
 			sort(p.begin(), p.end(), [](const Kmer &a, const Kmer &b) {
@@ -87,6 +87,18 @@ public:
 		C.inc("kmers_notmatched", p.size() - nonzero);
 
 		return p_unique;
+	}
+
+	qpos_t more_seeds_if_cheap(qpos_t S, const Seeds &p_unique) {
+		ZoneScoped;
+		qpos_t original_S = S;
+		while (S < (int)p_unique.size() && p_unique[S].hits_in_T <= 1) {
+			S++;
+		}
+		if (S > original_S && H->params.verbose >= 2) {
+			cerr << "Increased seeds from " << original_S << " to " << S << endl;
+		}
+		return S;
 	}
 
 	void match_seeds(const Seeds &p_unique, BucketsType &B, qpos_t S) {
@@ -429,7 +441,7 @@ public:
 				C.inc("read_len", P.size());
 
 				T.start("seeding");
-					Seeds p_unique = select_kmers(p);
+					Seeds p_unique = unique_elements_with_info(p);
 				T.stop("seeding");
 
 				h2seed_t p_ht;
@@ -465,6 +477,8 @@ public:
 				C.inc("kmers_unique", p_unique.size());
 				C.inc("kmers_seeds", S);
 			T.stop("prepare");
+
+			//S = more_seeds_if_cheap(S, p_unique);
 
 			T.start("match_seeds");
 				match_seeds(p_unique, B, S);
