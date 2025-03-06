@@ -113,7 +113,7 @@ public:
     // TODO: change to use std::convertible_to<std::string> when C++20 is available
     template <typename... Args>
     void init(Args&&... s) {
-        (void)std::initializer_list<std::string>{std::string(std::forward<Args>(s))...};
+        ((timers_[std::string(std::forward<Args>(s))] = Timer()), ...);
     }
 
     void start(const std::string& name) {
@@ -210,7 +210,7 @@ private:
 public:
     template <typename... Args>
     void init(Args&&... s) {
-        (void)std::initializer_list<std::string>{std::string(std::forward<Args>(s))...};
+        ((counters_[std::string(std::forward<Args>(s))] = Counter()), ...);
     }
 
     void inc(const std::string& name, int64_t value = 1) {
