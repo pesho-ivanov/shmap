@@ -127,7 +127,7 @@ public:
 				//		}
 				//	T.stop("match_seeds_single");
 				} else {
-					BucketsType b2m(B.get_bucket_halflen());
+					BucketsType b2m(B.halflen);
 					for (const auto &hit: tidx.h2multi.at(seed.kmer.h)) {
 						BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
 						b2m.add_to_pos(hit, content);
@@ -371,7 +371,7 @@ public:
 		return best_in_bucket;
 	}
 	
-	std::optional<Mapping> match_rest(qpos_t P_sz, qpos_t m, qpos_t lmax, const Seeds &p_unique, const BucketsType &B, vector<typename BucketsType::bucket_map_t::value_type> &sorted_buckets, h2cnt &diff_hist, const h2seed_t &p_ht,
+	std::optional<Mapping> match_rest(qpos_t P_sz, qpos_t m, qpos_t lmax, const Seeds &p_unique, const BucketsType &B, vector< pair<BucketLoc, BucketContent> > &sorted_buckets, h2cnt &diff_hist, const h2seed_t &p_ht,
 			double thr, std::optional<Mapping> forbidden, const string &query_id, int *lost_on_pruning, double max_overlap) {
 		ZoneScoped;
 		int lost_on_seeding = (0);
@@ -468,9 +468,9 @@ public:
 
 				BucketsType B;
 				if (abs_pos)
-					B.set_bucket_halflen(P.size());
+					B.halflen = P.size();
 				else
-					B.set_bucket_halflen(m); ///params.theta);
+					B.halflen = m; // / params.theta;
 
 				C.inc("kmers_sketched", m);
 				C.inc("kmers", m);
@@ -487,7 +487,7 @@ public:
 			if (H->params.verbose >= 2) {
 				cerr << "kmers: " << m << " seeds: " << S;
 				cerr << "seeded_buckets: " << C.count("seeded_buckets") << " total_matches: " << C.count("total_matches") << endl;
-				cerr << "B: bucket_halflen=" << B.get_bucket_halflen() << " i=" << B.i << " seeds=" << B.seeds << endl;
+				cerr << "B: bucket_halflen=" << B.halflen << " i=" << B.i << " seeds=" << B.seeds << endl;
 //				for (const auto &[b, content]: B.buckets) {
 //					auto containment = find_theta_Containment(p_unique, P.size(), lmax, p_ht, diff_hist);
 //					cerr << "bucket: " << b << "t [" << B.begin(b) << ", " << B.end(b) << "), nucl [" << B.from_nucl(b, tidx) << ", " << B.to_nucl(b, tidx) << "), seed matches: " << content.matches << ", sh: " << sh << ", containment: " << containment << endl;

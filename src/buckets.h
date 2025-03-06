@@ -67,29 +67,23 @@ struct BucketContent {
 
 template<bool abs_pos>
 class Buckets {
+	using bucket_map_t = ankerl::unordered_dense::map<BucketLoc, BucketContent, BucketHash, std::equal_to<BucketLoc> >;
+
 public:
-	qpos_t len;  // half-length; the bucket spans [r*len, (r+2)*len)
+	qpos_t halflen;  // half-length; the bucket spans [r*len, (r+2)*len)
 
 	int i;  				// index of the next kmer for all buckets
 	int seeds; 				// number of seeds in all buckets
 
-	Buckets() : len(-1), i(0), seeds(0) {}
-	Buckets(qpos_t len) : len(len), i(0), seeds(0) {}
-
-	qpos_t get_bucket_halflen() const {
-		return len;
-	}
-
-	void set_bucket_halflen(qpos_t len) {
-		this->len = len;
-	}
+	Buckets() : halflen(-1), i(0), seeds(0) {}
+	Buckets(qpos_t halflen) : halflen(halflen), i(0), seeds(0) {}
 
 	rpos_t begin(const BucketLoc& b) const {
-		return b.b * len;
+		return b.b * halflen;
 	}
 
 	rpos_t end(const BucketLoc& b) const {
-		return (b.b + 2) * len;
+		return (b.b + 2) * halflen;
 	}
 
 	void propagate_seeds_to_buckets() {
@@ -102,11 +96,9 @@ public:
 		}
 	}
 
-	using bucket_map_t = ankerl::unordered_dense::map<BucketLoc, BucketContent, BucketHash, std::equal_to<BucketLoc> >;
-
     void add_to_pos(const Hit& hit, const BucketContent &content) {
 		//ZoneScoped;
-		qpos_t b = (abs_pos ? hit.r : hit.tpos) / len;
+		qpos_t b = (abs_pos ? hit.r : hit.tpos) / halflen;
         buckets[ BucketLoc(hit.segm_id, b) ] += content;
         if (b>0) buckets[ BucketLoc(hit.segm_id, b-1) ] += content;
     }
@@ -115,18 +107,6 @@ public:
 		//ZoneScoped;
         buckets[b] += content;
     }
-
-	bool delete_bucket(BucketLoc b) {
-		ZoneScoped;
-		return buckets.erase(b);
-	}
-
-	qpos_t get_matches(const BucketLoc& b) const {
-		//ZoneScoped;
-		auto it = buckets.find(b);
-		if (it == buckets.end()) return 0;
-		return it->second.matches;
-	}
 
 	int size() const {
 		return buckets.size();
@@ -145,82 +125,3 @@ public:
 };
 
 } // namespace sweepmap
-
-
-//	class OrderedIterator {
-//	public:
-//		using sorted_vector_t = std::vector<std::reference_wrapper<bucket_map_t::value_type>>;
-//		using sorted_iterator = typename sorted_vector_t::iterator;
-//		using iterator_category = std::forward_iterator_tag;
-//		using value_type = BucketLoc;
-//		using difference_type = std::ptrdiff_t;
-//		using pointer = BucketLoc*;
-//		using reference = BucketLoc&;
-//
-//		OrderedIterator(sorted_iterator it) : it_(it) {}
-//
-//		bucket_map_t::value_type& operator*() {
-//			return it_->get();
-//		}
-//
-//        bucket_map_t::value_type* operator->() {
-//            return &(it_->get());
-//        }
-//
-//		OrderedIterator& operator++() {
-//			++it_;
-//			return *this;
-//		}
-//
-//		bool operator!=(const OrderedIterator& other) const {
-//			return it_ != other.it_;
-//		}
-//
-////	private:
-//		sorted_iterator it_;
-//	};
-//
-//    // TODO: sort once, not every time; make sure nothing changes
-//	// Helper to create a sorted vector
-//	std::vector<std::reference_wrapper<bucket_map_t::value_type>> get_sorted_buckets() {
-//		std::vector<std::reference_wrapper<bucket_map_t::value_type>> sorted_buckets;
-//		sorted_buckets.reserve(buckets.size());
-//		for (auto& bucket : buckets) {
-//			sorted_buckets.push_back(std::ref(bucket));
-//		}
-//		std::sort(sorted_buckets.begin(), sorted_buckets.end(),
-//				  [](const auto& a, const auto& b) {
-//					  // Define sorting criteria, e.g., by segm_id and then r
-//					//  if (a.get().first.segm_id != b.get().first.segm_id)
-//					//	  return a.get().first.segm_id < b.get().first.segm_id;
-//                    // Sort by decreasing number of matches
-//					  return a.get().second.matches > b.get().second.matches; 
-//				  });
-//		return sorted_buckets;
-//	}
-//
-//	OrderedIterator ordered_begin() {
-//		sorted_buckets_ = get_sorted_buckets();
-//		return OrderedIterator(sorted_buckets_.begin());
-//	}
-//
-//	OrderedIterator ordered_end() {
-//		return OrderedIterator(sorted_buckets_.end());
-//	}
-//
-////private:
-//	std::vector<std::reference_wrapper<bucket_map_t::value_type>> sorted_buckets_;
-
-
-	//struct Pos {
-	//	segm_t segm_id;
-	//	qpos_t r;
-
-	//	Pos() : segm_id(-1), r(-1) {}
-	//	Pos(segm_t segm_id, qpos_t r)
-	//		: segm_id(segm_id), r(r) {}
-	//};
-
-	//Pos get_pos(segm_t segm_id, qpos_t r) const {
-	//	return Pos(segm_id, r, this);
-	//}
