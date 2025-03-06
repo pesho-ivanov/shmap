@@ -39,4 +39,4 @@ out_small
 profile.txt
 debug/
 release/
-test/
+test/out/

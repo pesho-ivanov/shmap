@@ -322,7 +322,7 @@ TEST_CASE("test_select_kmers_pmatches") {
     pmatches_gt.insert({50});
 
     set< vector<qpos_t> > pmatches_res;
-    Seeds S = mapper->select_kmers(p);
+    Seeds S = mapper->unique_elements_with_info(p);
     for (auto s : S) {
         //for (auto m : s.pmatches)
         //    std::cout << m << " ";

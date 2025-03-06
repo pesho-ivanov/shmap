@@ -108,7 +108,7 @@ K_SLOW ?= $(K)
 R_SLOW ?= $(R)
 T_SLOW ?= $(T)
 
-DIR = evals
+DIR = test
 REF_DIR = $(DIR)/refs
 REF = $(REF_DIR)/$(REFNAME).fa
 READSIM_REF = $(REF_DIR)/$(READSIM_REFNAME).fa
@@ -129,14 +129,15 @@ REAL_READS = $(ALLREADS_DIR)/HG002.fq
 PBSIM3     = ~/libs/pbsim3/src/pbsim
 #PBSIM1     = pbsim
 #SAMTOOLS   = samtools
-PAFTOOLS   = $(DIR)/ext/paftools.js
+PAFTOOLS   = ext/paftools.js
 SEQKIT     = ~/miniconda3/bin/seqkit
 
 #LIFT_FASTA = $(DIR)/convert_fasta_with_args.py
 STREAM_LIFT_FASTA = $(DIR)/stream_fasta.py
 CHAIN_FILE = $(DIR)/refs/hg002v1.1_to_CHM13v2.0.chain
 
-SHMAP_PREF         = $(ALLOUT_DIR)/shmap-k$(K)-r$(R)-t$(T)-d$(MIN_DIFF)-o$(MAX_OVERLAP)-m$(METRIC)/$(READS_PREFIX)/shmap-k$(K)-r$(R)-t$(T)-d$(MIN_DIFF)-o$(MAX_OVERLAP)-m$(METRIC)
+SHMAP_PREF = $(DIR)/out/shmap-k$(K)-r$(R)-t$(T)-d$(MIN_DIFF)-o$(MAX_OVERLAP)-m$(METRIC)
+#SHMAP_PREF         = $(ALLOUT_DIR)/shmap-k$(K)-r$(R)-t$(T)-d$(MIN_DIFF)-o$(MAX_OVERLAP)-m$(METRIC)/$(READS_PREFIX)/shmap-k$(K)-r$(R)-t$(T)-d$(MIN_DIFF)-o$(MAX_OVERLAP)-m$(METRIC)
 MINIMAP_PREF       = $(ALLOUT_DIR)/minimap/$(READS_PREFIX)/minimap
 MM2_PREF           = $(ALLOUT_DIR)/mm2-fast/$(READS_PREFIX)/mm2-fast
 BLEND_PREF         = $(ALLOUT_DIR)/blend/$(READS_PREFIX)/blend
@@ -324,9 +325,9 @@ fdr_per_theta: $(SHMAP_BIN) gen_reads
 
 eval_shmap: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_PREF))
-	if [ $(SHMAP_NOINDEX) -ne 1 ]; then \
-		$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) -m $(METRIC) $(SHMAP_ARGS) 2>/dev/null >/dev/null; \
-	fi
+#	if [ $(SHMAP_NOINDEX) -ne 1 ]; then \
+#		$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) -m $(METRIC) $(SHMAP_ARGS) 2>/dev/null >/dev/null; \
+#	fi
 	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) -m $(METRIC) $(SHMAP_ARGS)    2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
 	$(PAFTOOLS) mapeval -r 0.1 $(SHMAP_PREF).paf 2>/dev/null | tee $(SHMAP_PREF).eval || true
 	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_PREF).paf > $(SHMAP_PREF).wrong 2>/dev/null || true
