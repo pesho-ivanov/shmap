@@ -5,6 +5,7 @@
 #include "index.h"
 //#include "edlib.h"
 #include "types.h"
+#include "buckets.h"
 
 namespace sweepmap {
 

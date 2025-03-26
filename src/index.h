@@ -25,6 +25,10 @@ public:
 	gtl::flat_hash_map<hash_t, gtl::vector<Hit>> h2multi;   // all sketched kmers with >1 hits
 
 	Handler *H;
+	
+	int segments() const {
+		return (int)T.size();
+	}
 
 	const RefSegment& get_segment(const string &segm_id) const {
 		for (const auto &segm: T)

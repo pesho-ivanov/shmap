@@ -6,67 +6,16 @@
 #include "tracy/public/tracy/Tracy.hpp"
 #include "unordered_dense/include/ankerl/unordered_dense.h"
 
+#include "index.h"
+
+namespace sweepmap {
+    class SketchIndex;
+}
+
 namespace sweepmap {
 
-struct BucketLoc {
-	segm_t segm_id;		// segm_id refers to tidx.T[segm_id]
-	rpos_t b;   		// b refers to interval [lmax*b, lmax*(b+2)) in tidx.T[segm_id].kmers
-
-	BucketLoc() : segm_id(-1), b(-1) {}
-	BucketLoc(segm_t segm_id, rpos_t b) : segm_id(segm_id), b(b) {}
-
-	bool operator==(const BucketLoc &other) const {
-		return segm_id == other.segm_id && b == other.b;
-	}
-	friend std::ostream& operator<<(std::ostream& os, const BucketLoc& b) {
-		os << "(" << b.segm_id << "," << b.b << ")";
-		return os;
-	}
-};
-struct BucketHash {
-	std::size_t operator()(const BucketLoc& b) const {
-		return std::hash<segm_t>()(b.segm_id) ^ (std::hash<rpos_t>()(b.b) << 1);
-	}
-};
-
-//struct LightMatch {
-//	qpos_t r;  // TODO: shrink to [0, 2*bucket_halflen)
-//	qpos_t seed_num;	// [0, |p_unique|)
-//};
-
-struct BucketContent {
-	// propagated from Buckets, then updated individually
-	int i;   // index of the next kmer for this bucket
-	qpos_t seeds;
-
-	// not propagated from Buckets
-	qpos_t matches;
-	int codirection;
-	rpos_t r_min, r_max;
-
-	BucketContent()
-		: i(-1), seeds(0), matches(0), codirection(0), r_min(std::numeric_limits<rpos_t>::max()), r_max(-1) {}
-	BucketContent(qpos_t matches, qpos_t seeds, int codirection, rpos_t r_min, rpos_t r_max)
-		: i(-1), seeds(seeds), matches(matches), codirection(codirection), r_min(r_min), r_max(r_max) {}
-
-	friend std::ostream& operator<<(std::ostream& os, const BucketContent& b) {
-		os << "(i=" << b.i << ", seeds=" << b.seeds << ", matches=" << b.matches << ", codirection=" << b.codirection << ", r=[" << b.r_min << "," << b.r_max << "])";
-		return os;
-	}
-
-	BucketContent operator+=(const BucketContent &other) {
-		//ZoneScoped;
-		matches += other.matches;
-		seeds += other.seeds;
-		codirection += other.codirection;
-		r_min = std::min(r_min, other.r_min);
-		r_max = std::max(r_max, other.r_max);
-		return *this;
-	}
-};
-
 template<bool abs_pos>
-class Buckets {
+class BucketsHash {
 	using bucket_map_t = ankerl::unordered_dense::map<BucketLoc, BucketContent, BucketHash, std::equal_to<BucketLoc> >;
 
 public:
@@ -75,8 +24,10 @@ public:
 	int i;  				// index of the next kmer for all buckets
 	int seeds; 				// number of seeds in all buckets
 
-	Buckets() : halflen(-1), i(0), seeds(0) {}
-	Buckets(qpos_t halflen) : halflen(halflen), i(0), seeds(0) {}
+	bucket_map_t buckets;
+
+	BucketsHash() : halflen(-1), i(0), seeds(0) {}
+	BucketsHash(qpos_t halflen) : halflen(halflen), i(0), seeds(0) {}
 
 	rpos_t begin(const BucketLoc& b) const {
 		return b.b * halflen;
@@ -120,8 +71,108 @@ public:
 		});
 		return sorted_buckets;
 	}
-
-	bucket_map_t buckets;
 };
+
+template<bool abs_pos>
+class Buckets {
+	static int const MAX_SEGMENTS = 100;
+public:
+	const SketchIndex &tidx;
+	qpos_t min_halflen;
+	qpos_t halflen;  // half-length; the bucket spans [r*len, (r+2)*len)
+
+	int i;  				// index of the next kmer for all buckets
+	int seeds; 				// number of seeds in all buckets
+							//
+    std::vector<BucketContent> buckets[MAX_SEGMENTS];   // buckets[segm_id][b]
+	std::vector<BucketLoc> non_empty_buckets_with_repeats;
+
+	Buckets(const SketchIndex &tidx, qpos_t min_halflen)
+	: tidx(tidx), min_halflen(min_halflen), halflen(-1), i(0), seeds(0) {
+		if (tidx.segments() > MAX_SEGMENTS)
+			throw std::runtime_error("Number of segments exceeds MAX_SEGMENTS (" + std::to_string(MAX_SEGMENTS) + ")");
+		for (int b = 0; b < (int)tidx.segments(); ++b)
+			buckets[b].resize(tidx.get_segment(b).sz / min_halflen + 2);
+	}
+	
+	void clear() {
+		i = 0;
+		seeds = 0;
+		for (auto &[segm_id, b] : non_empty_buckets_with_repeats)
+			buckets[segm_id][b] = BucketContent();
+		non_empty_buckets_with_repeats.clear();
+	}
+	
+	bool set_halflen(qpos_t new_halflen) {
+		//cerr << "min_halflen: " << min_halflen << ", new_halflen: " << new_halflen << endl;
+		halflen = new_halflen;
+		return halflen >= min_halflen;
+	}
+
+	rpos_t begin(const BucketLoc& b) const {
+		return b.b * halflen;
+	}
+
+	rpos_t end(const BucketLoc& b) const {
+		return (b.b + 2) * halflen;
+	}
+
+	void propagate_seeds_to_buckets() {
+		for (auto &[segm_id, b] : non_empty_buckets_with_repeats) {
+			//assert(buckets[segm_id][b].i == -1);
+			// works even with repeated buckets
+			buckets[segm_id][b].i = i;
+			buckets[segm_id][b].seeds = seeds;
+		}
+	}
+
+    void add_to_pos(const Hit& hit, const BucketContent &content) {
+		qpos_t b = (abs_pos ? hit.r : hit.tpos) / halflen;
+		//cerr << "halflen: " << halflen << ", b: " << b << ", hit.segm_id: " << hit.segm_id << ", buckets[segm_id].size = " << buckets[hit.segm_id].size() << endl;
+		assert(hit.segm_id < (int)tidx.segments());
+		assert(b < (int)buckets[hit.segm_id].size());
+        buckets[hit.segm_id][b] += content;
+		non_empty_buckets_with_repeats.push_back(BucketLoc(hit.segm_id, b));
+        if (b > 0) {
+			buckets[hit.segm_id][b-1] += content;
+			non_empty_buckets_with_repeats.push_back(BucketLoc(hit.segm_id, b-1));
+		}
+    }
+
+    void add_to_bucket(BucketLoc b, const BucketContent &content) {
+        buckets[b.segm_id][b.b] += content;
+		non_empty_buckets_with_repeats.push_back(b);
+    }
+
+	int size() const {
+		return -1;  // TODO: implement
+	}
+
+	std::vector< std::pair<BucketLoc, BucketContent> > get_sorted_buckets() {
+		ZoneScoped;
+		
+		// Sort non_empty_buckets_with_repeats to prepare for unique operation
+		std::sort(non_empty_buckets_with_repeats.begin(), non_empty_buckets_with_repeats.end(), 
+			[](const BucketLoc &a, const BucketLoc &b) {
+				if (a.segm_id != b.segm_id)
+					return a.segm_id < b.segm_id;
+				return a.b < b.b;
+			});
+		
+		auto unique_end = std::unique(non_empty_buckets_with_repeats.begin(), non_empty_buckets_with_repeats.end());
+		std::vector< std::pair<BucketLoc, BucketContent> > sorted_buckets;
+		
+		for (auto it = non_empty_buckets_with_repeats.begin(); it != unique_end; ++it) {
+			const BucketLoc& loc = *it;
+			sorted_buckets.push_back(std::make_pair(loc, buckets[loc.segm_id][loc.b]));
+		}
+		
+		std::sort(sorted_buckets.begin(), sorted_buckets.end(), [](const auto &a, const auto &b) {
+			return a.second.matches > b.second.matches;
+		});
+		return sorted_buckets;
+	}
+};
+
 
 } // namespace sweepmap

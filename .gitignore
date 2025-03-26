@@ -41,3 +41,4 @@ debug/
 release/
 test/
 test/out/
+src/repomix-output.txt

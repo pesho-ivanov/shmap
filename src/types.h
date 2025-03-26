@@ -70,6 +70,64 @@ struct Match {
 	}
 };
 
+struct BucketLoc {
+	segm_t segm_id;		// segm_id refers to tidx.T[segm_id]
+	rpos_t b;   		// b refers to interval [lmax*b, lmax*(b+2)) in tidx.T[segm_id].kmers
+
+	BucketLoc() : segm_id(-1), b(-1) {}
+	BucketLoc(segm_t segm_id, rpos_t b) : segm_id(segm_id), b(b) {}
+
+	bool operator==(const BucketLoc &other) const {
+		return segm_id == other.segm_id && b == other.b;
+	}
+	friend std::ostream& operator<<(std::ostream& os, const BucketLoc& b) {
+		os << "(" << b.segm_id << "," << b.b << ")";
+		return os;
+	}
+};
+struct BucketHash {
+	std::size_t operator()(const BucketLoc& b) const {
+		return std::hash<segm_t>()(b.segm_id) ^ (std::hash<rpos_t>()(b.b) << 1);
+	}
+};
+
+//struct LightMatch {
+//	qpos_t r;  // TODO: shrink to [0, 2*bucket_halflen)
+//	qpos_t seed_num;	// [0, |p_unique|)
+//};
+
+struct BucketContent {
+	// propagated from Buckets, then updated individually
+	int i;   // index of the next kmer for this bucket
+	qpos_t seeds;
+
+	// not propagated from Buckets
+	qpos_t matches;
+	int codirection;
+	rpos_t r_min, r_max;
+
+	BucketContent()
+		: i(-1), seeds(0), matches(0), codirection(0), r_min(std::numeric_limits<rpos_t>::max()), r_max(-1) {}
+	BucketContent(qpos_t matches, qpos_t seeds, int codirection, rpos_t r_min, rpos_t r_max)
+		: i(-1), seeds(seeds), matches(matches), codirection(codirection), r_min(r_min), r_max(r_max) {}
+
+	friend std::ostream& operator<<(std::ostream& os, const BucketContent& b) {
+		os << "(i=" << b.i << ", seeds=" << b.seeds << ", matches=" << b.matches << ", codirection=" << b.codirection << ", r=[" << b.r_min << "," << b.r_max << "])";
+		return os;
+	}
+
+	BucketContent operator+=(const BucketContent &other) {
+		//ZoneScoped;
+		matches += other.matches;
+		seeds += other.seeds;
+		codirection += other.codirection;
+		r_min = std::min(r_min, other.r_min);
+		r_max = std::max(r_max, other.r_max);
+		return *this;
+	}
+};
+
+
 using Seeds 	 = gtl::vector<Seed>;
 using Matches 	 = gtl::vector<Match>;
 using h2cnt 	 = ankerl::unordered_dense::map<hash_t, qpos_t>;

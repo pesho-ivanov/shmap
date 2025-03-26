@@ -1,8 +1,8 @@
 SHELL := /bin/bash
 CC = g++
 CFLAGS = -g -std=c++2a -march=native -lm -lpthread -isystem ext/ -isystem ext/gtl/include -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
-#CFLAGS += -fno-omit-frame-pointer -fno-inline 
 #CFLAGS += -DTRACY_ENABLE #-DTRACY_NO_EXIT
+#CFLAGS += -fno-omit-frame-pointer -fno-inline 
 #CFLAGS += -DTRACY_NO_CALLSTACK
 #CFLAGS += -DTRACY_NO_FRAME_IMAGE
 #CFLAGS += -DTRACY_NO_SAMPLING
@@ -45,7 +45,7 @@ RELDEPS = $(RELOBJS:.o=.d)
 TESTSRCS = test_shmap.cpp
 TESTSRCS += test_shmap.cpp mapper.cpp
 TESTOBJSFILES = $(TESTSRCS:.cpp=.o)
-TESTDIR = test
+TESTDIR = test/out
 TESTBIN = $(TESTDIR)/test_shmap
 TESTOBJS = $(addprefix $(TESTDIR)/, $(TESTOBJSFILES))
 TESTCFLAGS = -O0 -DDEBUG
@@ -153,9 +153,9 @@ ASTARIX_PREF       = $(ALLOUT_DIR)/astarix/$(READS_PREFIX)/astarix
 
 all: prep release
 	
-release/ext/tracy/public/%.o: ext/tracy/public/%.cpp
+$(RELDIR)/ext/tracy/public/%.o $(DBGDIR)/ext/tracy/public/%.o: ext/tracy/public/%.cpp
 	@mkdir -p $(dir $@)
-	$(CC) -c $(CFLAGS) $(RELCFLAGS) -o $@ $<
+	$(CC) -c $(CFLAGS) $(if $(findstring $(RELDIR),$@),$(RELCFLAGS),$(DBGCFLAGS)) -o $@ $<
 
 prep:
 	@mkdir -p $(DBGDIR) $(RELDIR) $(TESTDIR)

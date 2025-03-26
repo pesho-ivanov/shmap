@@ -12,7 +12,6 @@
 #include "io.h"
 #include "types.h"
 #include "utils.h"
-#include "buckets.h"
 
 namespace sweepmap {
 
