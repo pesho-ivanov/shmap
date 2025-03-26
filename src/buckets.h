@@ -75,11 +75,12 @@ public:
 
 template<bool abs_pos>
 class Buckets {
-	static int const MAX_SEGMENTS = 100;
+	static int    const MAX_SEGMENTS = 100;
+	static qpos_t const MIN_HALFLEN  = 5;
+
 public:
 	const SketchIndex &tidx;
-	qpos_t min_halflen;
-	qpos_t halflen;  // half-length; the bucket spans [r*len, (r+2)*len)
+	qpos_t halflen;  		// half-length; the bucket spans [r*len, (r+2)*len)
 
 	int i;  				// index of the next kmer for all buckets
 	int seeds; 				// number of seeds in all buckets
@@ -87,12 +88,12 @@ public:
     std::vector<BucketContent> buckets[MAX_SEGMENTS];   // buckets[segm_id][b]
 	std::vector<BucketLoc> non_empty_buckets_with_repeats;
 
-	Buckets(const SketchIndex &tidx, qpos_t min_halflen)
-	: tidx(tidx), min_halflen(min_halflen), halflen(-1), i(0), seeds(0) {
+	Buckets(const SketchIndex &tidx)
+	: tidx(tidx), halflen(-1), i(0), seeds(0) {
 		if (tidx.segments() > MAX_SEGMENTS)
 			throw std::runtime_error("Number of segments exceeds MAX_SEGMENTS (" + std::to_string(MAX_SEGMENTS) + ")");
 		for (int b = 0; b < (int)tidx.segments(); ++b)
-			buckets[b].resize(tidx.get_segment(b).sz / min_halflen + 2);
+			buckets[b].resize(tidx.get_segment(b).sz / MIN_HALFLEN + 2);
 	}
 	
 	void clear() {
@@ -104,9 +105,8 @@ public:
 	}
 	
 	bool set_halflen(qpos_t new_halflen) {
-		//cerr << "min_halflen: " << min_halflen << ", new_halflen: " << new_halflen << endl;
 		halflen = new_halflen;
-		return halflen >= min_halflen;
+		return halflen >= MIN_HALFLEN;
 	}
 
 	rpos_t begin(const BucketLoc& b) const {

@@ -20,6 +20,7 @@ namespace sweepmap {
 template <bool no_bucket_pruning, bool one_sweep, bool abs_pos>
 class SHMapper : public Mapper {
 	using BucketsType = Buckets<abs_pos>;
+	//using BucketsType = BucketsHash<abs_pos>;
 
 	const SketchIndex &tidx;
 	Handler *H;
@@ -103,7 +104,7 @@ public:
 
 	void match_seeds(const Seeds &p_unique, BucketsType &B, qpos_t S) {
 		ZoneScoped;
-		rpos_t seed_matches(0), seeded_buckets(0);  // stats
+		rpos_t seed_matches(0);  // stats
 		for (; B.i < (qpos_t)p_unique.size() && B.seeds < S; B.i++) {
 			Seed seed = p_unique[B.i];
 			if (seed.hits_in_T > 0) {
@@ -127,7 +128,7 @@ public:
 				//		}
 				//	T.stop("match_seeds_single");
 				} else {
-					BucketsType b2m(B.halflen);
+					BucketsHash<abs_pos> b2m(B.halflen);
 					for (const auto &hit: tidx.h2multi.at(seed.kmer.h)) {
 						BucketContent content(1, 0, hit.strand == seed.kmer.strand ? 1 : -1, hit.r, hit.r);
 						b2m.add_to_pos(hit, content);
@@ -166,8 +167,6 @@ public:
 			}
 			B.seeds += seed.occs_in_p;
 		}
-		seeded_buckets = B.size();
-		C.inc("seeded_buckets", seeded_buckets);
 		C.inc("seed_matches", seed_matches);
 		C.inc("total_matches", seed_matches);	
 	}
@@ -415,11 +414,12 @@ public:
 		return best_around_hit.score() - 0.01;
 	}
 
-	inline void map_read(const params_t &params, const FracMinHash &sketcher, ofstream &paulout, ofstream &unmapped_out, const string &query_id, const string &P) {
+	inline void map_read(const params_t &params, const FracMinHash &sketcher, ofstream &paulout, ofstream &unmapped_out, const string &query_id, const string &P, BucketsType &B) {
 		ZoneScoped;
 
-		C.clear();
+		//C.clear();
 		T.clear();
+		B.clear();
 
 		C.init("seeds_limit_reached", "mapped_reads", "kmers", "kmers_notmatched", "seeds", "matches",
 			   "seed_matches", "max_seed_matches", "matches_freq", "spurious_matches", "mappings", "J_best",
@@ -466,11 +466,10 @@ public:
 				double theta2 = theta - params.min_diff;
 				qpos_t S = qpos_t((1.0 - theta2) * m) + 1;			// any similar mapping includes at least 1 seed match
 
-				BucketsType B;
 				if (abs_pos)
-					B.halflen = P.size();
+					B.set_halflen(P.size());
 				else
-					B.halflen = m; // / params.theta;
+					B.set_halflen(m); // / params.theta;
 
 				C.inc("kmers_sketched", m);
 				C.inc("kmers", m);
@@ -484,6 +483,19 @@ public:
 				match_seeds(p_unique, B, S);
 			T.stop("match_seeds");
 
+			B.propagate_seeds_to_buckets();
+
+			//int lost_on_seeding = matcher.lost_correct_mapping(query_id, B);
+			//C.inc("lost_on_seeding", lost_on_seeding);
+			
+			auto sorted_buckets = B.get_sorted_buckets();
+			C.inc("seeded_buckets", sorted_buckets.size());
+			
+			//cerr << "sorted_buckets: " << endl;
+			//for (const auto &[b, content]: sorted_buckets) {
+			//	cerr << "bucket: " << b << " matches: " << content.matches << " i: " << content.i << " seeds: " << content.seeds << endl;
+			//}
+
 			if (H->params.verbose >= 2) {
 				cerr << "kmers: " << m << " seeds: " << S;
 				cerr << "seeded_buckets: " << C.count("seeded_buckets") << " total_matches: " << C.count("total_matches") << endl;
@@ -493,13 +505,6 @@ public:
 //					cerr << "bucket: " << b << "t [" << B.begin(b) << ", " << B.end(b) << "), nucl [" << B.from_nucl(b, tidx) << ", " << B.to_nucl(b, tidx) << "), seed matches: " << content.matches << ", sh: " << sh << ", containment: " << containment << endl;
 //				}
 			}
-
-			B.propagate_seeds_to_buckets();
-
-			//int lost_on_seeding = matcher.lost_correct_mapping(query_id, B);
-			//C.inc("lost_on_seeding", lost_on_seeding);
-			
-			auto sorted_buckets = B.get_sorted_buckets();
 
 			int lost_on_pruning = 1;
 			std::optional<Mapping> best, best2;
@@ -563,6 +568,7 @@ public:
 	}
 
 	void map_reads(const string &pFile) {
+		C.init("reads"); 
 		//std::signal(SIGINT, handle_signal);
 
 		cerr << "Mapping reads using SHmap..." << endl;
@@ -581,12 +587,13 @@ public:
 			}
 		}
 
+		BucketsType B(tidx);
 		H->T.start("mapping");
 		H->T.start("query_reading");
-		read_fasta_klib(pFile, [this, &paulout, &unmapped_out, &progress_bar](const string &query_id, const string &P, float mapping_progress) {
+		read_fasta_klib(pFile, [this, &paulout, &unmapped_out, &progress_bar, &B](const string &query_id, const string &P, float mapping_progress) {
 			H->C.inc("reads");
 			H->T.stop("query_reading");
-				map_read(H->params, H->sketcher, paulout, unmapped_out, query_id, P);
+				map_read(H->params, H->sketcher, paulout, unmapped_out, query_id, P, B);
 			H->T.start("query_reading");
 			H->C += C;
 			H->T += T;
