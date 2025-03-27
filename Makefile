@@ -1,7 +1,12 @@
+.PHONY: drop_caches
+
+drop_caches:
+	@sync; echo 3 | sudo tee /proc/sys/vm/drop_caches
+
 SHELL := /bin/bash
 CC = g++
 CFLAGS = -g -std=c++2a -march=native -lm -lpthread -isystem ext/ -isystem ext/gtl/include -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
-#CFLAGS += -DTRACY_ENABLE #-DTRACY_NO_EXIT
+CFLAGS += -DTRACY_ENABLE #-DTRACY_NO_EXIT
 #CFLAGS += -fno-omit-frame-pointer -fno-inline 
 #CFLAGS += -DTRACY_NO_CALLSTACK
 #CFLAGS += -DTRACY_NO_FRAME_IMAGE
@@ -328,7 +333,12 @@ eval_shmap: $(SHMAP_BIN) gen_reads
 #	if [ $(SHMAP_NOINDEX) -ne 1 ]; then \
 #		$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) -m $(METRIC) $(SHMAP_ARGS) 2>/dev/null >/dev/null; \
 #	fi
-	$(TIME_CMD) -o $(SHMAP_PREF).time $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) -m $(METRIC) $(SHMAP_ARGS)    2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
+#	$(TIME_CMD) -o $(SHMAP_PREF).time taskset -c 0 chrt -f 99 $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) -m $(METRIC) $(SHMAP_ARGS)    2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
+	$(TIME_CMD) -o $(SHMAP_PREF).time bash -c '\
+		sudo taskset -c 0 chrt -f 99 $(SHMAP_BIN) \
+		-s $(REF) -p $(READS) -z $(SHMAP_PREF).params \
+		-k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) -m $(METRIC) $(SHMAP_ARGS) \
+		2> >(tee $(SHMAP_PREF).log >&2) > $(SHMAP_PREF).paf'
 	$(PAFTOOLS) mapeval -r 0.1 $(SHMAP_PREF).paf 2>/dev/null | tee $(SHMAP_PREF).eval || true
 	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_PREF).paf > $(SHMAP_PREF).wrong 2>/dev/null || true
 
