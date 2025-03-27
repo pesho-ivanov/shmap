@@ -448,7 +448,6 @@ public:
 				h2cnt diff_hist;
 				rpos_t possible_matches(0);
 				for (const auto &kmer: p_unique) {
-					ZoneScoped;
 					p_ht.insert(make_pair(kmer.kmer.h, kmer));
 					diff_hist[kmer.kmer.h] = kmer.occs_in_p;
 					//if (params.verbose >= 2) {
