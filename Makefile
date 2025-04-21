@@ -1,11 +1,11 @@
-.PHONY: drop_caches
-
-drop_caches:
-	@sync; echo 3 | sudo tee /proc/sys/vm/drop_caches
+#.PHONY: drop_caches
+#
+#drop_caches:
+#	@sync; echo 3 | sudo tee /proc/sys/vm/drop_caches
 
 SHELL := /bin/bash
 CC = g++
-CFLAGS = -g -std=c++2a -march=native -lm -lpthread -isystem ext/ -isystem ext/gtl/include -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
+CFLAGS = -g -std=c++2a -march=native -lm -lpthread -isystem ext/ -isystem ext/gtl/include -Iext/tracy/public -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
 CFLAGS += -DTRACY_ENABLE #-DTRACY_NO_EXIT
 #CFLAGS += -fno-omit-frame-pointer -fno-inline 
 #CFLAGS += -DTRACY_NO_CALLSTACK
@@ -158,17 +158,24 @@ ASTARIX_PREF       = $(ALLOUT_DIR)/astarix/$(READS_PREFIX)/astarix
 
 all: prep release
 	
+#$(RELDIR)/ext/tracy/public/%.o $(DBGDIR)/ext/tracy/public/%.o: ext/tracy/public/%.cpp
+#	@mkdir -p $(dir $@)
+#	$(CC) -c $(CFLAGS) $(if $(findstring $(RELDIR),$@),$(RELCFLAGS),$(DBGCFLAGS)) -o $@ $<
+
 $(RELDIR)/ext/tracy/public/%.o $(DBGDIR)/ext/tracy/public/%.o: ext/tracy/public/%.cpp
 	@mkdir -p $(dir $@)
-	$(CC) -c $(CFLAGS) $(if $(findstring $(RELDIR),$@),$(RELCFLAGS),$(DBGCFLAGS)) -o $@ $<
+	$(CC) -c $(CFLAGS) \
+	    $(if $(findstring $(RELDIR),$@),$(RELCFLAGS),$(DBGCFLAGS)) \
+	    -Wno-missing-field-initializers -Wno-unused-function -Wno-unused-variable -Wno-empty-body \
+	    -o $@ $<
 
 prep:
 	@mkdir -p $(DBGDIR) $(RELDIR) $(TESTDIR)
 	
 debug: prep $(DBGBIN)
 	
-$(DBGDIR)/$(BIN): $(DBGOBJS)
-	$(CC) $(CFLAGS) $(DBGCFLAGS) -o $(DBGDIR)/$(BIN) $^ $(LIBS)
+$(DBGBIN): $(DBGOBJS)
+	$(CC) $(CFLAGS) $(DBGCFLAGS) -o $(DBGBIN) $^ $(LIBS)
 
 $(DBGDIR)/%.o: src/%.cpp
 	@mkdir -p $(dir $@)
