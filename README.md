@@ -12,6 +12,9 @@ Requirements: C++2a
 
 ```
 git clone --recurse-submodules git@github.com:pesho-ivanov/shmap.git
+cd shmap
+make
+./release/shmap -h
 ```
 
 ## Dependencies
