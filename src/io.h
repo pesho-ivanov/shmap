@@ -116,8 +116,8 @@ struct params_t {
 
         // Required options.
         // name, description, shorthand, required argument, boolean option (default is false)
-        p.add("pattern",    "Pattern sequences file (FASTA format)",                            "-p", true, false);
-        p.add("text",       "Text sequence file (FASTA format)",                                "-s", true, false);
+        p.add("pattern",    "Reads file (FASTA format)",                                        "-p", true, false);
+        p.add("text",       "Reference file (FASTA format)",                                    "-s", true, false);
 
         // Options with an argument.
         p.add("ksize",      "K-mer length to be used for sketches (positive integer)",          "-k", false, false);
