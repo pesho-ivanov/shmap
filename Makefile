@@ -47,8 +47,7 @@ RELCFLAGS = -O3 -DNDEBUG
 RELDEPS = $(RELOBJS:.o=.d)
 
 # Test build settings	
-TESTSRCS = test_shmap.cpp
-TESTSRCS += test_shmap.cpp mapper.cpp
+TESTSRCS = test_shmap.cpp mapper.cpp ext/tracy/public/TracyClient.cpp
 TESTOBJSFILES = $(TESTSRCS:.cpp=.o)
 TESTDIR = test/out
 TESTBIN = $(TESTDIR)/test_shmap
@@ -202,6 +201,10 @@ $(TESTDIR)/%.o: src/%.cpp
 	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $(TESTCFLAGS) $(DEPFLAGS) -o $@ $<
 
+$(TESTDIR)/ext/tracy/public/TracyClient.o: ext/tracy/public/TracyClient.cpp
+	@mkdir -p $(dir $@)
+	$(CC) -c $(CFLAGS) $(TESTCFLAGS) $(DEPFLAGS) -o $@ $<
+
 remake: clean all
 
 clean:
@@ -341,13 +344,14 @@ eval_shmap: $(SHMAP_BIN) gen_reads
 #		$(TIME_CMD) -o $(SHMAP_PREF).index.time $(SHMAP_BIN) -s $(REF) -p $(ONE_READ) -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) -m $(METRIC) $(SHMAP_ARGS) 2>/dev/null >/dev/null; \
 #	fi
 #	$(TIME_CMD) -o $(SHMAP_PREF).time taskset -c 0 chrt -f 99 $(SHMAP_BIN) -s $(REF) -p $(READS) -z $(SHMAP_PREF).params -k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) -m $(METRIC) $(SHMAP_ARGS)    2> >(tee $(SHMAP_PREF).log) > $(SHMAP_PREF).paf
-	$(TIME_CMD) -o $(SHMAP_PREF).time bash -c '\
-		sudo taskset -c 0 chrt -f 99 $(SHMAP_BIN) \
+	sudo $(TIME_CMD) -o $(SHMAP_PREF).time bash -c '\
+		taskset -c 0 chrt -f 99 $(SHMAP_BIN) \
 		-s $(REF) -p $(READS) -z $(SHMAP_PREF).params \
 		-k $(K) -r $(R) -t $(T) -d $(MIN_DIFF) -o $(MAX_OVERLAP) -m $(METRIC) $(SHMAP_ARGS) \
 		2> >(tee $(SHMAP_PREF).log >&2) > $(SHMAP_PREF).paf'
 	$(PAFTOOLS) mapeval -r 0.1 $(SHMAP_PREF).paf 2>/dev/null | tee $(SHMAP_PREF).eval || true
 	$(PAFTOOLS) mapeval -r 0.1 -Q 0 $(SHMAP_PREF).paf > $(SHMAP_PREF).wrong 2>/dev/null || true
+	cat $(SHMAP_PREF).time
 
 eval_shmap_noprune: $(SHMAP_BIN) gen_reads
 	@mkdir -p $(shell dirname $(SHMAP_NOPRUNE_PREF))

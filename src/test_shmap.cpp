@@ -344,7 +344,10 @@ TEST_CASE("lcs") {
     t.emplace_back(60, 0x111111, false);
     t.emplace_back(70, 0x222222, false);
 
-    const Buckets<false> B(2);
+    params_t params; // Create dummy params for Handler
+    Handler H(params);
+    SketchIndex tidx(&H);
+    const Buckets<false> B(tidx);
     segm_t segm_id = 0;
     rpos_t block = 1;  // t[2..6) including kmers (30, 0x111111), (40, 0x444444), (50, 0x555555), (60, 0x111111)
                        // result:                      1,              3,              4,              5
@@ -357,13 +360,10 @@ TEST_CASE("lcs") {
     // => seq = {5,1,3,5,1}  -- kmers from p in bucket t[2..6)
     // => lis = {1,3,5}
 
-    params_t params;
     params.k = 25;
     params.hFrac = 0.05;
     params.theta = 0.7;
-    auto H = new Handler(params);
-    auto tidx = new SketchIndex(H);
-    auto mapper = new SHMapper<false, false, false>(*tidx, H);
+    auto mapper = new SHMapper<false, false, false>(tidx, &H);
     qpos_t lcs_cnt = mapper->lcs(t, B, bucket, p_ht);
     CHECK(lcs_cnt == 3);
 }
