@@ -5,7 +5,15 @@
 
 SHELL := /bin/bash
 CC = g++
-CFLAGS = -g -std=c++2a -march=native -lm -lpthread -isystem ext/ -isystem ext/gtl/include -Iext/tracy/public -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -flto -fopenmp #-Wconversion 
+
+# Base compiler flags
+CFLAGS = -g -std=c++2a -lm -lpthread -isystem ext/ -isystem ext/gtl/include -Iext/tracy/public -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -Wno-comment -fpermissive -fopenmp #-Wconversion 
+
+# Add optimization flags unless running in CI
+ifndef CI
+CFLAGS += -march=native -flto
+endif
+
 CFLAGS += -DTRACY_ENABLE #-DTRACY_NO_EXIT
 #CFLAGS += -fno-omit-frame-pointer -fno-inline 
 #CFLAGS += -DTRACY_NO_CALLSTACK
