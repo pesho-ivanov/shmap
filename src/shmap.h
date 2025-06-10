@@ -30,16 +30,16 @@ class SHMapper : public Mapper {
 	Timers T;     // local timers: cleared for each read
 
 private:
-	static SHMapper* current_instance;
+//	static SHMapper* current_instance;
 
-	static void handle_signal(int signal) {
-		if (current_instance) {
-			std::cout << "Signal received: " << signal << "\n";
-			current_instance->print_stats();
-			current_instance->print_time_stats();
-		}
-		std::exit(0);
-	}
+//	static void handle_signal(int signal) {
+//		if (current_instance) {
+//			std::cout << "Signal received: " << signal << "\n";
+//			current_instance->print_stats();
+//			current_instance->print_time_stats();
+//		}
+//		std::exit(0);
+//	}
 
 public:
 	//using Buckets = std::unordered_map<bucket_t, qpos_t>;
@@ -178,13 +178,13 @@ public:
             cerr << "tThres = " << H->params.theta << " outside of [0,1]." << endl;
             exit(1);
         }
-        current_instance = this;  // Set current instance in constructor
+//        current_instance = this;  // Set current instance in constructor
     }
-	virtual ~SHMapper() {
-		if (current_instance == this) {
-			current_instance = nullptr;
-		}
-	}
+//	virtual ~SHMapper() {
+//		if (current_instance == this) {
+//			current_instance = nullptr;
+//		}
+//	}
 
 	double hseed(qpos_t p, qpos_t seeds, qpos_t matches) {
 		assert(seeds >= matches);
@@ -694,9 +694,9 @@ public:
 };
 
 // Initialize static member
-template <bool no_bucket_pruning, bool one_sweep, bool abs_pos>
-SHMapper<no_bucket_pruning, one_sweep, abs_pos>* 
-	SHMapper<no_bucket_pruning, one_sweep, abs_pos>::current_instance = nullptr;
+//template <bool no_bucket_pruning, bool one_sweep, bool abs_pos>
+//SHMapper<no_bucket_pruning, one_sweep, abs_pos>* 
+//	SHMapper<no_bucket_pruning, one_sweep, abs_pos>::current_instance = nullptr;
 
 }  // namespace sweepmap
 
