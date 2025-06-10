@@ -207,8 +207,8 @@ integration_test: $(RELBIN)
 	@echo "Running integration tests..."
 	@# Create small test files if they don't exist
 	@mkdir -p test/data
-	@if [ ! -f test/data/ref.fa ]; then echo ">ref\nACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT" > test/data/ref.fa; fi
-	@if [ ! -f test/data/reads.fa ]; then echo ">read1\nACGTACGTACGTACGTACGTACGTACGTACGTACGT\n>read2\nCGTACGTACGTACGTACGTACGTACGTACGTA" > test/data/reads.fa; fi
+	@if [ ! -f test/data/ref.fa ]; then printf ">ref\nACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT\n" > test/data/ref.fa; fi
+	@if [ ! -f test/data/reads.fa ]; then printf ">read1\nACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT\n>read2\nCGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT\n" > test/data/reads.fa; fi
 	@# Run shmap with small test data (lower thresholds for small data)
 	@$(RELBIN) -s test/data/ref.fa -p test/data/reads.fa -k 8 -r 1.0 -t 0.1 > test/data/output.paf 2>test/data/error.log
 	@# Check that shmap ran successfully (exit code 0) and created output
