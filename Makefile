@@ -197,11 +197,26 @@ $(RELDIR)/%.o: src/%.cpp
 	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $(RELCFLAGS) $(DEPFLAGS) -o $@ $<
 
-test: prep $(TESTBIN) run_test
+test: prep $(TESTBIN) run_test integration_test
 	
 run_test:
-	@echo "Running tests..."
+	@echo "Running unit tests..."
 	@$(TESTBIN) 2>/dev/null || { echo "Tests failed, running with error output:"; $(TESTBIN); }
+
+integration_test: $(RELBIN)
+	@echo "Running integration tests..."
+	@# Create small test files if they don't exist
+	@mkdir -p test/data
+	@if [ ! -f test/data/ref.fa ]; then echo ">ref\nACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT" > test/data/ref.fa; fi
+	@if [ ! -f test/data/reads.fa ]; then echo ">read1\nACGTACGTACGTACGTACGTACGTACGTACGTACGT\n>read2\nCGTACGTACGTACGTACGTACGTACGTACGTA" > test/data/reads.fa; fi
+	@# Run shmap with small test data (lower thresholds for small data)
+	@$(RELBIN) -s test/data/ref.fa -p test/data/reads.fa -k 8 -r 1.0 -t 0.1 > test/data/output.paf 2>test/data/error.log
+	@# Check that shmap ran successfully (exit code 0) and created output
+	@if [ $$? -eq 0 ] && [ -f test/data/output.paf ]; then \
+		echo "✓ Integration test passed: shmap ran successfully"; \
+	else \
+		echo "✗ Integration test failed"; cat test/data/error.log; exit 1; \
+	fi
 
 $(TESTBIN): $(TESTOBJS)
 	$(CC) $(CFLAGS) $(TESTCFLAGS) -o $(TESTBIN) $^ $(LIBS)
