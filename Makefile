@@ -192,7 +192,8 @@ $(RELDIR)/%.o: src/%.cpp
 test: prep $(TESTBIN) run_test
 	
 run_test:
-	$(TESTBIN)
+	@echo "Running tests..."
+	@$(TESTBIN) 2>/dev/null || { echo "Tests failed, running with error output:"; $(TESTBIN); }
 
 $(TESTBIN): $(TESTOBJS)
 	$(CC) $(CFLAGS) $(TESTCFLAGS) -o $(TESTBIN) $^ $(LIBS)
